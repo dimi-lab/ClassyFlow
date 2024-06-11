@@ -1,3 +1,10 @@
+# Nexflow items
+.nextflow*
+data
+public
+results
+work
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
