@@ -11,9 +11,14 @@ params.output_dir = "${projectDir}/output"
 Channel.fromPath("${params.input_dir}/*/", type: 'dir')
 			.ifEmpty { error "No subdirectories found in ${params.input_dir}" }
 			.set { batchDirs }
+			
+// Import sub-workflows
+include { normalization_wf } from './modules/normalizations'
 
 
 
+
+// -------------------------------------- //
 // Function which prints help message text
 def helpMessage() {
     log.info"""
@@ -35,11 +40,13 @@ process mergeTabDelimitedFiles {
     path subdir
 
     output:
-    path 'merged_dataframe.pkl'
+    path 'merged_dataframe.pkl', emit: batchtable
 
     script:
+    exMarks = "${params.exclude_markers}"
     template 'merge_files.py'
 }
+// -------------------------------------- //
 
 
 // Main workflow
@@ -52,9 +59,10 @@ workflow {
         // Exit out and do not run anything else
         exit 1
     } else {
-		// Pull channel object `batchDirs` from env - see top of file.
-    	mergeTabDelimitedFiles(batchDirs)
+		// Pull channel object `batchDirs` from nextflow env - see top of file.
+    	tables = mergeTabDelimitedFiles(batchDirs)
     
+    	normalization_wf(tables.batchtable, batchDirs)
     }
     
     
