@@ -1,8 +1,8 @@
-// Align reads with BWA MEM
+// Produce Batch based normalization - boxcox
 process boxcox {
 	publishDir(
-        path: "${params.output_dir}/output_reports",
-        pattern: "*.html",
+        path: "${params.output_dir}/normalization_reports",
+        pattern: "*.pdf",
         mode: "copy"
     )
 	
@@ -11,8 +11,8 @@ process boxcox {
 	path batchDir
 	
 	output:
-	path "boxcox_transformed_${idx}.tsv", emit: bc_table
-	path "boxcox_report_${idx}.pdf"
+	path "boxcox_transformed_${batchID}.tsv", emit: bc_table
+	path "boxcox_report_${batchID}.pdf"
 	
 	script:
     batchID = batchDir.baseName
@@ -20,13 +20,39 @@ process boxcox {
 
 }
     
+    
+// Produce Batch based normalization - boxcox
+process quantile {
+	publishDir(
+        path: "${params.output_dir}/normalization_reports",
+        pattern: "*.pdf",
+        mode: "copy"
+    )
+	
+	input:
+	path pickleTable
+	path batchDir
+	
+	output:
+	path "quantile_transformed_${batchID}.tsv", emit: qt_table
+	path "quantile_report_${batchID}.pdf"
+	
+	script:
+    batchID = batchDir.baseName
+	template 'quantile_transformer.py'
+
+}
+    
+    
 workflow normalization_wf{
 	take: 
 	batchPickleTable
 	originalDir
 
 	main:
-	//Examine BoxCox Transformation + Zscore (best so far)
+	//Examine Transformations
 	boxcox(batchPickleTable, originalDir)
+	
+	quantile(batchPickleTable, originalDir)
 
 }

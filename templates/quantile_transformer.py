@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.backends.backend_pdf
-from scipy.stats import boxcox
+from sklearn.preprocessing import QuantileTransformer
 
 
 def collect_and_transform(df, pdfOUT, qTyp, nucMark):
@@ -41,34 +41,17 @@ def collect_and_transform(df, pdfOUT, qTyp, nucMark):
 	pdfOUT.savefig( plt.gcf() )
 	
 	
-	### Do Box Cox on per batch level
-	### Need to treat each statistical feature as it's own transformation distribution. 
-	### (Avoid over skew correction) will calc lamda based on provided distribution.
-	### Really should be using all of the data for transformation. 
-	# https://machinelearningmastery.com/power-transforms-with-scikit-learn/
-	# https://www.jstor.org/stable/2109981
-	metrics = []
-	bcDf = df.copy(deep=True).fillna(0)
-	for fld in list(bcDf.filter(regex='(Min|Max|Median|Mean|StdDev)')):
-		preMu = bcDf[fld].mean()
-		# print("{} -> {:.2f} mu".format(fld,preMu))
-		try:
-			nArr, mxLambda = boxcox(bcDf[fld].add(1).values)
-			bcDf[fld] = nArr
-			mxLambda = "{:.3f}".format(mxLambda)
-		except:
-			bcDf[fld] = 0
-			mxLambda = 'Failed'
-		metrics.append([fld,preMu,mxLambda,bcDf[fld].mean(),bcDf[fld].min(),bcDf[fld].max()])
-		
-	bxcxMetrics = pd.DataFrame(metrics, columns =['Feature','Pre_Mean','Lambda','Post_Mean','Post_Min','Post_Max'])
-	bxcxMetrics.to_csv("BoxCoxRecord.csv")
+	# This method transforms the features to follow a uniform or a normal distribution. 
+	# Therefore, for a given feature, this transformation tends to spread out the most frequent values. 
+	# It also reduces the impact of (marginal) outliers: this is therefore a robust preprocessing scheme.
+	scaler = QuantileTransformer(n_quantiles=800, random_state=0)
 	
-	tmpPlot = bxcxMetrics.loc[bxcxMetrics['Lambda'] != 'Failed']
-	bxcxMetrics.plot.scatter(y='Pre_Mean', x='Post_Mean', figsize = (12, 12) )
-	plt.title("Feature Avg Pre v. Post (BoxCox)")
-	pdfOUT.savefig( plt.gcf() )
-	
+	# grab just quant fields
+	imgMets = df.filter(regex='(Min|Max|Median|Mean|StdDev)',axis=1)
+	df_norm = pd.DataFrame(scaler.fit_transform(imgMets), columns=imgMets.columns)
+
+	df_a = df[df.columns.difference(imgMets.columns)]
+	bcDf = pd.concat([df_a.reset_index(drop=True), df_norm], axis=1).fillna(0)	
 	
 	colNames = list(filter(lambda x:'Mean' in x, df.columns.tolist()))
 	NucOnly = list(filter(lambda x:nucMark in x, colNames))[0]
@@ -83,7 +66,7 @@ def collect_and_transform(df, pdfOUT, qTyp, nucMark):
 		
 		fig, ax2 = plt.subplots(figsize=(12,12))
 		scMarks = sns.scatterplot(x='Original_Value', y='Transformed_Value', data=qqDF, hue="Mark", ax=ax2)
-		ax2.set_title("BoxCox Transformation: {}".format(hd))
+		ax2.set_title("Quantile Transformation: {}".format(hd))
 		ax2.axline((0, 0), (nuc1['Original_Value'].max(), nuc1['Transformed_Value'].max()), linewidth=2, color='r')
 		pdfOUT.savefig( scMarks.get_figure() )
 		
@@ -95,7 +78,7 @@ def collect_and_transform(df, pdfOUT, qTyp, nucMark):
 	fig, ax1 = plt.subplots(figsize=(24,8))
 	origVals = sns.boxplot(x='Slide', y='value', color="#50C878", data=df_melted, ax=ax1, showfliers = False)
 	plt.setp(ax1.get_xticklabels(), rotation=40, ha="right")
-	ax1.set_title('Combined Marker Distribution (boxcox values)')
+	ax1.set_title('Combined Marker Distribution (quantile values)')
 	pdfOUT.savefig( origVals.get_figure() )
 	
 	return bcDf
@@ -106,11 +89,11 @@ if __name__ == "__main__":
 	quantType = '${params.qupath_object_type}'
 	nucMark = '${params.nucleus_marker}'
 			
-	pdfOUT = matplotlib.backends.backend_pdf.PdfPages("boxcox_report_{}.pdf".format(myFileIdx))
+	pdfOUT = matplotlib.backends.backend_pdf.PdfPages("quantile_report_{}.pdf".format(myFileIdx))
 	trnsfTBL = collect_and_transform(myData, pdfOUT, quantType, nucMark)
 	pdfOUT.close()
 	
-	trnsfTBL.to_csv("boxcox_transformed_{}.tsv".format(myFileIdx), sep="\t") 	
+	trnsfTBL.to_csv("quantile_transformed_{}.tsv".format(myFileIdx), sep="\t") 	
 	
 	
 
