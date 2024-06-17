@@ -7,15 +7,13 @@ process boxcox {
     )
 	
 	input:
-	path pickleTable
-	path batchDir
+	tuple val(batchID), path(pickleTable)
 	
 	output:
 	path "boxcox_transformed_${batchID}.tsv", emit: bc_table
 	path "boxcox_report_${batchID}.pdf"
 	
 	script:
-    batchID = batchDir.baseName
 	template 'boxcox_transformer.py'
 
 }
@@ -30,16 +28,34 @@ process quantile {
     )
 	
 	input:
-	path pickleTable
-	path batchDir
+	tuple val(batchID), path(pickleTable)
 	
 	output:
 	path "quantile_transformed_${batchID}.tsv", emit: qt_table
 	path "quantile_report_${batchID}.pdf"
 	
 	script:
-    batchID = batchDir.baseName
 	template 'quantile_transformer.py'
+
+}
+
+// Produce Batch based normalization - boxcox
+process minmax {
+	publishDir(
+        path: "${params.output_dir}/normalization_reports",
+        pattern: "*.pdf",
+        mode: "copy"
+    )
+	
+	input:
+	tuple val(batchID), path(pickleTable)
+	
+	output:
+	path "minmax_transformed_${batchID}.tsv", emit: mm_table
+	path "minmax_report_${batchID}.pdf"
+	
+	script:
+	template 'minmax_transformer.py'
 
 }
     
@@ -47,12 +63,15 @@ process quantile {
 workflow normalization_wf{
 	take: 
 	batchPickleTable
-	originalDir
-
+	
 	main:
 	//Examine Transformations
-	boxcox(batchPickleTable, originalDir)
+	boxcox(batchPickleTable)
 	
-	quantile(batchPickleTable, originalDir)
+	quantile(batchPickleTable)
+
+	minmax(batchPickleTable)
+	
+	
 
 }

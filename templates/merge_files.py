@@ -25,7 +25,7 @@ def merge_tab_delimited_files(directory_path, excld):
 	merged_df = merged_df.reset_index()
 
 	# Save the merged DataFrame as a pickle file
-	merged_df.to_pickle('merged_dataframe.pkl')
+	merged_df.to_pickle('merged_dataframe_${batchID}.pkl')
 
 if __name__ == "__main__":
 	directory_path = "${subdir}"

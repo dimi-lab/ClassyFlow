@@ -38,14 +38,42 @@ Required Arguments:
 process mergeTabDelimitedFiles {
 	input:
     path subdir
-
+    
     output:
-    path 'merged_dataframe.pkl', emit: batchtable
+    tuple val(batchID), path("merged_dataframe_${batchID}.pkl"), emit: namedBatchtables
+    path("merged_dataframe_${batchID}.pkl"), emit: batchtables
 
     script:
     exMarks = "${params.exclude_markers}"
+    batchID = subdir.baseName
     template 'merge_files.py'
 }
+
+// Identify 
+process checkPanelDesign {
+	input:
+	path(tables_pkl_collected)
+
+    output:
+    path 'panel_design.csv', emit: paneldesignfile
+
+    script:
+    template 'compare_panel_designs.py'
+}
+
+//Add back empty Markers, low noise (16-bit or 8-bit)
+process addEmptyMarkerNoise {
+	input:
+	tuple val(batchID), path(pickleTable)
+	path designTable
+
+    output:
+    tuple val(batchID), path("merged_dataframe_${batchID}.pkl"), emit: modbatchtables
+
+    script:
+    template 'add_empty_marker_noise.py'
+}
+
 // -------------------------------------- //
 
 
@@ -59,10 +87,18 @@ workflow {
         // Exit out and do not run anything else
         exit 1
     } else {
-		// Pull channel object `batchDirs` from nextflow env - see top of file.
-    	tables = mergeTabDelimitedFiles(batchDirs)
     
-    	normalization_wf(tables.batchtable, batchDirs)
+		// Pull channel object `batchDirs` from nextflow env - see top of file.
+    	mergeTabDelimitedFiles(batchDirs)
+    	
+    	checkPanelDesign(mergeTabDelimitedFiles.output.batchtables.collect())  // "merged_dataframe_SET01.pkl    merged_dataframe_SET02.pkl    merged_dataframe_SET03.pkl"
+    	
+    	//modify the pickle files to account for missing features...
+    	addEmptyMarkerNoise(mergeTabDelimitedFiles.output.namedBatchtables, checkPanelDesign.output.paneldesignfile)
+    	   
+    	normalization_wf(addEmptyMarkerNoise.output.modbatchtables)
+    	
+    	
     }
     
     
