@@ -8,12 +8,55 @@ import matplotlib.backends.backend_pdf
 
 #objtype = '${params.qupath_object_type}'
 objtype = 'CellObject'
+#nucMark = '${params.qupath_object_type}'
+nucMark = 'DAPI'
+downsampleFrac = 0.5
 
 def create_comparative_report(pdfOUT, nom, hshOfDFs):
-	print("In PDF Making")
+	for ky, df in hshOfDFs.items():
+		nucDF = df.filter(regex='('+nucMark+')')
+		othDF = df[df.columns.drop(list(df.filter(regex='('+nucMark+')')))]
+		## Subset to reduce compute burden.
+		subNuc = nucDF.sample(frac=downsampleFrac)
+		subOther = othDF.iloc[subNuc.index]
+		
+		if objtype == 'CellObject':
+			# Create a new figure for each page
+			fig, axs = plt.subplots(4, 2, figsize=(8.5, 11))
+			axs = axs.flatten()
+			
+			c1 = list(filter(lambda x:'Cell: Mean' in x, nucDF.columns.tolist()))[0]
+			subNuc[c1].plot.hist(bins=16,title='{} - {}'.format(ky,c1), ax=axs[0])
+			
+			c2 = list(filter(lambda x:'Cell: Mean' in x, subOther.columns.tolist()))
+			tmp = subOther.melt(value_vars=c2, var_name='meteric', value_name='vals')
+			tmp['vals'].plot.hist(bins=16,title='{} - {}'.format(ky,'All Other Cell: Mean'), ax=axs[1], color='g')
+			
+			sts = subOther[c2].mean(axis=0)
+			d1 = sts.idxmin()
+			d2 = sts.idxmax()
+			subOther[d1].plot.hist(bins=16,title='{} Darkest - {}'.format(ky,d1), ax=axs[2], color='y')
+			subOther[d2].plot.hist(bins=16,title='{} Brightest - {}'.format(ky,d2), ax=axs[3], color='k')
+			
+			c1 = list(filter(lambda x:'Nucleus: Mean' in x, nucDF.columns.tolist()))[0]
+			subNuc[c1].plot.hist(bins=16,title='{} - {}'.format(ky,c1), ax=axs[4])
+			
+			c2 = list(filter(lambda x:'Nucleus: Mean' in x, subOther.columns.tolist()))
+			tmp = subOther.melt(value_vars=c2, var_name='meteric', value_name='vals')
+			tmp['vals'].plot.hist(bins=16,title='{} - {}'.format(ky,'All Other Nucleus: Mean'), ax=axs[5], color='g')
 
-	#for ky, df in hshOfDFs.items():
-	# myDataFile['DAPI: Cell: Mean'].plot.hist(bins=16)
+			sts = subOther[c2].mean(axis=0)
+			d1 = sts.idxmin()
+			d2 = sts.idxmax()
+			subOther[d1].plot.hist(bins=16,title='{} Darkest - {}'.format(ky, d1), ax=axs[6], color='y')
+			subOther[d2].plot.hist(bins=16,title='{} Brightest - {}'.format(ky, d2), ax=axs[7], color='k')
+
+			# Adjust layout and save the page to the PDF
+			plt.tight_layout()
+			pdfOUT.savefig(fig)
+			
+		else:
+			raise ValueError('No code to assess other objects types in normalization comparison.')
 
 
 def select_best_normalization():
@@ -33,7 +76,7 @@ def buildDataDictionary(lstOfFiles):
 	hashOfNormalizationTables = {}
 	for fh in lstOfFiles:
 		filename, file_extension = os.path.splitext(fh)
-		print([filename, file_extension])
+		# print([filename, file_extension])
 		pnom = filename.split('_')[0]
 		if file_extension == ".pkl":
 			pDF = pd.read_pickle(fh)
@@ -50,10 +93,10 @@ def buildDataDictionary(lstOfFiles):
 	return hashOfNormalizationTables
 
 if __name__ == "__main__":
-	#norm_files = "${all_possible_tables}".split(' ')
-	norm_files = "merged_dataframe_SET02_mod.pkl boxcox_transformed_SET02.tsv minmax_transformed_SET02.tsv quantile_transformed_SET02.tsv".split(' ')
-	#myFileIdx = "${batchID}"	
-	myFileIdx = "SET02"
+	norm_files = "${all_possible_tables}".split(' ')
+	#norm_files = "merged_dataframe_SET02_mod.pkl boxcox_transformed_SET02.tsv minmax_transformed_SET02.tsv quantile_transformed_SET02.tsv".split(' ')
+	myFileIdx = "${batchID}"	
+	#myFileIdx = "SET02"
 	overrideVar = 'boxcox'
 
 	## Make this a dictonary so it is expandable later, when adding more normalization approaches.

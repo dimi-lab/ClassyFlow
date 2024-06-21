@@ -7,6 +7,9 @@ nextflow.enable.dsl=2
 params.input_dir = "${projectDir}/data"
 params.output_dir = "${projectDir}/output"
 
+//Static Assests for beautification
+params.letterhead = "${projectDir}/images/ClassyFlow_Letterhead.PNG"
+
 // Build Input List of Batches
 Channel.fromPath("${params.input_dir}/*/", type: 'dir')
 			.ifEmpty { error "No subdirectories found in ${params.input_dir}" }
@@ -14,8 +17,7 @@ Channel.fromPath("${params.input_dir}/*/", type: 'dir')
 			
 // Import sub-workflows
 include { normalization_wf } from './modules/normalizations'
-
-
+include { featureselection_wf } from './modules/featureselections'
 
 // -------------------------------------- //
 // Function which prints help message text
@@ -73,10 +75,19 @@ process addEmptyMarkerNoise {
     template 'add_empty_marker_noise.py'
 }
 
-//process generateTrainingNHoldout{
-//	input
-//	path(norms_pkl_collected)
-//}
+process generateTrainingNHoldout{
+	input:
+	path(norms_pkl_collected)
+
+	output:
+    path("holdout_dataframe.pkl"), emit: holdout
+    path("training_dataframe.pkl"), emit: training
+	path("celltypes.csv"), emit: lableFile
+
+    script:
+    template 'split_annotations_for_training.py'
+
+}
 
 // -------------------------------------- //
 
@@ -100,10 +111,23 @@ workflow {
     	//modify the pickle files to account for missing features...
     	addEmptyMarkerNoise(mergeTabDelimitedFiles.output.namedBatchtables, checkPanelDesign.output.paneldesignfile)
     	   
+    	/*
+    	 * - Subworkflow to handle all Normalization/Standardization Tasks - 
+    	 */ 
+    	
     	normalizedDataFrames = normalization_wf(addEmptyMarkerNoise.output.modbatchtables)
     	
-    	//normalizedDataFrames.collect().view()
-    	//generateTrainingNHoldout(normalizedDataFrames.collect())
+
+    	labledDataFrames = generateTrainingNHoldout(normalizedDataFrames.map{ it[1] }.collect())
+    	
+    	
+		/*
+    	 * - Subworkflow to examine Cell Type Specific interpetability & Feature Selections - 
+    	 */ 
+		featureselection_wf(labledDataFrames.training, labledDataFrames.lableFile)
+    	 
+    	 
+    	 
     	
     }
     

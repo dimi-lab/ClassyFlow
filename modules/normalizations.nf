@@ -87,7 +87,7 @@ process identify_best{
     
     
     
-workflow normalization_wf{
+workflow normalization_wf {
 	take: 
 	batchPickleTable
 	
@@ -99,11 +99,11 @@ workflow normalization_wf{
 	mxchannels = batchPickleTable.mix(bc.bc_table,qt.qt_table,mm.mm_table).groupTuple()
 	mxchannels.dump(tag: 'debug_normalization_channels', pretty: true)
 	
-	identify_best(mxchannels)
+	bestN = identify_best(mxchannels)
 	
-	/// add multi-batch synchro later
+	/// add multi-batch synchro later...
 	
 	emit:
-	normalized = identify_best.output.norm_df
+	normalized = bestN.norm_df
 	
 }
