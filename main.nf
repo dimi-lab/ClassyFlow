@@ -17,7 +17,6 @@ include { normalization_wf } from './modules/normalizations'
 
 
 
-
 // -------------------------------------- //
 // Function which prints help message text
 def helpMessage() {
@@ -68,11 +67,16 @@ process addEmptyMarkerNoise {
 	path designTable
 
     output:
-    tuple val(batchID), path("merged_dataframe_${batchID}.pkl"), emit: modbatchtables
+    tuple val(batchID), path("merged_dataframe_${batchID}_mod.pkl"), emit: modbatchtables
 
     script:
     template 'add_empty_marker_noise.py'
 }
+
+//process generateTrainingNHoldout{
+//	input
+//	path(norms_pkl_collected)
+//}
 
 // -------------------------------------- //
 
@@ -87,17 +91,19 @@ workflow {
         // Exit out and do not run anything else
         exit 1
     } else {
-    
+
 		// Pull channel object `batchDirs` from nextflow env - see top of file.
     	mergeTabDelimitedFiles(batchDirs)
     	
-    	checkPanelDesign(mergeTabDelimitedFiles.output.batchtables.collect())  // "merged_dataframe_SET01.pkl    merged_dataframe_SET02.pkl    merged_dataframe_SET03.pkl"
+    	checkPanelDesign(mergeTabDelimitedFiles.output.batchtables.collect())  
     	
     	//modify the pickle files to account for missing features...
     	addEmptyMarkerNoise(mergeTabDelimitedFiles.output.namedBatchtables, checkPanelDesign.output.paneldesignfile)
     	   
-    	normalization_wf(addEmptyMarkerNoise.output.modbatchtables)
+    	normalizedDataFrames = normalization_wf(addEmptyMarkerNoise.output.modbatchtables)
     	
+    	//normalizedDataFrames.collect().view()
+    	//generateTrainingNHoldout(normalizedDataFrames.collect())
     	
     }
     

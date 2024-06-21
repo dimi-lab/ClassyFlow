@@ -70,24 +70,6 @@ def collect_and_transform(df, pdfOUT, qTyp, nucMark):
 	pdfOUT.savefig( plt.gcf() )
 	
 	
-	colNames = list(filter(lambda x:'Mean' in x, df.columns.tolist()))
-	NucOnly = list(filter(lambda x:nucMark in x, colNames))[0]
-	for hd in colNames:
-		if hd == NucOnly:
-			continue
-		nuc1 = pd.DataFrame({"Original_Value": df[NucOnly], "Transformed_Value":bcDf[NucOnly]})
-		nuc1['Mark'] = nucMark
-		mk2 = pd.DataFrame({"Original_Value": df[hd], "Transformed_Value":bcDf[hd]})
-		mk2['Mark'] = hd.split(":")[0]
-		qqDF = pd.concat([nuc1,mk2], ignore_index=True)
-		
-		fig, ax2 = plt.subplots(figsize=(12,12))
-		scMarks = sns.scatterplot(x='Original_Value', y='Transformed_Value', data=qqDF, hue="Mark", ax=ax2)
-		ax2.set_title("BoxCox Transformation: {}".format(hd))
-		ax2.axline((0, 0), (nuc1['Original_Value'].max(), nuc1['Transformed_Value'].max()), linewidth=2, color='r')
-		pdfOUT.savefig( scMarks.get_figure() )
-		
-	
 	smTble = bcDf.groupby('Slide').apply(lambda x: x.sample(frac=0.25)) 
 	df_batching = smTble.filter(regex='(Mean|Median|Slide)',axis=1)
 	df_melted = pd.melt(df_batching, id_vars=["Slide"])
@@ -97,6 +79,39 @@ def collect_and_transform(df, pdfOUT, qTyp, nucMark):
 	plt.setp(ax1.get_xticklabels(), rotation=40, ha="right")
 	ax1.set_title('Combined Marker Distribution (boxcox values)')
 	pdfOUT.savefig( origVals.get_figure() )
+	
+	
+	colNames = list(filter(lambda x:'Mean' in x, df.columns.tolist()))[0:10]
+	NucOnly = list(filter(lambda x:nucMark in x, colNames))[0]
+	for i in range(0, len(colNames), 8):
+		# Create a new figure for each page
+		fig, axs = plt.subplots(8, 2, figsize=(8.5, 11))
+		axs = axs.flatten()
+
+		for j in range(8):
+			if i + j < len(colNames):
+				hd = colNames[(i + j)]
+				nuc1 = pd.DataFrame({"Original_Value": df[NucOnly], "Transformed_Value":bcDf[NucOnly]})
+				nuc1['Mark'] = nucMark
+				mk2 = pd.DataFrame({"Original_Value": df[hd], "Transformed_Value":bcDf[hd]})
+				mk2['Mark'] = hd.split(":")[0]
+				qqDF = pd.concat([nuc1,mk2], ignore_index=True)
+
+				# Plot on the j-th subplot
+				ax2 = axs[j]
+
+				sns.scatterplot(x='Original_Value', y='Transformed_Value', data=qqDF, hue="Mark", ax=ax2)
+				ax2.set_title("BoxCox Transformation: {}".format(hd))
+				ax2.axline((0, 0), (nuc1['Original_Value'].max(), nuc1['Transformed_Value'].max()), linewidth=2, color='r')
+
+			else:
+				axs[j].axis('off')  # Turn off axis if no data
+
+		# Adjust layout and save the page to the PDF
+		plt.tight_layout()
+		pdfOUT.savefig(fig)
+	
+	
 	
 	return bcDf
 

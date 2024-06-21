@@ -22,6 +22,7 @@ def merge_tab_delimited_files(directory_path, excld):
 
 	# Concatenate all DataFrames
 	merged_df = pd.concat(dataframes, ignore_index=True)
+	merged_df = merged_df.sample(n=5000)  # remove this after testing
 	merged_df = merged_df.reset_index()
 
 	# Save the merged DataFrame as a pickle file

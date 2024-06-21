@@ -1,5 +1,7 @@
 // Produce Batch based normalization - boxcox
 process boxcox {
+	tag { batchID }
+	
 	publishDir(
         path: "${params.output_dir}/normalization_reports",
         pattern: "*.pdf",
@@ -10,8 +12,8 @@ process boxcox {
 	tuple val(batchID), path(pickleTable)
 	
 	output:
-	path "boxcox_transformed_${batchID}.tsv", emit: bc_table
-	path "boxcox_report_${batchID}.pdf"
+	tuple val(batchID), path("boxcox_transformed_${batchID}.tsv"), emit: bc_table
+	path("boxcox_report_${batchID}.pdf")
 	
 	script:
 	template 'boxcox_transformer.py'
@@ -19,8 +21,10 @@ process boxcox {
 }
     
     
-// Produce Batch based normalization - boxcox
+// Produce Batch based normalization - quantile
 process quantile {
+	tag { batchID }
+	
 	publishDir(
         path: "${params.output_dir}/normalization_reports",
         pattern: "*.pdf",
@@ -31,16 +35,18 @@ process quantile {
 	tuple val(batchID), path(pickleTable)
 	
 	output:
-	path "quantile_transformed_${batchID}.tsv", emit: qt_table
-	path "quantile_report_${batchID}.pdf"
+	tuple val(batchID), path("quantile_transformed_${batchID}.tsv"), emit: qt_table
+	path("quantile_report_${batchID}.pdf")
 	
 	script:
 	template 'quantile_transformer.py'
 
 }
 
-// Produce Batch based normalization - boxcox
+// Produce Batch based normalization - min/max scaling
 process minmax {
+	tag { batchID }
+
 	publishDir(
         path: "${params.output_dir}/normalization_reports",
         pattern: "*.pdf",
@@ -51,13 +57,34 @@ process minmax {
 	tuple val(batchID), path(pickleTable)
 	
 	output:
-	path "minmax_transformed_${batchID}.tsv", emit: mm_table
-	path "minmax_report_${batchID}.pdf"
+	tuple val(batchID), path("minmax_transformed_${batchID}.tsv"), emit: mm_table
+	path("minmax_report_${batchID}.pdf")
 	
 	script:
 	template 'minmax_transformer.py'
 
 }
+
+// Look at all of the normalizations within a batch and attempt to idendity the best approach
+process identify_best{
+	publishDir(
+        path: "${params.output_dir}/normalization_reports",
+        pattern: "*.pdf",
+        mode: "copy"
+    )
+    
+	input:
+	tuple val(batchID), path(all_possible_tables)
+	
+	output:
+	tuple val(batchID), path("normalized_${batchID}.pkl"), emit: norm_df
+	path("multinormalize_report_${batchID}.pdf")
+
+	script:
+	template 'characterize_normalization.py'
+}
+// -------------------------------------- //
+    
     
     
 workflow normalization_wf{
@@ -65,13 +92,18 @@ workflow normalization_wf{
 	batchPickleTable
 	
 	main:
-	//Examine Transformations
-	boxcox(batchPickleTable)
+	bc = boxcox(batchPickleTable)
+	qt = quantile(batchPickleTable)
+	mm = minmax(batchPickleTable)
 	
-	quantile(batchPickleTable)
-
-	minmax(batchPickleTable)
+	mxchannels = batchPickleTable.mix(bc.bc_table,qt.qt_table,mm.mm_table).groupTuple()
+	mxchannels.dump(tag: 'debug_normalization_channels', pretty: true)
 	
+	identify_best(mxchannels)
 	
-
+	/// add multi-batch synchro later
+	
+	emit:
+	normalized = identify_best.output.norm_df
+	
 }
