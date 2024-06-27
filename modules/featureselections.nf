@@ -18,11 +18,7 @@ process examineClassLabel{
     script:
 	template 'generate_cell_type_selection.py'
 }
-
-
-
-
-
+// -------------------------------------- //
 
 
 workflow featureselection_wf {
@@ -34,7 +30,6 @@ workflow featureselection_wf {
 	// Split the list into individual elements
 	list_channel = celltypeCsv
 		.splitCsv(header: false, sep: ',')
-
 
 	examineClassLabel(trainingPickleTable, list_channel)
 

@@ -65,6 +65,28 @@ process minmax {
 
 }
 
+process logscale {
+	tag { batchID }
+
+	publishDir(
+        path: "${params.output_dir}/normalization_reports",
+        pattern: "*.pdf",
+        mode: "copy"
+    )
+	
+	input:
+	tuple val(batchID), path(pickleTable)
+	
+	output:
+	tuple val(batchID), path("log_transformed_${batchID}.tsv"), emit: lg_table
+	path("log_report_${batchID}.pdf")
+	
+	script:
+	template 'log_transformer.py'
+
+}
+
+
 // Look at all of the normalizations within a batch and attempt to idendity the best approach
 process identify_best{
 	publishDir(
@@ -95,8 +117,9 @@ workflow normalization_wf {
 	bc = boxcox(batchPickleTable)
 	qt = quantile(batchPickleTable)
 	mm = minmax(batchPickleTable)
+	lg = logscale(batchPickleTable)
 	
-	mxchannels = batchPickleTable.mix(bc.bc_table,qt.qt_table,mm.mm_table).groupTuple()
+	mxchannels = batchPickleTable.mix(bc.bc_table,qt.qt_table,mm.mm_table,lg.lg_table).groupTuple()
 	mxchannels.dump(tag: 'debug_normalization_channels', pretty: true)
 	
 	bestN = identify_best(mxchannels)

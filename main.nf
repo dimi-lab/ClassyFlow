@@ -19,6 +19,9 @@ Channel.fromPath("${params.input_dir}/*/", type: 'dir')
 include { normalization_wf } from './modules/normalizations'
 include { featureselection_wf } from './modules/featureselections'
 
+
+
+
 // -------------------------------------- //
 // Function which prints help message text
 def helpMessage() {
@@ -76,6 +79,12 @@ process addEmptyMarkerNoise {
 }
 
 process generateTrainingNHoldout{
+	publishDir(
+        path: "${params.output_dir}/celltype_reports",
+        pattern: "*.pdf",
+        mode: "copy"
+    )
+    
 	input:
 	path(norms_pkl_collected)
 
@@ -83,6 +92,7 @@ process generateTrainingNHoldout{
     path("holdout_dataframe.pkl"), emit: holdout
     path("training_dataframe.pkl"), emit: training
 	path("celltypes.csv"), emit: lableFile
+	path("annotation_report.pdf")
 
     script:
     template 'split_annotations_for_training.py'
@@ -90,6 +100,9 @@ process generateTrainingNHoldout{
 }
 
 // -------------------------------------- //
+
+
+
 
 
 // Main workflow

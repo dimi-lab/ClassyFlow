@@ -9,6 +9,10 @@ In Development nextflow workflow specific to outlining approaches to building an
 -   Nextflow 23.04.2 (requires: bash, java 11 [or later, up to 21] git and docker)
 -   Python 3.8+
     -   scimap 1.3.2
+    -  fpdf
+    - kaleido
+    - dataframe_image
+    
     
 ------------------------------------------------------------------------
 
