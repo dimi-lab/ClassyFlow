@@ -15,7 +15,7 @@ minimunHoldoutThreshold = 5
 
 ############################ PDF REPORTING ############################
 def create_letterhead(pdf, WIDTH):
-    pdf.image("${projectDir}/images/ClassyFlow_Letterhead.PNG", 0, 0, WIDTH)
+   	pdf.image("${params.letterhead}", 0, 0, WIDTH)
 
 def create_title(title, pdf):
     # Add main title

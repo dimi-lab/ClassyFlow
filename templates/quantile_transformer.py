@@ -7,6 +7,10 @@ import seaborn as sns
 import matplotlib.backends.backend_pdf
 from sklearn.preprocessing import QuantileTransformer
 
+import fpdf
+from fpdf import FPDF
+import dataframe_image as dfi
+
 ###### STATIC CONFIG VARS ######
 #quantType = '${params.qupath_object_type}'
 #nucMark = '${params.nucleus_marker}'
@@ -38,6 +42,9 @@ def write_to_pdf(pdf, words):
     pdf.set_font('Helvetica', '', 12)
     pdf.write(5, words)
 ############################ PDF REPORTING ############################
+
+
+
 
 
 def collect_and_transform(df, batchName):
@@ -82,7 +89,7 @@ def collect_and_transform(df, batchName):
 		fig.savefig("original_value_density_{}.png".format(idx))
 		#pdfOUT.savefig( plt.gcf() )
 	
-	
+		
 	# This method transforms the features to follow a uniform or a normal distribution. 
 	# Therefore, for a given feature, this transformation tends to spread out the most frequent values. 
 	# It also reduces the impact of (marginal) outliers: this is therefore a robust preprocessing scheme.
@@ -93,8 +100,8 @@ def collect_and_transform(df, batchName):
 	df_norm = pd.DataFrame(scaler.fit_transform(imgMets), columns=imgMets.columns)
 	df_a = df[df.columns.difference(imgMets.columns)]
 	bcDf = pd.concat([df_a.reset_index(drop=True), df_norm], axis=1).fillna(0)	
-	
-	
+
+
 	smTble = bcDf.groupby('Slide').apply(lambda x: x.sample(frac=plotFraction)) 
 	df_batching = smTble.filter(regex='(Mean|Median|Slide)',axis=1)
 	df_melted = pd.melt(df_batching, id_vars=["Slide"])
@@ -106,14 +113,25 @@ def collect_and_transform(df, batchName):
 	fig.savefig("normlize_marker_sample_boxplots.png") 
 	#pdfOUT.savefig( origVals.get_figure() )
 	
+	
+	df_batching = smTble.filter(regex='(Mean|Median|Image|Slide)',axis=1)
+	df_melted = pd.melt(df_batching, id_vars=["Image","Slide"])
+	fig, ax1 = plt.subplots(figsize=(20,8))
+	origVals = sns.boxplot(x='Image', y='value', hue="Slide", data=df_melted, ax=ax1, showfliers = False)
+	plt.setp(ax1.get_xticklabels(), rotation=40, ha="right")
+	ax1.set_title('Combined Marker Distribution (original values)')
+	fig = origVals.get_figure()
+	fig.savefig("normlize_marker_roi_boxplots.png") 
+	
+	
 	colNames = list(filter(lambda x:'Mean' in x, df.columns.tolist()))
 	NucOnly = list(filter(lambda x:nucMark in x, colNames))[0]
-	for i in range(0, len(colNames), 8):
+	for i in range(0, len(colNames), 4):
 		# Create a new figure for each page
-		fig, axs = plt.subplots(8, 2, figsize=(8.5, 11))
+		fig, axs = plt.subplots(4, 2, figsize=(4, 10))
 		axs = axs.flatten()
 
-		for j in range(8):
+		for j in range(4):
 			if i + j < len(colNames):
 				hd = colNames[(i + j)]
 				nuc1 = pd.DataFrame({"Original_Value": df[NucOnly], "Transformed_Value":bcDf[NucOnly]})
@@ -134,25 +152,29 @@ def collect_and_transform(df, batchName):
 
 		# Adjust layout and save the page to the PDF
 		plt.tight_layout()
+		fig.savefig("normlize_qrq_{}.png".format(i))
 		# pdfOUT.savefig(fig)
-
-
-	
 	bcDf.to_csv("quantile_transformed_{}.tsv".format(batchName), sep="\t") 	
-	
-	
+
+
 def generate_pdf_report(outfilename, batchName):
 	WIDTH = 215.9
 	pdf = FPDF()
 	# Create PDF
 	pdf.add_page()
-	create_title("Quantile Transformation: {}".format(batchName), pdf)
+	create_title("Log Transformation: {}".format(batchName), pdf)
 	pdf.image("${params.letterhead}", 0, 0, WIDTH)
-	write_to_pdf(pdf, "Fig 1: Disrtibution of all markers combined summarized by biospecimen.")	
+	write_to_pdf(pdf, "Fig 1.a: Disrtibution of all markers combined summarized by biospecimen.")	
 	pdf.ln(5)
 	pdf.image('original_marker_sample_boxplots.png', w=WIDTH )
 	pdf.ln(15)
 	pdf.image('normlize_marker_sample_boxplots.png', w=WIDTH )
+	pdf.ln(15)
+	write_to_pdf(pdf, "Fig 1.b: Disrtibution of all markers combined summarized by images.")	
+	pdf.ln(5)
+	pdf.image('original_marker_roi_boxplots.png', w=WIDTH )
+	pdf.ln(15)
+	pdf.image('normlize_marker_roi_boxplots.png', w=WIDTH )
 	pdf.ln(15)
 	
 	write_to_pdf(pdf, "Fig 2: Total cell population distibutions.")	
@@ -161,8 +183,17 @@ def generate_pdf_report(outfilename, batchName):
 			pdf.image(file, w=WIDTH )
 			pdf.ln(10)
 			
+	write_to_pdf(pdf, "Fig 3: Transformation Plots.")	
+	for root, dirs, files in os.walk('.'):
+		for file in fnmatch.filter(files, f"normlize_qrq_*"):
+			pdf.image(file, w=WIDTH )
+			pdf.ln(10)
+	
 	# Generate the PDF
 	pdf.output(outfilename, 'F')
+
+	
+	
 
 if __name__ == "__main__":
 	#myData = pd.read_pickle("${pickleTable}")
