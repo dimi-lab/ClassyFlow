@@ -24,6 +24,10 @@ def merge_tab_delimited_files(directory_path, excld):
 	merged_df = pd.concat(dataframes, ignore_index=True)
 	# merged_df = merged_df.sample(n=5000)  # remove this after testing
 	merged_df = merged_df.reset_index()
+	
+	## Throw Error if Quant Files are empty.
+	if merged_df.shape[0] == 0:
+		sys.exit("Merged Input Files result in EMPTY data table: {}".format(directory_path))
 
 	# Save the merged DataFrame as a pickle file
 	merged_df.to_pickle('merged_dataframe_${batchID}.pkl')

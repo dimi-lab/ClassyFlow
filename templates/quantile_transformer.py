@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-import sys, os
+import sys, os, time
+import fnmatch
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -83,7 +84,7 @@ def collect_and_transform(df, batchName):
 	for idx, fld in enumerate(myFields):
 		if fld == NucOnly:
 			continue
-		denstPlt = df_batching2.plot.density(figsize = (16, 8),linewidth = 3)
+		denstPlt = df_batching2[[NucOnly,fld]].plot.density(figsize = (16, 8),linewidth = 3)
 		plt.title("{} Distributions (original values)".format(fld))
 		fig = denstPlt.get_figure()
 		fig.savefig("original_value_density_{}.png".format(idx))
@@ -128,7 +129,7 @@ def collect_and_transform(df, batchName):
 	NucOnly = list(filter(lambda x:nucMark in x, colNames))[0]
 	for i in range(0, len(colNames), 4):
 		# Create a new figure for each page
-		fig, axs = plt.subplots(4, 2, figsize=(4, 10))
+		fig, axs = plt.subplots(2, 2, figsize=(8, 8))
 		axs = axs.flatten()
 
 		for j in range(4):
@@ -196,11 +197,8 @@ def generate_pdf_report(outfilename, batchName):
 	
 
 if __name__ == "__main__":
-	#myData = pd.read_pickle("${pickleTable}")
-	#myFileIdx = "${batchID}"
-
-	myData = pd.read_pickle("merged_dataframe_SET02_mod.pkl")
-	myFileIdx = "SET02"
+	myData = pd.read_pickle("${pickleTable}")
+	myFileIdx = "${batchID}"
 
 	collect_and_transform(myData, myFileIdx)
 	

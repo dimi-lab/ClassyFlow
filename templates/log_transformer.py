@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-import sys, os
+import sys, os, time
+import fnmatch
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -16,7 +17,7 @@ import dataframe_image as dfi
 # nucMark = '${params.nucleus_marker}'
 
 quantType = 'CellObject'
-nucMark = 'DAPI'
+nucMark = 'NA1'
 plotFraction = 0.25
 ################################
 
@@ -82,10 +83,11 @@ def collect_and_transform(df, batchName):
 	for idx, fld in enumerate(myFields):
 		if fld == NucOnly:
 			continue
-		denstPlt = df_batching2.plot.density(figsize = (16, 8),linewidth = 3)
+		denstPlt = df_batching2[[NucOnly,fld]].plot.density(figsize = (16, 8),linewidth = 3)
 		plt.title("{} Distributions (original values)".format(fld))
 		fig = denstPlt.get_figure()
 		fig.savefig("original_value_density_{}.png".format(idx))
+		plt.close()
 		#pdfOUT.savefig( plt.gcf() )
 	
 		
@@ -148,6 +150,7 @@ def collect_and_transform(df, batchName):
 		plt.tight_layout()
 		fig.savefig("normlize_qrq_{}.png".format(i))
 		# pdfOUT.savefig(fig)
+		plt.close('all')
 	bcDf.to_csv("log_transformed_{}.tsv".format(batchName), sep="\t") 	
 
 
@@ -157,7 +160,8 @@ def generate_pdf_report(outfilename, batchName):
 	# Create PDF
 	pdf.add_page()
 	create_title("Log Transformation: {}".format(batchName), pdf)
-	pdf.image("${params.letterhead}", 0, 0, WIDTH)
+	#pdf.image("${params.letterhead}", 0, 0, WIDTH)
+	pdf.image("/research/bsi/projects/staff_analysis/m088378/SupervisedClassifierFlow/images/ClassyFlow_Letterhead.PNG", 0, 0, WIDTH)
 	write_to_pdf(pdf, "Fig 1.a: Disrtibution of all markers combined summarized by biospecimen.")	
 	pdf.ln(5)
 	pdf.image('original_marker_sample_boxplots.png', w=WIDTH )
@@ -190,8 +194,8 @@ def generate_pdf_report(outfilename, batchName):
 if __name__ == "__main__":
 	#myData = pd.read_pickle("${pickleTable}")
 	#myFileIdx = "${batchID}"
-	myData = pd.read_pickle("merged_dataframe_SET02_mod.pkl")
-	myFileIdx = "SET02"
+	myData = pd.read_pickle("merged_dataframe_AE_QUANT_mod.pkl")
+	myFileIdx = "AE_QUANT"
 
 	collect_and_transform(myData, myFileIdx)
 
