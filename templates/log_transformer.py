@@ -13,11 +13,11 @@ from fpdf import FPDF
 import dataframe_image as dfi
 
 ###### STATIC CONFIG VARS ######
-# quantType = '${params.qupath_object_type}'
-# nucMark = '${params.nucleus_marker}'
+quantType = '${params.qupath_object_type}'
+nucMark = '${params.nucleus_marker}'
 
-quantType = 'CellObject'
-nucMark = 'NA1'
+#quantType = 'CellObject'
+#nucMark = 'NA1'
 plotFraction = 0.25
 ################################
 
@@ -160,8 +160,7 @@ def generate_pdf_report(outfilename, batchName):
 	# Create PDF
 	pdf.add_page()
 	create_title("Log Transformation: {}".format(batchName), pdf)
-	#pdf.image("${params.letterhead}", 0, 0, WIDTH)
-	pdf.image("/research/bsi/projects/staff_analysis/m088378/SupervisedClassifierFlow/images/ClassyFlow_Letterhead.PNG", 0, 0, WIDTH)
+	pdf.image("${params.letterhead}", 0, 0, WIDTH)
 	write_to_pdf(pdf, "Fig 1.a: Disrtibution of all markers combined summarized by biospecimen.")	
 	pdf.ln(5)
 	pdf.image('original_marker_sample_boxplots.png', w=WIDTH )
@@ -192,10 +191,10 @@ def generate_pdf_report(outfilename, batchName):
 	
 
 if __name__ == "__main__":
-	#myData = pd.read_pickle("${pickleTable}")
-	#myFileIdx = "${batchID}"
-	myData = pd.read_pickle("merged_dataframe_AE_QUANT_mod.pkl")
-	myFileIdx = "AE_QUANT"
+	myData = pd.read_pickle("${pickleTable}")
+	myFileIdx = "${batchID}"
+	#myData = pd.read_pickle("merged_dataframe_AE_QUANT_mod.pkl")
+	#myFileIdx = "AE_QUANT"
 
 	collect_and_transform(myData, myFileIdx)
 

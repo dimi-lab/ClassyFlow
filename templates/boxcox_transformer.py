@@ -46,7 +46,18 @@ def write_to_pdf(pdf, words):
     pdf.write(5, words)
 ############################ PDF REPORTING ############################
 
-
+def get_max_value(df):
+    # Flatten the DataFrame to a 1D array
+    values = df.values.flatten()
+    # Filter out NaN and Inf values
+    filtered_values = values[np.isfinite(values)]
+    # Get the maximum value from the filtered array
+    if filtered_values.size > 0:
+        max_value = np.max(filtered_values)
+    else:
+        max_value = 65535  # Handle the case where there are no valid numeric values
+    
+    return max_value
 
 
 def collect_and_transform(df, batchName):
@@ -120,9 +131,11 @@ def collect_and_transform(df, batchName):
 		da = df_batching2[[NucOnly,fld]].add_suffix(' Original')
 		dB = bcDf[[NucOnly,fld]].add_suffix(' Transformed')
 		tmpMerge = pd.concat([da,dB], axis=0, ignore_index=True)
+		maxX = get_max_value(tmpMerge)
 
 		denstPlt = tmpMerge.plot.density(figsize = (8, 3),linewidth = 3)
 		plt.title("{} Distributions".format(fld))
+		plt.xlim(0, maxX)
 		fig = denstPlt.get_figure()
 		fig.savefig("original_value_density_{}.png".format(idx))
 		#pdfOUT.savefig( plt.gcf() )
@@ -142,7 +155,7 @@ def collect_and_transform(df, batchName):
 	
 	df_batching = smTble.filter(regex='(Mean|Median|Image|Slide)',axis=1)
 	df_melted = pd.melt(df_batching, id_vars=["Image","Slide"])
-	fig, ax1 = plt.subplots(figsize=(20,8))
+	fig, ax1 = plt.subplots(figsize=(10,8))
 	origVals = sns.boxplot(x='Image', y='value', hue="Slide", data=df_melted, ax=ax1, showfliers = False)
 	plt.setp(ax1.get_xticklabels(), rotation=40, ha="right")
 	ax1.set_title('Combined Marker Distribution (original values)')
@@ -154,7 +167,7 @@ def collect_and_transform(df, batchName):
 	NucOnly = list(filter(lambda x:nucMark in x, colNames))[0]
 	for i in range(0, len(colNames), 4):
 		# Create a new figure for each page
-		fig, axs = plt.subplots(4, 2, figsize=(8.5, 11))
+		fig, axs = plt.subplots(2, 2, figsize=(8, 8))
 		axs = axs.flatten()
 
 		for j in range(4):
@@ -170,7 +183,7 @@ def collect_and_transform(df, batchName):
 				ax2 = axs[j]
 
 				sns.scatterplot(x='Original_Value', y='Transformed_Value', data=qqDF, hue="Mark", ax=ax2)
-				ax2.set_title("Quantile Transformation: {}".format(hd))
+				ax2.set_title("BoxCox: {}".format(hd))
 				ax2.axline((0, 0), (nuc1['Original_Value'].max(), nuc1['Transformed_Value'].max()), linewidth=2, color='r')
 
 			else:
@@ -192,20 +205,20 @@ def generate_pdf_report(outfilename, batchName):
 	pdf.image("${params.letterhead}", 0, 0, WIDTH)
 	write_to_pdf(pdf, "Fig 1.a: Disrtibution of all markers combined summarized by biospecimen.")	
 	pdf.ln(5)
-	pdf.image('original_marker_sample_boxplots.png', w=WIDTH )
+	pdf.image('original_marker_sample_boxplots.png', w=(WIDTH*0.95) )
 	pdf.ln(15)
-	pdf.image('normlize_marker_sample_boxplots.png', w=WIDTH )
+	pdf.image('normlize_marker_sample_boxplots.png', w=(WIDTH*0.95) )
 	pdf.ln(15)
 	write_to_pdf(pdf, "Fig 1.b: Disrtibution of all markers combined summarized by images.")	
 	pdf.ln(5)
-	pdf.image('original_marker_roi_boxplots.png', w=WIDTH )
+	pdf.image('original_marker_roi_boxplots.png', w=(WIDTH*0.95))
 	pdf.ln(15)
-	pdf.image('normlize_marker_roi_boxplots.png', w=WIDTH )
+	pdf.image('normlize_marker_roi_boxplots.png', w=(WIDTH*0.95) )
 	
 	pdf.add_page()
-
 		
-	write_to_pdf(pdf, "Fig 5: Transformation Plots.")	
+	write_to_pdf(pdf, "Fig 5: Transformation Plots.")
+	pdf.ln(10)	
 	for root, dirs, files in os.walk('.'):
 		for file in fnmatch.filter(files, f"normlize_qrq_*"):
 			pdf.image(file, w=WIDTH )
@@ -213,6 +226,7 @@ def generate_pdf_report(outfilename, batchName):
 
 	
 	write_to_pdf(pdf, "Fig 3: Total cell population distibutions.")	
+	pdf.ln(10)	
 	for root, dirs, files in os.walk('.'):
 		for file in fnmatch.filter(files, f"original_value_density_*"):
 			pdf.image(file, w=WIDTH )

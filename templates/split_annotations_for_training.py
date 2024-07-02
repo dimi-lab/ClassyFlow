@@ -7,9 +7,9 @@ from fpdf import FPDF
 import dataframe_image as dfi
 
 ## Static Variables: File Formatting
-classColumn = "${classifed_column_name}" # 'Classification'
+classColumn = "${params.classifed_column_name}" # 'Classification'
 batchColumn = 'Batch'
-holdoutFraction = float("${holdout_fraction}") #0.05
+holdoutFraction = float("${params.holdout_fraction}") #0.05
 cellTypeNegative = '0' 
 minimunHoldoutThreshold = 5
 
