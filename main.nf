@@ -18,7 +18,7 @@ Channel.fromPath("${params.input_dir}/*/", type: 'dir')
 // Import sub-workflows
 include { normalization_wf } from './modules/normalizations'
 include { featureselection_wf } from './modules/featureselections'
-include { modelling_wf } from './modules/makemodels'
+//include { modelling_wf } from './modules/makemodels'
 
 
 

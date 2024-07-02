@@ -38,6 +38,7 @@ batchColumn = 'Batch'
 varThreshold = 0.01
 WIDTH = 215.9
 HEIGHT = 279.4
+n_folds = 10
 
 ############################ PDF REPORTING ############################
 def create_letterhead(pdf, WIDTH):
@@ -115,7 +116,7 @@ def get_lasso_classification_features(df, celltype):
 	X_train, X_test, y_train, y_test = train_test_split(XAll, yAll, test_size=0.33, random_state=101, stratify=yAll)
 	#alphas = np.arange(0.0002,0.004,0.0003)
 	alphas = np.logspace(-5.1,-0.008, 3)
-	n_folds = 10
+
 
 	pipeline = Pipeline([
 		('scaler',StandardScaler(with_mean=False)),
@@ -185,7 +186,7 @@ def get_lasso_classification_features(df, celltype):
 	# import sklearn
 	# sklearn.metrics.SCORERS.keys()
 	def evaluate_model(model, X, y):
-		cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
+		cv = RepeatedStratifiedKFold(n_splits=n_folds, n_repeats=5, random_state=1)
 		scores = cross_val_score(model, X, y, scoring='neg_root_mean_squared_error', cv=cv, n_jobs=-1, error_score='raise')
 		return scores
 
@@ -201,7 +202,7 @@ def get_lasso_classification_features(df, celltype):
 	# plot model performance for comparison
 	pyplot.boxplot(results, labels=names, showmeans=True)
 	pyplot.savefig("recursive_elimination_plot.png")
-
+	pdf.image('recursive_elimination_plot.png', w= (WIDTH*0.8) )
 	
 
 	# Generate the PDF
@@ -209,10 +210,10 @@ def get_lasso_classification_features(df, celltype):
 
 
 if __name__ == "__main__":
-	#	myData = pd.read_pickle("${trainingDataframe}")
-	myData = pd.read_pickle("training_dataframe.pkl")
-	#myLabel = "${celltype}"
-	myLabel = "Tumor Cell"	
+	myData = pd.read_pickle("${trainingDataframe}")
+	#myData = pd.read_pickle("training_dataframe.pkl")
+	myLabel = "${celltype}"
+	#myLabel = "Tumor Cell"	
 
 	get_lasso_classification_features(myData, myLabel)
 
