@@ -18,7 +18,7 @@ Channel.fromPath("${params.input_dir}/*/", type: 'dir')
 // Import sub-workflows
 include { normalization_wf } from './modules/normalizations'
 include { featureselection_wf } from './modules/featureselections'
-//include { modelling_wf } from './modules/makemodels'
+include { modelling_wf } from './modules/makemodels'
 
 
 
@@ -129,17 +129,17 @@ workflow {
     	 */ 
     	
     	normalizedDataFrames = normalization_wf(addEmptyMarkerNoise.output.modbatchtables)
-    	
-
     	labledDataFrames = generateTrainingNHoldout(normalizedDataFrames.map{ it[1] }.collect())
-    	
     	
 		/*
     	 * - Subworkflow to examine Cell Type Specific interpetability & Feature Selections - 
     	 */ 
-		featureselection_wf(labledDataFrames.training, labledDataFrames.lableFile)
-    	 
-    	 
+		selectFeatures = featureselection_wf(labledDataFrames.training, labledDataFrames.lableFile)
+    	
+    	/*
+    	 * - Subworkflow to generate models and then check them against the holdout - 
+    	 */ 
+		modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures)
     	 
     	
     }

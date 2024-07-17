@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, csv, time
+import os, sys, csv, time, warnings
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -12,6 +12,10 @@ from numpy import mean
 from numpy import std
 
 import concurrent.futures
+from functools import partial
+from sklearn.exceptions import ConvergenceWarning
+
+from pprint import pprint
 
 ### Following SciKit Learn recommended path
 ## https://scikit-learn.org/stable/auto_examples/linear_model/plot_lasso_model_selection.html
@@ -36,14 +40,15 @@ import dataframe_image as dfi
 classColumn = 'Classification'
 batchColumn = 'Batch'
 varThreshold = 0.01
-n_features_to_RFE = 4
-n_folds = 2
+n_features_to_RFE = 7
+n_folds = 3
+lasso_max_iteration = 2000
 ifSubsetData=True
+max_workers = 2  # Limit the number of parallel processes
 
 ############################ PDF REPORTING ############################
 def create_letterhead(pdf, WIDTH):
-    # pdf.image("${projectDir}/images/ClassyFlow_Letterhead.PNG", 0, 0, WIDTH)
-    pdf.image("/research/bsi/projects/staff_analysis/m088378/SupervisedClassifierFlow/images/ClassyFlow_Letterhead.PNG", 0, 0, WIDTH)
+     pdf.image("${projectDir}/images/ClassyFlow_Letterhead.PNG", 0, 0, WIDTH)
 
 def create_title(title, pdf):
     # Add main title
@@ -66,10 +71,46 @@ def write_to_pdf(pdf, words):
     pdf.write(5, words)
 ############################ PDF REPORTING ############################
 
+# evaluate a give model using cross-validation
+# sklearn.metrics.SCORERS.keys()
+## Passing in models by parameters will not work with Concurrent Processing...needs to be internal, like this.
+def evaluate_model(idx, x, y, a):
+	print(f"Starting task {idx}")
+	rfe = RFE(estimator=Lasso(), n_features_to_select=idx)
+	model = Lasso(alpha=a, max_iter=lasso_max_iteration)
+	pipeline = Pipeline(steps=[('s',rfe),('m',model)])
+	cv = RepeatedStratifiedKFold(n_splits=n_folds, n_repeats=n_folds, random_state=1)
+
+	with warnings.catch_warnings():
+		warnings.filterwarnings("ignore", category=ConvergenceWarning)
+		scores = cross_val_score(pipeline, x, y, scoring='neg_root_mean_squared_error', cv=cv, n_jobs=-1, error_score='raise')
+	return idx, scores
+	
+	
+def summary_table(data):
+	# Create lists to store the data
+	element = []
+	mean_values = []
+	std_values = []
+
+	# Iterate over the data to extract mean and standard deviation
+	for key, (elem, values) in data.items():
+		element.append(elem)
+		mean_values.append(np.mean(values))
+		std_values.append(np.std(values))
+
+	# Create a DataFrame
+	summary_df = pd.DataFrame({
+		'Features': element,
+		'Mean': mean_values,
+		'StdDev': std_values
+	})
+
+	return summary_df
+
 
 def get_lasso_classification_features(df, celltype):
 	allPDFText = {}
-	
 	df["cnt"]=1
 	df["Lasso_Binary"] = 0
 	df.loc[df[classColumn] == celltype, 'Lasso_Binary'] = 1
@@ -77,7 +118,20 @@ def get_lasso_classification_features(df, celltype):
 	### Add optional parameter to speed up by reducing data amount. Half of target class size
 	if ifSubsetData:
 		totCls = df["Lasso_Binary"].sum()
-		df = df.sample( n=int(totCls*0.33) )
+		totRow = df.shape[0]
+		if totCls < 1000:
+			df1 = df[df["Lasso_Binary"] == 1]
+		else:
+			df1 = df[df["Lasso_Binary"] == 1].sample( n=1000 )
+			
+		negN = totRow - totCls
+		if negN < 1000:
+			df2 = df[df["Lasso_Binary"] == 0]
+		else:
+			df2 = df[df["Lasso_Binary"] == 0].sample( n=1000 )
+			
+		df = pd.concat([df1,df2])
+			
 	
 	## too big to plot
 	print(df.groupby([batchColumn, 'Lasso_Binary']).size() )
@@ -85,7 +139,7 @@ def get_lasso_classification_features(df, celltype):
 	styled_df = binaryCntTbl.style.format({'Batches': "{}",
                       'Binary': "{:,}",
                       'Frequency': "{:,}"}).hide()
-	dfi.export(styled_df, 'binary_count_table.png')
+	dfi.export(styled_df, 'binary_count_table.png', table_conversion='matplotlib')
 	
 	XAll = df[list(df.select_dtypes(include=[np.number]).columns.values)]
 	XAll = XAll[XAll.columns.drop(list(XAll.filter(regex='(Centroid|Binary|cnt|Name)')))].fillna(0)
@@ -154,33 +208,15 @@ def get_lasso_classification_features(df, celltype):
 	
 	########## Start output rank file
 	dfF = pd.DataFrame( list(zip(features, importance)), columns=['Name', 'Feature_Importance'])
-	dfF.sort_values(by=['Feature_Importance'], ascending=False)
-	
-	# get a list of models to evaluate
-	def get_models():
-		models = dict()
-		for i in range(2, n_features_to_RFE):
-			rfe = RFE(estimator=Lasso(), n_features_to_select=i)
-			model = Lasso(alpha=allPDFText['best_alpha'])
-			models[str(i)] = Pipeline(steps=[('s',rfe),('m',model)])
-		return models
+	dfF = dfF.sort_values(by=['Feature_Importance'], ascending=False)
 
-	# evaluate a give model using cross-validation
-	# import sklearn
-	# sklearn.metrics.SCORERS.keys()
-	def evaluate_model(name, model, X, y):
-		print(f"Starting task {name}")
-		cv = RepeatedStratifiedKFold(n_splits=n_folds, n_repeats=n_folds, random_state=1)
-		scores = cross_val_score(model, XAll, yAll, scoring='neg_root_mean_squared_error', cv=cv, n_jobs=-1, error_score='raise')
-		return name, scores
 
-	# get the models to evaluate
-	models = get_models()
-	print(	models )
 	# evaluate the models and store results
 	results = {}
-	with concurrent.futures.ProcessPoolExecutor() as executor:
-		future_to_task = {executor.submit(evaluate_model, name, value): name for name, value in models.items()}
+
+	with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+		evalModelPart = partial(evaluate_model, x=XAll, y=yAll, a=allPDFText['best_alpha'])
+		future_to_task = {executor.submit(evalModelPart, idx): idx for idx in list(range(2, n_features_to_RFE)) }
 		for future in concurrent.futures.as_completed(future_to_task):
 			name = future_to_task[future]
 			try:
@@ -189,28 +225,39 @@ def get_lasso_classification_features(df, celltype):
 			except Exception as exc:
 				print(f'{name} generated an exception: {exc}')
 
-	sys.exit(1)
+	pprint(results)
+	summary_df = summary_table(results)
+	styled_df = summary_df.style.format({'Number of Features': "{}",
+                      'Mean (-RMSE)': "{:,}",
+                      'Std.Dev. (-RMSE)': "{:,}"}).hide()
+	dfi.export(styled_df, 'ref_summary_table.png', table_conversion='matplotlib')
+		
+	idxnames = [str(key) for key in results.keys()]
+	rfevalues = [val[1] for val in results.values()]
 	
-	
-	for name, model in models.items():
-		scores = evaluate_model(name, model, )
-		results.append(scores)
-		names.append(name)
-		print('>%s %.3f (%.3f)' % (name, mean(scores), std(scores)))
 	# plot model performance for comparison
-	pyplot.boxplot(results, labels=names, showmeans=True)
+	pyplot.cla()  
+	pyplot.boxplot(rfevalues, labels=idxnames, showmeans=True)
 	pyplot.savefig("recursive_elimination_plot.png")
+	
+	##### NEED TO ADD SMARTER CUTOFF = "One Standard Error Rule"
+	featureCutoff = int(n_features_to_RFE/2)
+	ctl = dfF['Name'].tolist()[:featureCutoff]	
+	with open("top_rank_features_{}.csv".format(celltype.replace(' ','_')), 'w', newline='') as csvfile:
+		f_writer = csv.writer(csvfile)
+		f_writer.writerow(["Features"])
+		for ln in ctl:
+			f_writer.writerow([ln])
 	
 	return allPDFText
 
 if __name__ == "__main__":
-	#myData = pd.read_pickle("${trainingDataframe}")
-	myData = pd.read_pickle("training_dataframe.pkl")
-	#myLabel = "${celltype}"
-	myLabel = "B Cell"	
+	myData = pd.read_pickle("${trainingDataframe}")
+	#myData = pd.read_pickle("training_dataframe.pkl")
+	myLabel = "${celltype}".replace('[', '').replace(']', '')  ### figure out why this passes an array from nextflow...??
+	#myLabel = "B Cell"	
 
 	hshResults = get_lasso_classification_features(myData, myLabel)
-
 
 	WIDTH = 215.9
 	HEIGHT = 279.4
@@ -218,7 +265,7 @@ if __name__ == "__main__":
 	pdf.add_page()
 	# Add lettterhead and title
 	create_letterhead(pdf, WIDTH)
-	create_title("Feature Evaluation: {}".format(celltype), pdf)
+	create_title("Feature Evaluation: {}".format(myLabel), pdf)
 	# Add some words to PDF
 	write_to_pdf(pdf, "In-Variant Feature Threshold: {}".format(varThreshold))	
 	pdf.ln(5)
@@ -231,8 +278,9 @@ if __name__ == "__main__":
 	pdf.ln(5)
 	pdf.image('best_alpha_plot.png', w= (WIDTH*0.8) )
 	pdf.image('feature_ranking_plot.png', w= (WIDTH*0.8) )
+	pdf.image('ref_summary_table.png', w= (WIDTH*0.4) )
 	pdf.image('recursive_elimination_plot.png', w= (WIDTH*0.8) )
 	# Generate the PDF
-	pdf.output("{}_Features.pdf".format(celltype.replace(' ','_')), 'F')
+	pdf.output("{}_Features.pdf".format(myLabel.replace(' ','_')), 'F')
 
 

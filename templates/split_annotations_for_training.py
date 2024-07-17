@@ -96,7 +96,7 @@ def gather_annotations(pickle_files):
 	with open("celltypes.csv", 'w', newline='') as csvfile:
 		f_writer = csv.writer(csvfile, delimiter=',')
 		for ln in ctl:
-			f_writer.writerow(ln)
+			f_writer.writerow([ln])
 	# holdoutDF = merged_df.groupby(batchColumn, group_keys=False).apply(lambda x: x.sample(frac=holdoutFraction))
 	trainingDF = merged_df.loc[~merged_df.index.isin(holdoutDF.index)]
 	trainingDF = trainingDF.reset_index(drop=True)
