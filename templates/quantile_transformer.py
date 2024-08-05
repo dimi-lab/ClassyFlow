@@ -13,10 +13,10 @@ from fpdf import FPDF
 import dataframe_image as dfi
 
 ###### STATIC CONFIG VARS ######
-#quantType = '${params.qupath_object_type}'
-#nucMark = '${params.nucleus_marker}'
-quantType = 'CellObject'
-nucMark = 'DAPI'
+quantType = '${params.qupath_object_type}'
+nucMark = '${params.nucleus_marker}'
+#quantType = 'CellObject'
+#nucMark = 'DAPI'
 plotFraction = 0.25
 quantileSplit = 800 ## Good for 16-bit, but not 255 or Dual Band
 ################################

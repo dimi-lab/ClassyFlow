@@ -43,8 +43,9 @@ varThreshold = 0.01
 n_features_to_RFE = 7
 n_folds = 3
 lasso_max_iteration = 2000
-ifSubsetData=True
+ifSubsetData=False
 max_workers = 2  # Limit the number of parallel processes
+mim_class_label_threshold = 6
 
 ############################ PDF REPORTING ############################
 def create_letterhead(pdf, WIDTH):
@@ -68,6 +69,11 @@ def write_to_pdf(pdf, words):
     # Set text colour, font size, and font type
     pdf.set_text_color(r=0,g=0,b=0)
     pdf.set_font('Helvetica', '', 12)
+    pdf.write(5, words)
+def error_to_pdf(pdf, words):
+    # Set text colour, font size, and font type
+    pdf.set_text_color(r=200,g=0,b=55)
+    pdf.set_font('Helvetica', '', 16)
     pdf.write(5, words)
 ############################ PDF REPORTING ############################
 
@@ -115,9 +121,18 @@ def get_lasso_classification_features(df, celltype):
 	df["Lasso_Binary"] = 0
 	df.loc[df[classColumn] == celltype, 'Lasso_Binary'] = 1
 	
+	## Skip if too few labels exist
+	totCls = df["Lasso_Binary"].sum()
+	print("{} has {} lables".format(celltype, totCls))
+	if totCls < mim_class_label_threshold:
+		allPDFText['too_few'] = "{} '{}' is not enough class labels to model!".format(totCls, celltype)
+		return allPDFText
+	else:
+		allPDFText['too_few'] = ""
+	
+	
 	### Add optional parameter to speed up by reducing data amount. Half of target class size
 	if ifSubsetData:
-		totCls = df["Lasso_Binary"].sum()
 		totRow = df.shape[0]
 		if totCls < 1000:
 			df1 = df[df["Lasso_Binary"] == 1]
@@ -243,7 +258,7 @@ def get_lasso_classification_features(df, celltype):
 	##### NEED TO ADD SMARTER CUTOFF = "One Standard Error Rule"
 	featureCutoff = int(n_features_to_RFE/2)
 	ctl = dfF['Name'].tolist()[:featureCutoff]	
-	with open("top_rank_features_{}.csv".format(celltype.replace(' ','_')), 'w', newline='') as csvfile:
+	with open("top_rank_features_{}.csv".format(celltype.replace(' ','_').replace('|','_')), 'w', newline='') as csvfile:
 		f_writer = csv.writer(csvfile)
 		f_writer.writerow(["Features"])
 		for ln in ctl:
@@ -253,9 +268,8 @@ def get_lasso_classification_features(df, celltype):
 
 if __name__ == "__main__":
 	myData = pd.read_pickle("${trainingDataframe}")
-	#myData = pd.read_pickle("training_dataframe.pkl")
 	myLabel = "${celltype}".replace('[', '').replace(']', '')  ### figure out why this passes an array from nextflow...??
-	#myLabel = "B Cell"	
+	#myLabel = myLabel = "[B cell|T reg]".replace('[', '').replace(']', '')	
 
 	hshResults = get_lasso_classification_features(myData, myLabel)
 
@@ -266,21 +280,31 @@ if __name__ == "__main__":
 	# Add lettterhead and title
 	create_letterhead(pdf, WIDTH)
 	create_title("Feature Evaluation: {}".format(myLabel), pdf)
-	# Add some words to PDF
-	write_to_pdf(pdf, "In-Variant Feature Threshold: {}".format(varThreshold))	
-	pdf.ln(5)
-	# Add table
-	pdf.image('binary_count_table.png', w= (WIDTH*0.3) )
-	pdf.ln(10)
-	write_to_pdf(pdf, "In-Variant Features: {}".format(', '.join(hshResults['nonVarFeatures'])))
-	pdf.ln(10)
-	write_to_pdf(pdf, "Best Alpha: {}".format( hshResults['best_alpha'] ))
-	pdf.ln(5)
-	pdf.image('best_alpha_plot.png', w= (WIDTH*0.8) )
-	pdf.image('feature_ranking_plot.png', w= (WIDTH*0.8) )
-	pdf.image('ref_summary_table.png', w= (WIDTH*0.4) )
-	pdf.image('recursive_elimination_plot.png', w= (WIDTH*0.8) )
+	if hshResults['too_few'] == "":
+		# Add some words to PDF
+		write_to_pdf(pdf, "In-Variant Feature Threshold: {}".format(varThreshold))	
+		pdf.ln(5)
+		# Add table
+		pdf.image('binary_count_table.png', w= (WIDTH*0.3) )
+		pdf.ln(10)
+		write_to_pdf(pdf, "In-Variant Features: {}".format(', '.join(hshResults['nonVarFeatures'])))
+		pdf.ln(10)
+		write_to_pdf(pdf, "Best Alpha: {}".format( hshResults['best_alpha'] ))
+		pdf.ln(5)
+		pdf.image('best_alpha_plot.png', w= (WIDTH*0.8) )
+		pdf.image('feature_ranking_plot.png', w= (WIDTH*0.8) )
+		pdf.image('ref_summary_table.png', w= (WIDTH*0.4) )
+		pdf.image('recursive_elimination_plot.png', w= (WIDTH*0.8) )
+	else:
+		error_to_pdf(pdf,hshResults['too_few'])
+		### Supply blank file
+		with open("top_rank_features_{}.csv".format(myLabel.replace(' ','_').replace('|','_')), 'w', newline='') as csvfile:
+			f_writer = csv.writer(csvfile)
+			f_writer.writerow(["Features"])
+		
+		
+		
 	# Generate the PDF
-	pdf.output("{}_Features.pdf".format(myLabel.replace(' ','_')), 'F')
+	pdf.output("{}_Features.pdf".format(myLabel.replace(' ','_').replace('|','_')), 'F')
 
 

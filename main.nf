@@ -21,7 +21,6 @@ include { featureselection_wf } from './modules/featureselections'
 include { modelling_wf } from './modules/makemodels'
 
 
-
 // -------------------------------------- //
 // Function which prints help message text
 def helpMessage() {
@@ -98,7 +97,25 @@ process generateTrainingNHoldout{
     template 'split_annotations_for_training.py'
 
 }
+// Run model on everything make results
+process predictAllCells_xgb{
+	publishDir(
+        path: "${params.output_dir}/celltypes",
+        pattern: "*_PRED.tsv",
+        mode: "copy"
+    )
+    
+	input:
+	tuple val(model_name), path(model_path)
+	tuple val(batchID), path(pickleTable)
+	
+	output:
+	path("*.tsv")
+	
+	script:
+    template 'predict_celltypes.py'
 
+}
 // -------------------------------------- //
 
 
@@ -127,7 +144,6 @@ workflow {
     	/*
     	 * - Subworkflow to handle all Normalization/Standardization Tasks - 
     	 */ 
-    	
     	normalizedDataFrames = normalization_wf(addEmptyMarkerNoise.output.modbatchtables)
     	labledDataFrames = generateTrainingNHoldout(normalizedDataFrames.map{ it[1] }.collect())
     	
@@ -139,8 +155,11 @@ workflow {
     	/*
     	 * - Subworkflow to generate models and then check them against the holdout - 
     	 */ 
-		modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures)
-    	 
+		bestModel = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures)
+		
+		
+    	// Run the best model on the full input batches/files 
+    	predictAllCells_xgb(bestModel, normalizedDataFrames)
     	
     }
     

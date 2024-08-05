@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.backends.backend_pdf
 
-#objtype = '${params.qupath_object_type}'
-objtype = 'CellObject'
+objtype = '${params.qupath_object_type}'
+#objtype = 'CellObject'
 #nucMark = '${params.qupath_object_type}'
 nucMark = 'DAPI'
 downsampleFrac = 0.5
@@ -56,7 +56,29 @@ def create_comparative_report(pdfOUT, nom, hshOfDFs):
 			pdfOUT.savefig(fig)
 			
 		else:
-			raise ValueError('No code to assess other objects types in normalization comparison.')
+			#raise ValueError('No code to assess other objects types in normalization comparison.')
+			# Create a new figure for each page
+			fig, axs = plt.subplots(2, 2, figsize=(8.5, 11))
+			axs = axs.flatten()
+			
+			c1 = list(filter(lambda x:'Mean' in x, nucDF.columns.tolist()))[0]
+			subNuc[c1].plot.hist(bins=16,title='{} - {}'.format(ky,c1), ax=axs[0])
+			
+			c2 = list(filter(lambda x:'Mean' in x, subOther.columns.tolist()))
+			tmp = subOther.melt(value_vars=c2, var_name='meteric', value_name='vals')
+			tmp['vals'].plot.hist(bins=16,title='{} - {}'.format(ky,'All Other Cell: Mean'), ax=axs[1], color='g')
+			
+			sts = subOther[c2].mean(axis=0)
+			d1 = sts.idxmin()
+			d2 = sts.idxmax()
+			subOther[d1].plot.hist(bins=16,title='{} Darkest - {}'.format(ky,d1), ax=axs[2], color='y')
+			subOther[d2].plot.hist(bins=16,title='{} Brightest - {}'.format(ky,d2), ax=axs[3], color='k')
+
+			# Adjust layout and save the page to the PDF
+			plt.tight_layout()
+			pdfOUT.savefig(fig)
+			
+			
 
 
 def select_best_normalization():
