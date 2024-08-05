@@ -40,12 +40,13 @@ import dataframe_image as dfi
 classColumn = 'Classification'
 batchColumn = 'Batch'
 varThreshold = 0.01
-n_features_to_RFE = 7
-n_folds = 3
+n_features_to_RFE = 16
+n_folds = 10
 lasso_max_iteration = 2000
 ifSubsetData=False
 max_workers = 2  # Limit the number of parallel processes
 mim_class_label_threshold = 6
+n_alphas_to_search = 26
 
 ############################ PDF REPORTING ############################
 def create_letterhead(pdf, WIDTH):
@@ -171,13 +172,12 @@ def get_lasso_classification_features(df, celltype):
 	nonVarFeatures = [x for x in XAll.columns if x not in XAll.columns[sel.get_support()]]
 	print("NonVariant Features: "+', '.join(nonVarFeatures))
 	allPDFText['nonVarFeatures'] = nonVarFeatures
-	
 
 	
 	X_train, X_test, y_train, y_test = train_test_split(XAll, yAll, test_size=0.33, random_state=101, stratify=yAll)
 	#alphas = np.arange(0.0002,0.004,0.0003)
 	### Add Templating right here.
-	alphas = np.logspace(-5.1,-0.008, 3)
+	alphas = np.logspace(-5.1,-0.0004, n_alphas_to_search)
 	pipeline = Pipeline([
 		('scaler',StandardScaler(with_mean=False)),
 		('model',Lasso())
@@ -252,11 +252,11 @@ def get_lasso_classification_features(df, celltype):
 	
 	# plot model performance for comparison
 	pyplot.cla()  
-	pyplot.boxplot(rfevalues, labels=idxnames, showmeans=True)
+	pyplot.boxplot(rfevalues, labels=idxnames, showmeans=True)  ## add axis labels
 	pyplot.savefig("recursive_elimination_plot.png")
 	
 	##### NEED TO ADD SMARTER CUTOFF = "One Standard Error Rule"
-	featureCutoff = int(n_features_to_RFE/2)
+	featureCutoff = int(n_features_to_RFE/3)
 	ctl = dfF['Name'].tolist()[:featureCutoff]	
 	with open("top_rank_features_{}.csv".format(celltype.replace(' ','_').replace('|','_')), 'w', newline='') as csvfile:
 		f_writer = csv.writer(csvfile)
