@@ -7,11 +7,12 @@ from fpdf import FPDF
 import dataframe_image as dfi
 
 ## Static Variables: File Formatting
-classColumn = "${params.classifed_column_name}" # 'Classification'
+classColumn = "${params.classifed_column_name}" 
 batchColumn = 'Batch'
 holdoutFraction = float("${params.holdout_fraction}") #0.05
-cellTypeNegative = '0' 
-minimunHoldoutThreshold = 5
+cellTypeNegative = "${params.filter_out_junk_celltype_labels}".split(",")
+cellTypeNegative.append("")
+minimunHoldoutThreshold = ${params.minimum_label_count}
 
 ############################ PDF REPORTING ############################
 def create_letterhead(pdf, WIDTH):
@@ -72,7 +73,7 @@ def gather_annotations(pickle_files):
 	# merged_df = merged_df.sample(n=5000)  # remove this after testing
 	merged_df[classColumn] = merged_df[classColumn].str.strip()
 	merged_df = merged_df.dropna(subset=[classColumn])
-	merged_df = merged_df.loc[~(merged_df[classColumn].isin(["", "??", "?", cellTypeNegative]))]
+	merged_df = merged_df.loc[~(merged_df[classColumn].isin(cellTypeNegative))]
 	merged_df = merged_df.reset_index()
 
 	ct = merged_df[classColumn].value_counts()

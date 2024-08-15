@@ -31,7 +31,7 @@ from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import RepeatedStratifiedKFold
 from sklearn.feature_selection import RFE
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.feature_selection import VarianceThreshold
+
 
 import fpdf
 from fpdf import FPDF
@@ -40,13 +40,13 @@ import dataframe_image as dfi
 classColumn = 'Classification'
 batchColumn = 'Batch'
 varThreshold = 0.01
-n_features_to_RFE = 16
+n_features_to_RFE = 12
 n_folds = 10
 lasso_max_iteration = 2000
-ifSubsetData=False
-max_workers = 2  # Limit the number of parallel processes
-mim_class_label_threshold = 6
-n_alphas_to_search = 26
+ifSubsetData=True
+max_workers = 8  # Limit the number of parallel processes
+mim_class_label_threshold = ${params.minimum_label_count}
+n_alphas_to_search = 8
 
 ############################ PDF REPORTING ############################
 def create_letterhead(pdf, WIDTH):
@@ -118,60 +118,6 @@ def summary_table(data):
 
 def get_lasso_classification_features(df, celltype):
 	allPDFText = {}
-	df["cnt"]=1
-	df["Lasso_Binary"] = 0
-	df.loc[df[classColumn] == celltype, 'Lasso_Binary'] = 1
-	
-	## Skip if too few labels exist
-	totCls = df["Lasso_Binary"].sum()
-	print("{} has {} lables".format(celltype, totCls))
-	if totCls < mim_class_label_threshold:
-		allPDFText['too_few'] = "{} '{}' is not enough class labels to model!".format(totCls, celltype)
-		return allPDFText
-	else:
-		allPDFText['too_few'] = ""
-	
-	
-	### Add optional parameter to speed up by reducing data amount. Half of target class size
-	if ifSubsetData:
-		totRow = df.shape[0]
-		if totCls < 1000:
-			df1 = df[df["Lasso_Binary"] == 1]
-		else:
-			df1 = df[df["Lasso_Binary"] == 1].sample( n=1000 )
-			
-		negN = totRow - totCls
-		if negN < 1000:
-			df2 = df[df["Lasso_Binary"] == 0]
-		else:
-			df2 = df[df["Lasso_Binary"] == 0].sample( n=1000 )
-			
-		df = pd.concat([df1,df2])
-			
-	
-	## too big to plot
-	print(df.groupby([batchColumn, 'Lasso_Binary']).size() )
-	binaryCntTbl = df.groupby([batchColumn, 'Lasso_Binary']).size().reset_index()
-	styled_df = binaryCntTbl.style.format({'Batches': "{}",
-                      'Binary': "{:,}",
-                      'Frequency': "{:,}"}).hide()
-	dfi.export(styled_df, 'binary_count_table.png', table_conversion='matplotlib')
-	
-	XAll = df[list(df.select_dtypes(include=[np.number]).columns.values)]
-	XAll = XAll[XAll.columns.drop(list(XAll.filter(regex='(Centroid|Binary|cnt|Name)')))].fillna(0)
-	yAll = df['Lasso_Binary']
-
-	# using sklearn variancethreshold to find constant features
-	sel = VarianceThreshold(threshold=varThreshold)
-	sel.fit(XAll)  # fit finds the features with zero variance
-	# get_support is a boolean vector that indicates which features are retained
-	# if we sum over get_support, we get the number of features that are not constant
-	sum(sel.get_support())
-
-	# print the constant features
-	nonVarFeatures = [x for x in XAll.columns if x not in XAll.columns[sel.get_support()]]
-	print("NonVariant Features: "+', '.join(nonVarFeatures))
-	allPDFText['nonVarFeatures'] = nonVarFeatures
 
 	
 	X_train, X_test, y_train, y_test = train_test_split(XAll, yAll, test_size=0.33, random_state=101, stratify=yAll)
@@ -256,7 +202,7 @@ def get_lasso_classification_features(df, celltype):
 	pyplot.savefig("recursive_elimination_plot.png")
 	
 	##### NEED TO ADD SMARTER CUTOFF = "One Standard Error Rule"
-	featureCutoff = int(n_features_to_RFE/3)
+	featureCutoff = int(n_features_to_RFE/2)
 	ctl = dfF['Name'].tolist()[:featureCutoff]	
 	with open("top_rank_features_{}.csv".format(celltype.replace(' ','_').replace('|','_')), 'w', newline='') as csvfile:
 		f_writer = csv.writer(csvfile)

@@ -1,6 +1,10 @@
 // Produce Batch based normalization - boxcox
 process boxcox {
 	tag { batchID }
+	executor "slurm"
+    memory "50G"
+    queue "cpu-short"
+    time "24:00:00"
 	
 	publishDir(
         path: "${params.output_dir}/normalization_reports",
@@ -24,6 +28,10 @@ process boxcox {
 // Produce Batch based normalization - quantile
 process quantile {
 	tag { batchID }
+	executor "slurm"
+    memory "50G"
+    queue "cpu-short"
+    time "24:00:00"
 	
 	publishDir(
         path: "${params.output_dir}/normalization_reports",
@@ -46,7 +54,11 @@ process quantile {
 // Produce Batch based normalization - min/max scaling
 process minmax {
 	tag { batchID }
-
+	executor "slurm"
+    memory "40G"
+    queue "cpu-short"
+    time "24:00:00"
+    
 	publishDir(
         path: "${params.output_dir}/normalization_reports",
         pattern: "*.pdf",
@@ -67,7 +79,11 @@ process minmax {
 
 process logscale {
 	tag { batchID }
-
+	executor "slurm"
+    memory "30G"
+    queue "cpu-short"
+    time "24:00:00"
+    
 	publishDir(
         path: "${params.output_dir}/normalization_reports",
         pattern: "*.pdf",

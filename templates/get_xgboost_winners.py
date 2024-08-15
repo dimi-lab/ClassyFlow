@@ -152,7 +152,8 @@ if __name__ == "__main__":
 		next(file) # Skip header
 		featureList = file.readlines()
 	featureList = list(set([line.strip() for line in featureList]))
-	featureList.remove('level_0')
+	if 'level_0' in featureList:
+		featureList.remove('level_0')
 	featureList.append(classColumn)
 	focusData = myData[featureList]
 

@@ -60,6 +60,7 @@ process xgboostingFinalModel {
     publishDir(
         path: "${params.output_dir}/models",
         pattern: "classes.npy",
+        overwrite: true,
         mode: "copy"
     )
 	
