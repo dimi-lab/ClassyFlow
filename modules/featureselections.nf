@@ -11,13 +11,10 @@ process topLabelSplit {
 
 	output:
 	tuple val(celltype), path("binary_df*")
-	//path("binary_count_table*"), emit: binary_cnts
-	//path("non_variant_features*"), emit: nonvars
-
+	
 	script:
 	template 'split_cell_type_labels.py'
 }
-
 
 process search_for_alphas {
 	executor "slurm"
@@ -29,59 +26,78 @@ process search_for_alphas {
 	tuple val(celltype), path(binary_dataframe), val(logspace_chunk)
     
     output:
-    val(celltype)
-    path("alphas_params*"), emit: alphas
+    tuple val(celltype), path("alphas_params*"), emit: alphas
     
     script:
     template 'search_all_alphas.py'
-
 }
 
 process merge_alphas_search_csv_files {
     input:
-    path csv_files
+    tuple val(celltype), path(csv_files)
 
     output:
-    path "merged_alphas.csv"
+    tuple val(celltype), path("merged_alphas_*.csv")
 
     script:
+    // Remove spaces from the original string
+    cleanedString = celltype.replaceAll(/\s+/, '')
     """
     # Concatenate all CSV files, sort by mean_test_score
-    head -n 1 ${csv_files[0]} > merged_alphas.csv
-    tail -n +2 -q ${csv_files.join(' ')} | sort -t, -k1,1nr >> merged_alphas.csv
+    head -n 1 ${csv_files[0]} > merged_alphas_${cleanedString}.csv
+    tail -n +2 -q ${csv_files.join(' ')} | sort -t, -k1,1nr >> merged_alphas_${cleanedString}.csv
     """
 }
 
 process select_best_alpha {
     input:
-    path merged_csv
+    tuple val(celltype), path(merged_csv)
 
     output:
-    stdout
+    tuple val(celltype), stdout
 
     shell:
     """
     # Extract the best_alpha where mean_test_score is the highest
     best_alpha=\$(awk -F, 'NR==2 {best=\$3} END {print best}' ${merged_csv})
-    echo \$best_alpha
+    echo -n \$best_alpha
     """
 }
+
+
 process runAllRFE{
 	executor "slurm"
-	memory "14G"
+    cpus 8
+	memory "4G"
 	queue "cpu-short"
 	time "24:00:00"
 
 	input:
-	tuple val(celltype), path(binary_dataframe), val(n_feats)
-	val(best_alpha)
+	tuple val(celltype), path(binary_dataframe), val(best_alpha), val(n_feats)
 	    
     output:
-    val(celltype)
-    path("ref_scores*"), emit: alphas
+    tuple val(celltype), path("rfe_scores*"), emit: feature_scores
     
     script:
-    template 'calculate_RFE.py.py'
+    template 'calculate_RFE.py'
+}
+
+
+process merge_rfe_score_csv_files {
+    input:
+    tuple val(celltype), path(csv_files)
+
+    output:
+    tuple val(celltype), path("merged_rfe_scores_*.csv")
+
+    script:
+    // Remove spaces from the original string
+    cleanedString = celltype.replaceAll(/\s+/, '')
+    """
+    # Concatenate all CSV files, sort by mean_test_score
+    head -n 1 ${csv_files[0]} > merged_rfe_scores_${cleanedString}.csv
+    tail -n +2 -q ${csv_files.join(' ')} | sort -t, -k1,1nr >> merged_rfe_scores_${cleanedString}.csv
+    """
 }
 
 
@@ -90,8 +106,7 @@ process runAllRFE{
 // Need to generate a comma seperated list of Celltype labels from Pandas
 process examineClassLabel{
 	executor "slurm"
-    cpus 16
-    memory "40G"
+    memory "20G"
     queue "cpu-short"
     time "24:00:00"
 
@@ -102,8 +117,7 @@ process examineClassLabel{
     )
     
 	input:
-	tuple val(celltype), path(trainingDataframe)
-	val(bestAlpha)
+	tuple val(celltype), path(trainingDataframe), val(best_alpha), path(rfe_scores), path(alpha_scores)
 	
 	output:
 	path("top_rank_features_*.csv"), emit: feature_list
@@ -113,17 +127,12 @@ process examineClassLabel{
 	template 'generate_cell_type_selection.py'
 }
 
-
-
-
-
-
 process mergeAndSortCsv {
     input:
     path csv_files
 
     output:
-    path "selected_features.csv"
+    path("selected_features.csv")
 
     script:
     """
@@ -133,8 +142,10 @@ process mergeAndSortCsv {
 }
 // -------------------------------------- //
 
-//Need to generate list of possible alpha values to attempt
-//logspace_values = (0..<24).collect { idx -> Math.exp(-5.1 + idx * (Math.log(10) * (-0.0004 - (-5.1)) / 23)) }
+
+
+
+
 
 workflow featureselection_wf {
 	take: 
@@ -142,17 +153,14 @@ workflow featureselection_wf {
 	celltypeCsv
 	
 	main:
-	// Split the list into individual elements
+	// Step1. Split the list into individual elements
 	list_channel = celltypeCsv
-		.splitCsv(header: false, sep: ',')
-	//     list_channel.view()
+		.splitCsv(header: false, sep: ',').flatten()
+	list_channel.dump(tag: 'markers', pretty: true)
 
-	//Generate binary data frames	
+	//Step 2. Generate binary data frames for each label	
 	bls = topLabelSplit(trainingPickleTable, list_channel)
 
-	// Debugging views (Remove these if not needed)
-    // bls.lbl.view()
-    // bls.binary_df.view()
     //lgVals = logspace_values  //.collate(2)   //[a,b,c,d] = [[a,b],[c,d]]
     logspace_values_channel = Channel.from(
     (0..<96).collect { idx -> 
@@ -166,24 +174,47 @@ workflow featureselection_wf {
 	}
 	combined_channel.dump(tag: 'alpha_searching', pretty: true)
 	
+	// Step 4. Search many parameters to determine best alpha per label
 	sfa = search_for_alphas(combined_channel)
 	
-	// Merge CSV files into one
-    merged_csv = merge_alphas_search_csv_files(sfa.alphas.collect())
+	// Step 5. Merge CSV files into one per label
+    merged_csv = merge_alphas_search_csv_files(sfa.alphas.groupTuple())
 
-    // Select the best alpha from the merged CSV
-    best_alpha = select_best_alpha(merged_csv)
-	best_alpha.view()
+    // Step 6. Sort and Select the best alpha from the merged CSV
+    best_alpha_channel = select_best_alpha(merged_csv)
 	
 	
-	ref_counts = Channel.from(2..12)
-	combined_channel2 = bls.combine(ref_counts).map { lbl, binary_df, rfeIdx ->
-		tuple( lbl, binary_df, rfeIdx )
-	}
+	//bls.view()	
+	//best_alpha_channel.view()
 	
-	rfeRez = runAllRFE(combined_channel2, best_alpha)
 	
-	fts = examineClassLabel(bls, best_alpha)
+	// Debugging intermediate outputs
+	labelWithAlphas = bls
+    .combine(best_alpha_channel, by: 0)
+	//	labelWithAlphas.view() // Check the structure of the combined tuples
+    labelWithAlphas.dump(tag: 'labelWithAlphas', pretty: true)
+    
+	ref_counts = Channel.from(2..14)
+	//ref_counts.view()
+	//labelWithAlphas.view()
+    // Combine the `labelWithAlphas` with `ref_counts`
+    scatter2_channel = labelWithAlphas.combine(ref_counts)
+    //scatter2_channel.view()
+   	scatter2_channel.dump(tag: 'alpha_and_rfe', pretty: true)
+	rfeRez = runAllRFE(scatter2_channel)
+	
+	refScores = merge_rfe_score_csv_files(rfeRez.feature_scores.groupTuple())
+	
+	//labelWithEverything = labelWithAlphas.join(refScores, by: 0).map { labelAlpha, rfe_tuple ->
+    //    def (celltype1, binary_df, best_alpha) = labelAlpha
+    //    def (celltype2, rfe_csv) = rfe_tuple
+    //    return tuple(celltype1, binary_df, best_alpha, rfe_csv)
+    //}
+    labelWithEverything = labelWithAlphas.join(refScores, by: 0).join(merged_csv, by: 0)
+    //labelWithEverything.view()	
+    labelWithEverything.dump(tag: 'feat_sec_everything', pretty: true)
+	
+	fts = examineClassLabel(labelWithEverything)
 		
 	mas = mergeAndSortCsv(fts.feature_list.collect())
 	

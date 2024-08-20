@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, csv, warnings, random, string
+import os, sys, csv, re, warnings, random, string
 import pandas as pd
 import numpy as np
 from pprint import pprint
@@ -64,9 +64,18 @@ def grid_search_alpha_set(df, celltype, alphas):
 	}) 
 	searchAlphas['best_alpha'] = search.best_params_['model__alpha']
 	searchAlphas['input_a'] = format_floats(alphas)
+	searchAlphas['logspace'] = alphas
 	print(searchAlphas)
+	
+	
+	
+	
+	
+	
+	
 	random_5_letters = ''.join(random.choice(string.ascii_letters) for _ in range(5))
-	searchAlphas.to_csv("alphas_params_{}_{}_{}.csv".format(celltype, format_floats(alphas),random_5_letters), index=False) 	
+	clean_celltype = re.sub(r'[^a-zA-Z0-9]', '', celltype)
+	searchAlphas.to_csv("alphas_params_{}_{}_{}.csv".format(clean_celltype, format_floats(alphas),random_5_letters), index=False) 	
 
 
 
