@@ -10,7 +10,7 @@ process xgboostingModel {
     cpus 16
     memory "30G"
     queue "cpu-short"
-    time "24:00:00"
+    time "8:00:00"
 
 	input:
 	path(trainingDataframe)
@@ -70,8 +70,8 @@ process xgboostingFinalModel {
 	path(model_performance_table)
 	
 	output:
-	path("XGBoost_Model_First.pkl")
-	path("XGBoost_Model_Second.pkl")
+	path("XGBoost_Model_First.pkl"), emit: m1
+	path("XGBoost_Model_Second.pkl"), emit: m2
 	path("Model_Development_Xgboost.pdf")
 	path("classes.npy")
 	
@@ -156,11 +156,12 @@ workflow modelling_wf {
 	xgbHyper = xgboostingModel(trainingPickleTable, featuresCSV, params_channel)
 	paramSearch = mergeXgbCsv(xgbHyper.behavior.collect())
 	
-	xgboostingFinalModel(trainingPickleTable, featuresCSV, paramSearch.table)
+	xgbModels = xgboostingFinalModel(trainingPickleTable, featuresCSV, paramSearch.table)
 	
 	/// Able to add more modelling modules here
 	
-	allModelsTrained = Channel.fromPath( "${params.output_dir}/models/XGBoost_Model*.pkl" )
+	//allModelsTrained = Channel.fromPath( "${params.output_dir}/models/XGBoost_Model*.pkl" )
+	allModelsTrained = xgbModels.m1.concat(xgbModels.m2).flatten()
 	allModelsTrained.subscribe { println "Model: $it" }
 	//allModelsTrained.view()
 	

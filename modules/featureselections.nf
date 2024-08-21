@@ -3,14 +3,14 @@ process topLabelSplit {
 	executor "slurm"
 	memory "10G"
 	queue "cpu-short"
-	time "24:00:00"
+	time "5:00:00"
 
 	input:
 	path(trainingDataframe)
 	val(celltype)
 
 	output:
-	tuple val(celltype), path("binary_df*")
+	tuple val(celltype), path("binary_df*"), optional: true
 	
 	script:
 	template 'split_cell_type_labels.py'
@@ -20,7 +20,7 @@ process search_for_alphas {
 	executor "slurm"
 	memory "14G"
 	queue "cpu-short"
-	time "24:00:00"
+	time "5:00:00"
 	
 	input:
 	tuple val(celltype), path(binary_dataframe), val(logspace_chunk)
@@ -70,7 +70,7 @@ process runAllRFE{
     cpus 8
 	memory "4G"
 	queue "cpu-short"
-	time "24:00:00"
+	time "6:00:00"
 
 	input:
 	tuple val(celltype), path(binary_dataframe), val(best_alpha), val(n_feats)
@@ -108,7 +108,7 @@ process examineClassLabel{
 	executor "slurm"
     memory "20G"
     queue "cpu-short"
-    time "24:00:00"
+    time "4:00:00"
 
 	publishDir(
         path: "${params.output_dir}/celltype_reports",
