@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.backends.backend_pdf
 import numpy as np
+from pprint import pprint 
 
 import fpdf
 from fpdf import FPDF
@@ -95,6 +96,8 @@ def collect_and_transform(df, batchName):
 	# Apply log transformation to all numeric columns
 	bcDf = df
 	numeric_cols = bcDf.select_dtypes(include=[np.number]).columns
+	pprint(numeric_cols)
+	numeric_cols = [ x for x in numeric_cols if "Centroid" not in x ]
 	bcDf[numeric_cols] = bcDf[numeric_cols].apply(lambda x: np.log(x + 1))  # Adding 1 to avoid log(0)
 
 

@@ -46,6 +46,11 @@ process mergeXgbCsv {
 }
 
 process xgboostingFinalModel {
+	executor "slurm"
+    memory "30G"
+    queue "cpu-short"
+    time "8:00:00"
+    
 	publishDir(
         path: "${params.output_dir}/model_reports",
         pattern: "*.pdf",
@@ -80,6 +85,11 @@ process xgboostingFinalModel {
 
 }
 process holdOutXgbEvaluation{
+	executor "slurm"
+    memory "30G"
+    queue "cpu-short"
+    time "8:00:00"
+    
 	publishDir(
         path: "${params.output_dir}/model_reports",
         pattern: "*.pdf",

@@ -7,10 +7,8 @@ import seaborn as sns
 import matplotlib.backends.backend_pdf
 
 objtype = '${params.qupath_object_type}'
-#objtype = 'CellObject'
-#nucMark = '${params.qupath_object_type}'
-nucMark = 'DAPI'
-downsampleFrac = 0.5
+nucMark = '${params.nucleus_marker}'
+downsampleFrac = ${params.downsample_normalization_plots}
 
 def create_comparative_report(pdfOUT, nom, hshOfDFs):
 	for ky, df in hshOfDFs.items():
@@ -116,10 +114,8 @@ def buildDataDictionary(lstOfFiles):
 
 if __name__ == "__main__":
 	norm_files = "${all_possible_tables}".split(' ')
-	#norm_files = "merged_dataframe_SET02_mod.pkl boxcox_transformed_SET02.tsv minmax_transformed_SET02.tsv quantile_transformed_SET02.tsv".split(' ')
-	myFileIdx = "${batchID}"	
-	#myFileIdx = "SET02"
-	overrideVar = 'boxcox'
+	myFileIdx = "${batchID}"
+	overrideVar = "${params.override_normalization}"
 
 	## Make this a dictonary so it is expandable later, when adding more normalization approaches.
 	allApproaches = buildDataDictionary(norm_files)
@@ -136,6 +132,9 @@ if __name__ == "__main__":
 		print("Override Found")
 		if overrideVar in allApproaches.keys():
 			allApproaches[overrideVar].to_pickle('normalized_{}.pkl'.format(myFileIdx))
+		else:
+			print(allApproaches.keys())
+			sys.exit(1)
 	
 	
 	
