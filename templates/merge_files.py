@@ -4,8 +4,10 @@ import sys, os
 import pandas as pd
 
 slide_by_prefix = ${params.slide_contains_prefix}
-input_extension='${params.quant_file_extension}'
-input_delimiter='${params.quant_file_delimiter}'
+folder_is_slide = ${params.folder_is_slide}
+
+input_extension="${params.quant_file_extension}"
+input_delimiter="${params.quant_file_delimiter}"
 
 def merge_tab_delimited_files(directory_path, excld):
 	# List all files in the directory
@@ -16,10 +18,19 @@ def merge_tab_delimited_files(directory_path, excld):
 	for file in files:
 		file_path = os.path.join(directory_path, file)
 		df = pd.read_csv(file_path, sep=input_delimiter)
+		#print(file_path) - Used to debug, misformatted files.
+		#print(df.columns.tolist())
 		if excld != '':
 			df = df[df.columns.drop(list(df.filter(regex='('+excld+')')))]
 		if slide_by_prefix:
-			df['Slide'] = [e.split('_')[0] for e in df['Image'].tolist() ]		
+			df['Slide'] = [e.split('_')[0] for e in df['Image'].tolist() ]
+		elif folder_is_slide:
+			df['Slide'] = directory_path
+		else:
+			df['Slide'] = file
+			
+		if folder_is_slide:
+			df['Image'] = directory_path+'-'+df['Image']
 		dataframes.append(df)
 
 	# Concatenate all DataFrames
