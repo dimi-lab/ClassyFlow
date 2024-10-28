@@ -41,7 +41,8 @@ process merge_alphas_search_csv_files {
 
     script:
     // Remove spaces from the original string
-    cleanedString = celltype.replaceAll(/\s+/, '')
+    cleanedString = celltype.replaceAll(/[\s\/]+/, '')
+    cleanedString = cleanedString.replaceAll(/\|/, '_')
     """
     # Concatenate all CSV files, sort by mean_test_score
     head -n 1 ${csv_files[0]} > merged_alphas_${cleanedString}.csv
