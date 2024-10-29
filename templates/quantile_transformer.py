@@ -15,10 +15,9 @@ import dataframe_image as dfi
 ###### STATIC CONFIG VARS ######
 quantType = '${params.qupath_object_type}'
 nucMark = '${params.nucleus_marker}'
-#quantType = 'CellObject'
-#nucMark = 'DAPI'
+
 plotFraction = 0.25
-quantileSplit = 800 ## Good for 16-bit, but not 255 or Dual Band
+quantileSplit = ${params.quantile_split} 
 ################################
 
 
@@ -78,6 +77,9 @@ def collect_and_transform(df, batchName):
 		df_batching2 = smTble.filter(regex='Cell: Mean',axis=1)
 	else: 
 		df_batching2 = smTble.filter(regex='Mean',axis=1)
+		
+	# Drop columns with no variability (all values are the same)
+	df_batching2 = df_batching2.loc[:, df_batching2.nunique() > 1]
 	
 	myFields = df_batching2.columns.to_list()
 	NucOnly = list(filter(lambda x:nucMark in x, myFields))[0]

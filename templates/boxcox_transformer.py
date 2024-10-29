@@ -88,7 +88,8 @@ def collect_and_transform(df, batchName):
 	else: 
 		df_batching2 = smTble.filter(regex='Mean',axis=1)
 	
-	
+	# Drop columns with no variability (all values are the same)
+	df_batching2 = df_batching2.loc[:, df_batching2.nunique() > 1]
 	
 	
 	### Do Box Cox on per batch level
