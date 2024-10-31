@@ -2,7 +2,7 @@
 process boxcox {
 	tag { batchID }
 	executor "slurm"
-    memory "50G"
+    memory "60G"
     queue "cpu-short"
     time "24:00:00"
 	
@@ -29,7 +29,7 @@ process boxcox {
 process quantile {
 	tag { batchID }
 	executor "slurm"
-    memory "50G"
+    memory "60G"
     queue "cpu-short"
     time "24:00:00"
 	
@@ -55,7 +55,7 @@ process quantile {
 process minmax {
 	tag { batchID }
 	executor "slurm"
-    memory "40G"
+    memory "50G"
     queue "cpu-short"
     time "24:00:00"
     
@@ -80,7 +80,7 @@ process minmax {
 process logscale {
 	tag { batchID }
 	executor "slurm"
-    memory "30G"
+    memory "50G"
     queue "cpu-short"
     time "24:00:00"
     
