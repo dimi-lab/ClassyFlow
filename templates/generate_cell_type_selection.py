@@ -234,7 +234,7 @@ def get_lasso_classification_features(df, celltype, a, aTbl, rfeTbl):
 	
 	
 	ctl = dfF['Name'].tolist()[:featureCutoff]	
-	with open("top_rank_features_{}.csv".format(celltype.replace(' ','_').replace('|','_')), 'w', newline='') as csvfile:
+	with open("top_rank_features_{}.csv".format(celltype.replace(' ','_').replace('|','_').replace('/','')), 'w', newline='') as csvfile:
 		f_writer = csv.writer(csvfile)
 		f_writer.writerow(["Features"])
 		for ln in ctl:
@@ -280,13 +280,13 @@ if __name__ == "__main__":
 	else:
 		error_to_pdf(pdf,hshResults['too_few'])
 		### Supply blank file
-		with open("top_rank_features_{}.csv".format(myLabel.replace(' ','_').replace('|','_')), 'w', newline='') as csvfile:
+		with open("top_rank_features_{}.csv".format(myLabel.replace(' ','_').replace('|','_').replace('/','')), 'w', newline='') as csvfile:
 			f_writer = csv.writer(csvfile)
 			f_writer.writerow(["Features"])
 		
 		
 		
 	# Generate the PDF
-	pdf.output("{}_Features.pdf".format(myLabel.replace(' ','_').replace('|','_')), 'F')
+	pdf.output("{}_Features.pdf".format(myLabel.replace(' ','_').replace('|','_').replace('/','')), 'F')
 
 
