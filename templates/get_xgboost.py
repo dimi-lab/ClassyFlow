@@ -24,7 +24,7 @@ classColumn = 'Classification' #"${params.classifed_column_name}" # 'Classificat
 
 cpu_jobs=16
 uTaskID="${task.index}"
-mim_class_label_threshold = 6
+mim_class_label_threshold = ${params.minimum_label_count}
 
 def make_a_new_model(toTrainDF):
 	allPDFText = {}
