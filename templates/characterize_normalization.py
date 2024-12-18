@@ -128,10 +128,12 @@ if __name__ == "__main__":
 		print("No Override - Proceed to Auto Select")
 		# Save the merged DataFrame as a pickle file
 		allApproaches['original'].to_pickle('normalized_{}.pkl'.format(myFileIdx))
+		allApproaches['original'].to_csv("normalized_{}_{}.tsv".format('original',myFileIdx), sep="\t")
 	else:
 		print("Override Found")
 		if overrideVar in allApproaches.keys():
 			allApproaches[overrideVar].to_pickle('normalized_{}.pkl'.format(myFileIdx))
+			allApproaches[overrideVar].to_csv("normalized_{}_{}.tsv".format(overrideVar,myFileIdx), sep="\t") 
 		else:
 			print(allApproaches.keys())
 			sys.exit(1)
