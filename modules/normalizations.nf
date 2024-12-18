@@ -123,7 +123,7 @@ process identify_best{
 	output:
 	tuple val(batchID), path("normalized_${batchID}.pkl"), emit: norm_df
 	path("multinormalize_report_${batchID}.pdf")
-	path("normalized_*_${batchID}.tsv)
+	path("normalized_*_${batchID}.tsv")
 
 	script:
 	template 'characterize_normalization.py'
