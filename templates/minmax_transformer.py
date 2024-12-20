@@ -98,9 +98,6 @@ def collect_and_transform(df, pdfOUT, qTyp, nucMark):
 		# Adjust layout and save the page to the PDF
 		plt.tight_layout()
 		pdfOUT.savefig(fig)
-	
-	
-	
 	return bcDf
 
 if __name__ == "__main__":
