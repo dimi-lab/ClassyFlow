@@ -104,16 +104,10 @@ def collect_and_transform(df, pdfOUT, qTyp, nucMark):
 	return bcDf
 
 if __name__ == "__main__":
-	#myData = pd.read_pickle("${pickleTable}")
-	#myFileIdx = "${batchID}"
-	#quantType = '${params.qupath_object_type}'
-	#nucMark = '${params.nucleus_marker}'
-
-	myData = pd.read_pickle("merged_dataframe_Mel_BMS_2_mod.pkl")
-	myFileIdx = "Mel_BMS_2"
-	quantType = 'DetectionObject'
-	nucMark = 'DAPI'
-
+	myData = pd.read_pickle("${pickleTable}")
+	myFileIdx = "${batchID}"
+	quantType = '${params.qupath_object_type}'
+	nucMark = '${params.nucleus_marker}'
 			
 	pdfOUT = matplotlib.backends.backend_pdf.PdfPages("minmax_report_{}.pdf".format(myFileIdx))
 	trnsfTBL = collect_and_transform(myData, pdfOUT, quantType, nucMark)
