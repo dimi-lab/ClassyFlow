@@ -69,7 +69,7 @@ def collect_and_transform(df, pdfOUT, qTyp, nucMark):
 	pdfOUT.savefig( origVals.get_figure() )
 	
 	
-	colNames = list(filter(lambda x:'Mean' in x, df.columns.tolist()))[0:10]
+	colNames = list(filter(lambda x:'Mean' in x, df.columns.tolist()))
 	NucOnly = list(filter(lambda x:nucMark in x, colNames))[0]
 	for i in range(0, len(colNames), 8):
 		# Create a new figure for each page

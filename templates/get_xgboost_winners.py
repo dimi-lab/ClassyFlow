@@ -25,6 +25,8 @@ classColumn = 'Classification' #"${params.classifed_column_name}" # 'Classificat
 cpu_jobs=16
 leEncoderFile = "${params.output_dir}/models/classes.npy"
 
+mim_class_label_threshold = ${params.minimum_label_count}
+
 
 ############################ PDF REPORTING ############################
 def create_letterhead(pdf, WIDTH):
@@ -92,6 +94,11 @@ def plot_parameter_search(df):
 
 def make_a_new_model(toTrainDF):
 	allPDFText = {}
+	class_counts = toTrainDF[classColumn].value_counts()
+	# Identify classes with fewer than 2 instances
+	classes_to_keep = class_counts[class_counts > mim_class_label_threshold].index
+	# Filter the dataframe to remove these classes
+	toTrainDF = toTrainDF[toTrainDF[classColumn].isin(classes_to_keep)]
 	X = toTrainDF[list(toTrainDF.select_dtypes(include=[np.number]).columns.values)]
 
 	le = preprocessing.LabelEncoder()

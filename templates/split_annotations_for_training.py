@@ -90,7 +90,7 @@ def gather_annotations(pickle_files):
                       'Counts': "{:,}",
                       'Frequency': "{:.4f}%",
                       'Holdout': "{:,}"}).hide()
-	dfi.export(styled_df, 'cell_count_table.png')
+	dfi.export(styled_df, 'cell_count_table.png', max_rows=-1)
 
 	
 	ctl = merged_df[classColumn].unique().tolist()
