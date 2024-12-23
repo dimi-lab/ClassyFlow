@@ -16,9 +16,6 @@ import dataframe_image as dfi
 ###### STATIC CONFIG VARS ######
 quantType = '${params.qupath_object_type}'
 nucMark = '${params.nucleus_marker}'
-
-#quantType = 'CellObject'
-#nucMark = 'NA1'
 plotFraction = 0.25
 ################################
 
@@ -78,12 +75,18 @@ def collect_and_transform(df, batchName):
 		df_batching2 = smTble.filter(regex='Cell: Mean',axis=1)
 	else: 
 		df_batching2 = smTble.filter(regex='Mean',axis=1)
+		
+	# Drop columns with no variability (all values are the same)
+	df_batching2 = df_batching2.loc[:, df_batching2.nunique() > 1]
 	
 	myFields = df_batching2.columns.to_list()
 	NucOnly = list(filter(lambda x:nucMark in x, myFields))[0]
 	for idx, fld in enumerate(myFields):
 		if fld == NucOnly:
 			continue
+#		print("  >>  {} << ".format(fld))
+#		print(df_batching2[[NucOnly,fld]].describe())
+		
 		denstPlt = df_batching2[[NucOnly,fld]].plot.density(figsize = (16, 8),linewidth = 3)
 		plt.title("{} Distributions (original values)".format(fld))
 		fig = denstPlt.get_figure()
@@ -94,7 +97,7 @@ def collect_and_transform(df, batchName):
 		
 	# grab just quant fields
 	# Apply log transformation to all numeric columns
-	bcDf = df
+	bcDf = df.copy(deep=True)
 	numeric_cols = bcDf.select_dtypes(include=[np.number]).columns
 	pprint(numeric_cols)
 	numeric_cols = [ x for x in numeric_cols if "Centroid" not in x ]
@@ -196,9 +199,7 @@ def generate_pdf_report(outfilename, batchName):
 if __name__ == "__main__":
 	myData = pd.read_pickle("${pickleTable}")
 	myFileIdx = "${batchID}"
-	#myData = pd.read_pickle("merged_dataframe_AE_QUANT_mod.pkl")
-	#myFileIdx = "AE_QUANT"
-
+	
 	collect_and_transform(myData, myFileIdx)
 
 	generate_pdf_report( "log_report_{}.pdf".format(myFileIdx), myFileIdx )

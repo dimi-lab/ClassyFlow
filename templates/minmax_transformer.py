@@ -11,7 +11,8 @@ def collect_and_transform(df, pdfOUT, qTyp, nucMark):
 	## Print original values figure
 	df['Image'] = [e.replace('.ome.tiff', '') for e in df['Image'].tolist() ]
 
-	smTble = df.groupby('Slide').apply(lambda x: x.sample(frac=0.25)) 
+	#smTble = df.groupby('Slide').apply(lambda x: x.sample(frac=0.25))
+	smTble = df.groupby('Slide', group_keys=False).apply(lambda x: x.sample(frac=0.25))
 	df_batching = smTble.filter(regex='(Mean|Median|Slide)',axis=1)
 	df_melted = pd.melt(df_batching, id_vars=["Slide"])
 
@@ -35,6 +36,10 @@ def collect_and_transform(df, pdfOUT, qTyp, nucMark):
 	else: 
 		df_batching2 = smTble.filter(regex='Mean',axis=1)
 	
+	# Drop columns with no variability (all values are the same)
+	df_batching2 = df_batching2.loc[:, df_batching2.nunique() > 1]
+	
+	#print(df_batching2.describe())
 	df_batching2.plot.density(figsize = (24, 6),linewidth = 3)
 	plt.title("Marker Distributions (original values)")
 	pdfOUT.savefig( plt.gcf() )
@@ -52,7 +57,8 @@ def collect_and_transform(df, pdfOUT, qTyp, nucMark):
 	bcDf = pd.concat([df_a.reset_index(drop=True), df_norm], axis=1).fillna(0)	
 	
 	
-	smTble = bcDf.groupby('Slide').apply(lambda x: x.sample(frac=0.25)) 
+	#smTble = bcDf.groupby('Slide').apply(lambda x: x.sample(frac=0.25)) 
+	smTble = bcDf.groupby('Slide', group_keys=False).apply(lambda x: x.sample(frac=0.25)) 
 	df_batching = smTble.filter(regex='(Mean|Median|Slide)',axis=1)
 	df_melted = pd.melt(df_batching, id_vars=["Slide"])
 	
@@ -92,9 +98,6 @@ def collect_and_transform(df, pdfOUT, qTyp, nucMark):
 		# Adjust layout and save the page to the PDF
 		plt.tight_layout()
 		pdfOUT.savefig(fig)
-	
-	
-	
 	return bcDf
 
 if __name__ == "__main__":

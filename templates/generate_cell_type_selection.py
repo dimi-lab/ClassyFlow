@@ -193,8 +193,9 @@ def get_lasso_classification_features(df, celltype, a, aTbl, rfeTbl):
 	
 	#print(rfeTbl.head())
 	# Group the data by the 'Category' column
-	grouped_data = [rfeTbl[rfeTbl['n_features'] == cat]['rfe_score'] for cat in rfeTbl['n_features'].unique()]
-	categories = rfeTbl['n_features'].unique()
+	categories = sorted(rfeTbl['n_features'].unique())
+	grouped_data = [rfeTbl[rfeTbl['n_features'] == cat]['rfe_score'] for cat in categories]
+	
 
 	# Plot model performance for comparison
 	pyplot.cla()  

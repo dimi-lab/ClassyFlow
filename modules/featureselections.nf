@@ -196,7 +196,7 @@ workflow featureselection_wf {
 	//	labelWithAlphas.view() // Check the structure of the combined tuples
     labelWithAlphas.dump(tag: 'labelWithAlphas', pretty: true)
     
-	ref_counts = Channel.from(2..14)
+	ref_counts = Channel.from(params.min_rfe_nfeatures..params.max_rfe_nfeatures)
 	//ref_counts.view()
 	//labelWithAlphas.view()
     // Combine the `labelWithAlphas` with `ref_counts`

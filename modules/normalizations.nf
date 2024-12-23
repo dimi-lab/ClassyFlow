@@ -2,7 +2,7 @@
 process boxcox {
 	tag { batchID }
 	executor "slurm"
-    memory "50G"
+    memory "60G"
     queue "cpu-short"
     time "24:00:00"
 	
@@ -29,7 +29,7 @@ process boxcox {
 process quantile {
 	tag { batchID }
 	executor "slurm"
-    memory "50G"
+    memory "60G"
     queue "cpu-short"
     time "24:00:00"
 	
@@ -55,7 +55,7 @@ process quantile {
 process minmax {
 	tag { batchID }
 	executor "slurm"
-    memory "40G"
+    memory "50G"
     queue "cpu-short"
     time "24:00:00"
     
@@ -80,7 +80,7 @@ process minmax {
 process logscale {
 	tag { batchID }
 	executor "slurm"
-    memory "30G"
+    memory "50G"
     queue "cpu-short"
     time "24:00:00"
     
@@ -110,6 +110,12 @@ process identify_best{
         pattern: "*.pdf",
         mode: "copy"
     )
+
+	publishDir(
+        path: "${params.output_dir}/normalization_files",
+        pattern: "normalized_*.tsv",
+        mode: "copy"
+    )
     
 	input:
 	tuple val(batchID), path(all_possible_tables)
@@ -117,6 +123,7 @@ process identify_best{
 	output:
 	tuple val(batchID), path("normalized_${batchID}.pkl"), emit: norm_df
 	path("multinormalize_report_${batchID}.pdf")
+	path("normalized_*_${batchID}.tsv")
 
 	script:
 	template 'characterize_normalization.py'
