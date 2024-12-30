@@ -206,11 +206,11 @@ if __name__ == "__main__":
 	pdf.ln(10)
 	# Add some words to PDF
 	eval_metrics = (
-	#("Metric", "Value"),
-	("Accuracy", round(textHsh['accuracy'],2)),
-	("Balanced Accuracy", round(textHsh['balanced_accuracy'],2)),
-	("F1 Score", round(textHsh['f1_score'],2)),
-	("Matthews Corr Coef", round(textHsh['matthews_corrcoef'],2)))
+	("Metric", "Value"),
+	("Accuracy", round(textHsh['accuracy']*100,2)),
+	("Balanced Accuracy", round(textHsh['balanced_accuracy']*100,2)),
+	("F1 Score", round(textHsh['f1_score']*100,2)),
+	("Matthews Corr Coef", round(textHsh['matthews_corrcoef']*100,2)))
 	pdf.set_font('Helvetica', '', 12)
 	pdf.set_text_color(r=0,g=0,b=0)
 
