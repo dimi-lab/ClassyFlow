@@ -8,6 +8,9 @@ import seaborn as sns
 from pprint import pprint
 from sklearn.metrics import roc_curve, auc
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import balanced_accuracy_score
+from sklearn.metrics import f1_score
+from sklearn.metrics import matthews_corrcoef
 from sklearn.metrics import confusion_matrix
 from sklearn import preprocessing
 from sklearn.preprocessing import label_binarize
@@ -45,9 +48,15 @@ def create_title(title, pdf):
 
 def write_to_pdf(pdf, words):
     # Set text colour, font size, and font type
-    pdf.set_text_color(r=0,g=0,b=0)
+    pdf.set_text_color(r=72,g=72,b=72)
     pdf.set_font('Helvetica', '', 12)
     pdf.write(5, words)
+
+def write_header(pdf, words):
+    pdf.set_text_color(r=0,g=0,b=0)
+    pdf.set_font('Helvetica', 'b', 14)
+    pdf.write(5,words)
+
 ############################ PDF REPORTING ############################
 
 
@@ -67,6 +76,10 @@ def check_holdout(toCheckDF, xgbM):
 	y_pred_proba = xgbM.predict(dmatrix)
 
 	allPDFText['accuracy'] = accuracy_score(y_holdout, y_pred_proba)
+	allPDFText['balanced_accuracy'] = balanced_accuracy_score(y_holdout, y_pred_proba)
+	allPDFText['f1_score'] = f1_score(y_holdout, y_pred_proba, average="weighted")
+	allPDFText['matthews_corrcoef'] = matthews_corrcoef(y_holdout, y_pred_proba)
+
 
 	"""Plot ROC curve for binary or multiclass classification."""
 	# Get unique values and their counts
@@ -86,6 +99,14 @@ def check_holdout(toCheckDF, xgbM):
 	#pprint(metrics_df)
 	styled_df = metrics_df.style.format().hide()
 	dfi.export(styled_df, 'crosstab.png', table_conversion='matplotlib')
+	plt.figure(figsize=(10,7))
+	plt.title("Confusion Matrix")
+	ax = sns.heatmap(metrics_df, annot=True, fmt='.10g', cmap="YlGnBu")
+	ax.set_xticklabels(metrics_df.columns)
+	ax.set_yticklabels(metrics_df.columns, rotation=0)
+	ax.set(ylabel="True Label", xlabel="Predicted Label")
+	plt.savefig("confusion_heatmap.png",  bbox_inches="tight")
+
 
 	# Multiclass case
 	y_true_binarized = label_binarize(y_holdout, classes=np.arange(n_classes))
@@ -175,13 +196,49 @@ if __name__ == "__main__":
 	create_letterhead(pdf, WIDTH)
 	create_title("Holdout Evaluation: XGBoost", pdf)
 	# Add some words to PDF
-	write_to_pdf(pdf, "Holdout Model Accuracy: %.2f%%" % (textHsh['accuracy'] * 100.0))	
-	pdf.ln(15)
+	# Brief description of this report
+	write_to_pdf(pdf, "A hold-out set is a portion of your data that you set aside and do not use during the training of your machine learning model. Think of it as a test group that helps you evaluate how well your model performs on new, unseen data")
+	pdf.ln(10)
+
+	write_header(pdf, "Evaluation Metrics:")
+	pdf.ln(10)
+	write_to_pdf(pdf, "The table below summarizes some commonly used metrics to help us evaluate the model")
+	pdf.ln(10)
+	# Add some words to PDF
+	eval_metrics = (
+	("Metric", "Value"),
+	("Accuracy", round(textHsh['accuracy']*100,2)),
+	("Balanced Accuracy", round(textHsh['balanced_accuracy']*100,2)),
+	("F1 Score", round(textHsh['f1_score']*100,2)),
+	("Matthews Corr Coef", round(textHsh['matthews_corrcoef']*100,2)))
+	pdf.set_font('Helvetica', '', 12)
+	pdf.set_text_color(r=0,g=0,b=0)
+
+	for data_row in eval_metrics:
+		for data in data_row:
+			pdf.cell(w=60, h=10, txt=str(data), border=1)
+		pdf.ln()
+
+	pdf.add_page()
+	write_header(pdf, "Hold-out Data:")
+	pdf.ln(10)
+	write_to_pdf(pdf, 'The following bar plot summarizes the number of cells we held-out for each label. For this project, we used a hold out fraction of ${params.holdout_fraction}')
+	pdf.ln(10)
 	pdf.image('label_bars.png', w= (WIDTH*0.85) )
-	pdf.ln(15)
-	pdf.image('crosstab.png', w= (WIDTH*0.8) )
-	pdf.ln(15)
-	pdf.image('auc_curve_stacked.png', w= (WIDTH*0.95) )
+
+	pdf.add_page()
+	write_header(pdf, "Confusion Matrix:")
+	pdf.ln(10)
+	write_to_pdf(pdf, "This is a heatmap that shows the number of true positive, true negative, false positive, and false negative predictions. It provides a detailed breakdown of the model's performance, helping to understand where the model is making errors.")
+	pdf.ln(10)
+	pdf.image('confusion_heatmap.png', w= (WIDTH*0.8) )
+
+	pdf.add_page()
+	write_header(pdf, "ROC/AUC:")
+	pdf.ln(10)
+	write_to_pdf(pdf, "ROC/AUC (Receiver Operating Characteristic/Area Under the Curve): The ROC curve is a graphical representation of the model's ability to distinguish between classes. The AUC is the area under this curve, providing a single value that summarizes the model's performance. A higher AUC indicates better performance.")
+	pdf.ln(10)
+	pdf.image('auc_curve_stacked.png', w= (WIDTH*0.85) )
 
 	# Generate the PDF
 	pdf.output("Holdout_on_{}.pdf".format(modelName.replace(".pkl","")), 'F')
