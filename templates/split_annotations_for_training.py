@@ -99,7 +99,7 @@ def gather_annotations(pickle_files):
 		for ln in ctl:
 			f_writer.writerow([ln])
 	# holdoutDF = merged_df.groupby(batchColumn, group_keys=False).apply(lambda x: x.sample(frac=holdoutFraction))
-	trainingDF = merged_df.loc[~merged_df.index.isin(holdoutDF.index)]
+	trainingDF = merged_df.loc[~merged_df["index"].isin(holdoutDF["index"])]
 	trainingDF = trainingDF.reset_index(drop=True)
 
 	holdoutDF.to_pickle('holdout_dataframe.pkl')
