@@ -98,7 +98,7 @@ def make_a_new_model(toTrainDF):
 	# Identify classes with fewer than 2 instances
 	classes_to_keep = class_counts[class_counts > mim_class_label_threshold].index
 	# Filter the dataframe to remove these classes
-	toTrainDF = toTrainDF[toTrainDF[classColumn].isin(classes_to_keep)]
+	#toTrainDF = toTrainDF[toTrainDF[classColumn].isin(classes_to_keep)]
 	X = toTrainDF[list(toTrainDF.select_dtypes(include=[np.number]).columns.values)]
 
 	le = preprocessing.LabelEncoder()

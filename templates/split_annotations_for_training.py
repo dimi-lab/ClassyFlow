@@ -76,6 +76,11 @@ def gather_annotations(pickle_files):
 	merged_df = merged_df.loc[~(merged_df[classColumn].isin(cellTypeNegative))]
 	merged_df = merged_df.reset_index()
 
+	#Remove classes below the threshold
+	class_counts = merged_df[classColumn].value_counts()
+	classes_to_keep = class_counts[class_counts >= minimunHoldoutThreshold].index
+	merged_df = merged_df[merged_df[classColumn].isin(classes_to_keep)]
+
 	ct = merged_df[classColumn].value_counts()
 	pt = merged_df[classColumn].value_counts(normalize=True).mul(100).round(2).astype(str) + '%'
 	
