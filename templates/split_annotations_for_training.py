@@ -82,8 +82,9 @@ def gather_annotations(pickle_files):
 
 	#Remove classes below the threshold
 	class_counts = merged_df[classColumn].value_counts()
-	classes_to_keep = class_counts[class_counts >= minimunHoldoutThreshold].index
-	merged_df = merged_df[merged_df[classColumn].isin(classes_to_keep)]
+	classes_to_remove = class_counts[class_counts < minimunHoldoutThreshold].index
+	merged_df = merged_df[~merged_df[classColumn].isin(classes_to_remove)]
+	print("The folloing classes do not have enough labels to model and have been removed from the training and holdout sets: {}".format(classes_to_remove))
 
 	# Get the stratified sample
 	holdoutDF = stratified_sample(merged_df, [batchColumn, classColumn], frac=holdoutFraction, min_count=minimunHoldoutThreshold)
