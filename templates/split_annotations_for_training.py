@@ -76,9 +76,16 @@ def gather_annotations(pickle_files):
 	merged_df = merged_df.loc[~(merged_df[classColumn].isin(cellTypeNegative))]
 	merged_df = merged_df.reset_index()
 
+	#Get some stats before filtering
 	ct = merged_df[classColumn].value_counts()
 	pt = merged_df[classColumn].value_counts(normalize=True).mul(100).round(2).astype(str) + '%'
-	
+
+	#Remove classes below the threshold
+	class_counts = merged_df[classColumn].value_counts()
+	classes_to_remove = class_counts[class_counts < minimunHoldoutThreshold].index
+	merged_df = merged_df[~merged_df[classColumn].isin(classes_to_remove)]
+	print("The folloing classes do not have enough labels to model and have been removed from the training and holdout sets: {}".format(classes_to_remove))
+
 	# Get the stratified sample
 	holdoutDF = stratified_sample(merged_df, [batchColumn, classColumn], frac=holdoutFraction, min_count=minimunHoldoutThreshold)
 	hd = holdoutDF[classColumn].value_counts()
@@ -99,7 +106,7 @@ def gather_annotations(pickle_files):
 		for ln in ctl:
 			f_writer.writerow([ln])
 	# holdoutDF = merged_df.groupby(batchColumn, group_keys=False).apply(lambda x: x.sample(frac=holdoutFraction))
-	trainingDF = merged_df.loc[~merged_df.index.isin(holdoutDF.index)]
+	trainingDF = merged_df.loc[~merged_df["index"].isin(holdoutDF["index"])]
 	trainingDF = trainingDF.reset_index(drop=True)
 
 	holdoutDF.to_pickle('holdout_dataframe.pkl')
