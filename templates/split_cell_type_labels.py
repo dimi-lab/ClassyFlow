@@ -14,7 +14,7 @@ batchColumn = 'Batch'
 varThreshold = 0.01
 mim_class_label_threshold = ${params.minimum_label_count}
 ifSubsetData=True
-subSet_n=1000
+subSet_n=3000
 
 def split_and_binarize(df, celltype):
 	df["cnt"]=1
@@ -24,9 +24,9 @@ def split_and_binarize(df, celltype):
 	## Skip if too few labels exist
 	totCls = df["Lasso_Binary"].sum()
 	print("{} has {} lables".format(celltype, totCls))
-	#if totCls < mim_class_label_threshold:
-	#	print("{} '{}' is not enough class labels to model!".format(totCls, celltype))
-	#	return 	
+	if totCls < mim_class_label_threshold:
+		print("{} '{}' is not enough class labels to model!".format(totCls, celltype))
+		return 	
 	
 	### Add optional parameter to speed up by reducing data amount. Half of target class size
 	if ifSubsetData:

@@ -38,8 +38,8 @@ import dataframe_image as dfi
 classColumn = 'Classification'
 batchColumn = 'Batch'
 varThreshold = 0.01
-n_features_to_RFE = 12
-n_folds = 10
+n_features_to_RFE = 20
+n_folds = 12
 
 ifSubsetData=True
 max_workers = 8  # Limit the number of parallel processes
@@ -50,9 +50,7 @@ varThreshold = 0.01
 
 ############################ PDF REPORTING ############################
 def create_letterhead(pdf, WIDTH):
-	#pdf.image("${projectDir}/images/ClassyFlow_Letterhead.PNG", 0, 0, WIDTH)
-	pdf.image("/research/bsi/projects/staff_analysis/m088378/SupervisedClassifierFlow/images/ClassyFlow_Letterhead.PNG", 0, 0, WIDTH)
-
+	pdf.image("${projectDir}/images/ClassyFlow_Letterhead.PNG", 0, 0, WIDTH)
 
 def create_title(title, pdf):
     # Add main title
@@ -206,7 +204,7 @@ def get_lasso_classification_features(df, celltype, a, aTbl, rfeTbl):
 	# Identify the smallest n_features within 1 standard deviation of the median
 	# Find the global median across all n_features
 	global_median = rfeTbl['rfe_score'].median()
-	global_sd = ( rfeTbl['rfe_score'].std() / 2 ) ## modify to increase asymtotic behaviour
+	global_sd = ( rfeTbl['rfe_score'].std() / 8 ) ## modify to increase asymtotic behaviour
 	print(global_median, global_sd)
 	print(summary_df)
 	# Find the smallest n_features within 1 standard deviation of the global median

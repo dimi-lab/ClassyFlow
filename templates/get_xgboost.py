@@ -20,14 +20,18 @@ import dataframe_image as dfi
 from random import randint
 
 ## Static Variables: File Formatting
-classColumn = 'Classification' #"${params.classifed_column_name}" # 'Classification'
-
+classColumn = "${params.classifed_column_name}" # 'Classification'
 cpu_jobs=16
 uTaskID="${task.index}"
 mim_class_label_threshold = ${params.minimum_label_count}
 
 def make_a_new_model(toTrainDF):
 	allPDFText = {}
+	class_counts = toTrainDF[classColumn].value_counts()
+	# Identify classes with fewer than 2 instances
+	classes_to_keep = class_counts[class_counts > mim_class_label_threshold].index
+	# Filter the dataframe to remove these classes
+	toTrainDF = toTrainDF[toTrainDF[classColumn].isin(classes_to_keep)]
 	X = toTrainDF[list(toTrainDF.select_dtypes(include=[np.number]).columns.values)]
 
 	le = preprocessing.LabelEncoder()
@@ -73,8 +77,8 @@ def make_a_new_model(toTrainDF):
 	xgboostParams.to_csv("parameters_found_{}_{}.csv".format(rnd,uTaskID), index=False)
 
 if __name__ == "__main__":
-	myData = pd.read_pickle("training_dataframe.pkl") # myData = pd.read_pickle("${trainingDataframe}")
-	with open("selected_features.csv", 'r') as file: # with open("${select_features_csv}", 'r') as file:
+	myData = pd.read_pickle("${trainingDataframe}")
+	with open("${select_features_csv}", 'r') as file:
 		next(file) # Skip header
 		featureList = file.readlines()
 	featureList = list(set([line.strip() for line in featureList]))

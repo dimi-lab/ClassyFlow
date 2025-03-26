@@ -17,7 +17,7 @@ def merge_tab_delimited_files(directory_path, excld):
 	dataframes = []
 	for file in files:
 		file_path = os.path.join(directory_path, file)
-		df = pd.read_csv(file_path, sep=input_delimiter)
+		df = pd.read_csv(file_path, sep=input_delimiter, low_memory=False)
 		#print(file_path) - Used to debug, misformatted files.
 		#print(df.columns.tolist())
 		if excld != '':
