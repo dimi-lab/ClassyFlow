@@ -1,11 +1,8 @@
 // Produce Batch based normalization - boxcox
 process boxcox {
 	tag { batchID }
-	executor "slurm"
-    memory "60G"
-    queue "cpu-short"
-    time "24:00:00"
-	
+    label 'normalization_parallel'
+
 	publishDir(
         path: "${params.output_dir}/normalization_reports",
         pattern: "*.pdf",
@@ -16,7 +13,7 @@ process boxcox {
 	tuple val(batchID), path(pickleTable)
 	
 	output:
-	tuple val(batchID), path("boxcox_transformed_${batchID}.tsv"), emit: bc_table
+	tuple val(batchID), path("boxcox_transformed_${batchID}.tsv"), emit: norm_df
 	path("boxcox_report_${batchID}.pdf")
 	
 	script:
@@ -43,7 +40,7 @@ process quantile {
 	tuple val(batchID), path(pickleTable)
 	
 	output:
-	tuple val(batchID), path("quantile_transformed_${batchID}.tsv"), emit: qt_table
+	tuple val(batchID), path("quantile_transformed_${batchID}.tsv"), emit: norm_df
 	path("quantile_report_${batchID}.pdf")
 	
 	script:
@@ -69,7 +66,7 @@ process minmax {
 	tuple val(batchID), path(pickleTable)
 	
 	output:
-	tuple val(batchID), path("minmax_transformed_${batchID}.tsv"), emit: mm_table
+	tuple val(batchID), path("minmax_transformed_${batchID}.tsv"), emit: norm_df
 	path("minmax_report_${batchID}.pdf")
 	
 	script:
@@ -94,7 +91,7 @@ process logscale {
 	tuple val(batchID), path(pickleTable)
 	
 	output:
-	tuple val(batchID), path("log_transformed_${batchID}.tsv"), emit: lg_table
+	tuple val(batchID), path("log_transformed_${batchID}.tsv"), emit: norm_df
 	path("log_report_${batchID}.pdf")
 	
 	script:
@@ -150,30 +147,46 @@ process AUGMENT_WITH_LEIDEN_CLUSTERS{
 // -------------------------------------- //
     
     
-    
 workflow normalization_wf {
-	take: 
-	batchPickleTable
-	
-	main:
-	bc = boxcox(batchPickleTable)
-	qt = quantile(batchPickleTable)
-	mm = minmax(batchPickleTable)
-	lg = logscale(batchPickleTable)
-	
-	mxchannels = batchPickleTable.mix(bc.bc_table,qt.qt_table,mm.mm_table,lg.lg_table).groupTuple()
-	mxchannels.dump(tag: 'debug_normalization_channels', pretty: true)
-	
-	bestN = IDENTIFY_BEST(mxchannels)
-	
-	// Optional line to add engineered features for difficult samples
+    take:
+    batchPickleTable
+
+    main:
+	def best_ch
+    if (params.override_normalization == "boxcox") {
+        def bc = boxcox(batchPickleTable)
+        best_ch = bc.norm_df
+    }
+    else if (params.override_normalization == "quantile") {
+        def qt = quantile(batchPickleTable)
+        best_ch = qt.norm_df
+    }
+    else if (params.override_normalization == "minmax") {
+        def mm = minmax(batchPickleTable)
+        best_ch = mm.norm_df
+    }
+    else if (params.override_normalization == "logscale") {
+        def lg = logscale(batchPickleTable)
+        best_ch = lg.norm_df
+    }
+    else {
+        def bc = boxcox(batchPickleTable).norm_df
+        def qt = quantile(batchPickleTable).norm_df
+        def mm = minmax(batchPickleTable).norm_df
+        def lg = logscale(batchPickleTable).norm_df
+
+        def mxchannels = batchPickleTable.mix(bc, qt, mm, lg).groupTuple()
+        mxchannels.dump(tag: 'debug_normalization_channels', pretty: true)
+
+        def best = IDENTIFY_BEST(mxchannels)
+        best_ch = best.norm_df
+    }
+
     if (params.run_get_leiden_clusters) {
-        bestN = AUGMENT_WITH_LEIDEN_CLUSTERS(bestN.norm_df)
-    }	
-	
-	/// add multi-batch synchro later...
-	
-	emit:
-	normalized = bestN.norm_df
-	
+        def leiden_augmented = AUGMENT_WITH_LEIDEN_CLUSTERS(best_ch)
+        best_ch = leiden_augmented.norm_df
+    }
+
+    emit:
+    normalized = best_ch
 }
