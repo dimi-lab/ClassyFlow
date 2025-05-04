@@ -104,7 +104,7 @@ process logscale {
 
 
 // Look at all of the normalizations within a batch and attempt to idendity the best approach
-process identify_best{
+process IDENTIFY_BEST{
 	publishDir(
         path: "${params.output_dir}/normalization_reports",
         pattern: "*.pdf",
@@ -128,6 +128,25 @@ process identify_best{
 	script:
 	template 'characterize_normalization.py'
 }
+
+
+process AUGMENT_WITH_LEIDEN_CLUSTERS{
+	publishDir(
+        path: "${params.output_dir}/clusters",
+        pattern: "*.pdf",
+        mode: "copy"
+    )
+    
+	input:
+	tuple val(batchID), path(norms_pkl)
+
+	output:
+    path("x_dataframe.pkl"), emit: norm_df
+	path("*report.pdf")
+
+    script:
+    template 'scimap_clustering.py'
+}
 // -------------------------------------- //
     
     
@@ -145,7 +164,12 @@ workflow normalization_wf {
 	mxchannels = batchPickleTable.mix(bc.bc_table,qt.qt_table,mm.mm_table,lg.lg_table).groupTuple()
 	mxchannels.dump(tag: 'debug_normalization_channels', pretty: true)
 	
-	bestN = identify_best(mxchannels)
+	bestN = IDENTIFY_BEST(mxchannels)
+	
+	// Optional line to add engineered features for difficult samples
+    if (params.run_get_leiden_clusters) {
+        bestN = AUGMENT_WITH_LEIDEN_CLUSTERS(bestN.norm_df)
+    }	
 	
 	/// add multi-batch synchro later...
 	

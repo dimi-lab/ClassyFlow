@@ -76,7 +76,6 @@ process addEmptyMarkerNoise {
     script:
     template 'add_empty_marker_noise.py'
 }
-
 process generateTrainingNHoldout{
 	publishDir(
         path: "${params.output_dir}/celltype_reports",
@@ -121,7 +120,6 @@ process predictAllCells_xgb{
 
 
 
-
 // Main workflow
 workflow {
     // Show help message if the user specifies the --help flag at runtime
@@ -135,7 +133,7 @@ workflow {
 
 		// Pull channel object `batchDirs` from nextflow env - see top of file.
     	mergeTabDelimitedFiles(batchDirs)
-    	
+    
     	checkPanelDesign(mergeTabDelimitedFiles.output.batchtables.collect())  
     	
     	//modify the pickle files to account for missing features...
@@ -145,6 +143,7 @@ workflow {
     	 * - Subworkflow to handle all Normalization/Standardization Tasks - 
     	 */ 
     	normalizedDataFrames = normalization_wf(addEmptyMarkerNoise.output.modbatchtables)
+    	
     	labledDataFrames = generateTrainingNHoldout(normalizedDataFrames.map{ it[1] }.collect())
     	
 		/*
