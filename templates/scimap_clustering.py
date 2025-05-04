@@ -8,10 +8,12 @@ import scanpy as sc
 # Import Scimap
 import scimap as sm
 sc.settings.figdir = "./"
-clustering_res = ${params.scimap_resolution}
+#clustering_res = ${params.scimap_resolution}
+clustering_res = 0.5
 
 # Read in the cleaned marker file
-roi_df = pd.read_pickle("${norms_pkl}")
+# roi_df = pd.read_pickle("${norms_pkl}")
+roi_df = pd.read_pickle("boxcox_transformed_TMAS1_4xB2.tsv")
 
 # Get ROI name for file paths later
 roi = roi_path.replace("all_markers_clean_", "")
