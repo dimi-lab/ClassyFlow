@@ -145,8 +145,8 @@ process AUGMENT_WITH_LEIDEN_CLUSTERS{
     template 'scimap_clustering.py'
 }
 // -------------------------------------- //
-    
-    
+
+
 workflow normalization_wf {
     take:
     batchPickleTable
@@ -190,3 +190,4 @@ workflow normalization_wf {
     emit:
     normalized = best_ch
 }
+

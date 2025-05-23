@@ -69,9 +69,9 @@ process select_best_alpha {
 process runAllRFE{
 	executor "slurm"
     cpus 8
-	memory "4G"
+	memory "5G"
 	queue "cpu-short"
-	time "6:00:00"
+	time "6:50:00"
 
 	input:
 	tuple val(celltype), path(binary_dataframe), val(best_alpha), val(n_feats)

@@ -55,8 +55,8 @@ def stratified_sample(df, stratify_cols, frac=0.01, min_count=3):
         return group.sample(frac=frac, random_state=42)
 
     # Apply the function to each group
-    #sampled_df = grouped.apply(sample_or_skip)
-    sampled_df = grouped.apply(sample_or_skip, include_groups=True)
+    sampled_df = grouped.apply(sample_or_skip)
+    #sampled_df = grouped.apply(sample_or_skip, include_groups=True)
     # Remove the multi-level index created by groupby
     sampled_df.reset_index(drop=True, inplace=True)
     return sampled_df
@@ -67,8 +67,12 @@ def gather_annotations(pickle_files):
     dataframes = []
     for file in pickle_files:
         print(f"Getting...{file}")
-        df = pd.read_pickle(file)
-        dataframe_name = os.path.basename(file).replace('.pkl','').replace('merged_dataframe_','')
+        if file.endswith('.pkl'):
+            df = pd.read_pickle(file)
+            dataframe_name = os.path.basename(file).replace('.pkl','').replace('merged_dataframe_','')
+        else:
+            df = pd.read_csv(file, sep='\t', low_memory=False)
+            dataframe_name = os.path.basename(file).replace('.tsv','').replace('boxcox_transformed_','')
         df[batchColumn] = dataframe_name
         dataframes.append(df)
     
@@ -90,6 +94,7 @@ def gather_annotations(pickle_files):
     hd = holdoutDF[classColumn].value_counts()
     
     freqTable = pd.concat([ct,pt,hd], axis=1, keys=['counts', '%', 'holdout']).reset_index()
+    freqTable.rename(columns={'index': classColumn}, inplace=True)
     #print(freqTable)
     # Apply styling to dataframe
     styled_df = freqTable.style.format({'Cell Types': "{}",
@@ -99,8 +104,12 @@ def gather_annotations(pickle_files):
     dfi.export(styled_df, 'cell_count_table.png', max_rows=-1)
 
     keptFreq = freqTable[freqTable['holdout'].notna()]
+    
+    keptFreq.columns = keptFreq.columns.str.strip()
     #pprint(keptFreq)
     #print(keptFreq.columns.tolist())
+    if classColumn not in keptFreq.columns:
+        raise ValueError(f"{classColumn} column is missing. Found columns: {keptFreq.columns.tolist()}")
     ctl = keptFreq[classColumn].tolist()
     
     with open("celltypes.csv", 'w', newline='') as csvfile:

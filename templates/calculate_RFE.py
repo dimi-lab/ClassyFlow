@@ -15,15 +15,15 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.model_selection import cross_val_score
 
 n_splits = 4
-n_folds = 10
-lasso_max_iteration = 2000
+n_folds = 9
+lasso_max_iteration = 1000
 #parallel_jobs=-1
 parallel_cpus=8
 
 
 def calculate_rfe_of_n(df, celltype, a, idx):
 	XAll = df[list(df.select_dtypes(include=[np.number]).columns.values)]
-	XAll = XAll[XAll.columns.drop(list(XAll.filter(regex='(Centroid|Binary|cnt|Name)')))].fillna(0)
+	XAll = XAll[XAll.columns.drop(list(XAll.filter(regex='(Centroid|Binary|cnt|Name|Cytoplasm)')))].fillna(0)
 	yAll = df['Lasso_Binary']
 	
 	
