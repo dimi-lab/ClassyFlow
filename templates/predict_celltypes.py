@@ -86,7 +86,11 @@ def predict_on_xgb_best_model(toCheckDF, xgbM, bID):
 
 if __name__ == "__main__":
 	batchID = "${batchID}"
-	myData = pd.read_pickle("${pickleTable}") 
+	infile = "${pickleTable}"
+	if infile.endswith('.pkl'):
+	    myData = pd.read_pickle(infile)
+	else:
+	    myData = pd.read_csv(infile, sep='\t', low_memory=False)
 		
 	modelfile = "${model_path}"
 	with open(modelfile, 'rb') as file:

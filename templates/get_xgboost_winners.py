@@ -70,7 +70,8 @@ def plot_parameter_search(df):
 
     # Plot the boxplot
     plt.figure(figsize=(12, 6))
-    boxplot = sns.boxplot(x='combination', y='testf', data=df, palette=color_palette, flierprops={'markerfacecolor':'grey'}, patch_artist=True)
+    boxplot = sns.boxplot(x='combination', y='testf', data=df, palette=color_palette, flierprops={'markerfacecolor':'grey'})
+    #boxplot = sns.boxplot(x='combination', y='testf', data=df, palette=color_palette, flierprops={'markerfacecolor':'grey'}, patch_artist=True)
 
     # Set y-axis limits and convert to percentages
     plt.ylim(df['testf'].min()-0.01, df['testf'].max()+0.01)
