@@ -4,15 +4,19 @@
 nextflow.enable.dsl=2
 
 // All of the default parameters are being set in `nextflow.config`
-params.input_dir = "${projectDir}/data"
+params.input_dirs = [
+    "${workflow.projectDir}/data/TMA1990",
+    "${workflow.projectDir}/data/TMAS1_4xB2"
+]
+// Users can override this in their own config or with --input_dirs
 params.output_dir = "${projectDir}/output"
 
 //Static Assests for beautification
 params.letterhead = "${projectDir}/images/ClassyFlow_Letterhead.PNG"
 
 // Build Input List of Batches
-Channel.fromPath("${params.input_dir}/*/", type: 'dir')
-			.ifEmpty { error "No subdirectories found in ${params.input_dir}" }
+Channel.from("${params.input_dirs}", type: 'dir')
+			.ifEmpty { error "No files found in ${params.input_dirs}" }
 			.set { batchDirs }
 			
 // Import sub-workflows
@@ -24,16 +28,19 @@ include { modelling_wf } from './modules/makemodels'
 // -------------------------------------- //
 // Function which prints help message text
 def helpMessage() {
-    log.info"""
-Usage:
+    """
+    This pipeline processes batches of images, where the list of input directories is specified in the configuration file (nextflow.config) using the 'input_dirs' parameter. 
+    By default, all output will be written to the 'output' directory within the Nextflow working directory, unless an alternative output directory is specified in the configuration file.
 
-nextflow run main.nf <ARGUMENTS>
+    Usage:
+      nextflow run main.nf
 
-Required Arguments:
+    Options:
+      --input_dirs      List of input directories containing image batches (set in nextflow.config)
+      --outdir          Output directory for results (default: ./output, can be overridden in nextflow.config)
+      -profile          Configuration profile to use
 
-  Input Data:
-  --input_dir        Folder containing subfolders of QuPath's Quantification Exported Measurements,
-                        each dir containing Quant files belonging to a common batch of images.
+    For more details, see the
     """.stripIndent()
 }
 
