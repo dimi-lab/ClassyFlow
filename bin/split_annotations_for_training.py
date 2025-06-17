@@ -1,69 +1,33 @@
 #!/usr/bin/env python3
 
 import os, sys, csv, time
+import argparse
 import pandas as pd
-import fpdf
-from fpdf import FPDF
-import dataframe_image as dfi
-from pprint import pprint
+
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 
 ### Static Variables: File Formatting
-classColumn = "${params.classifed_column_name}" 
 batchColumn = 'Batch'
-holdoutFraction = float("${params.holdout_fraction}") #0.05
-cellTypeNegative = "${params.filter_out_junk_celltype_labels}".split(",")
-cellTypeNegative.append("")
-minimunHoldoutThreshold = ${params.minimum_label_count}
-
-
-############################ PDF REPORTING ############################
-def create_letterhead(pdf, WIDTH):
-    pdf.image("${params.letterhead}", 0, 0, WIDTH)
-
-def create_title(title, pdf):
-    # Add main title
-    pdf.set_font('Helvetica', 'b', 20)  
-    pdf.ln(40)
-    pdf.write(5, title)
-    pdf.ln(10)
-    # Add date of report
-    pdf.set_font('Helvetica', '', 14)
-    pdf.set_text_color(r=128,g=128,b=128)
-    today = time.strftime("%d/%m/%Y")
-    pdf.write(4, f'{today}')
-    # Add line break
-    pdf.ln(10)
-
-def write_to_pdf(pdf, words):
-    # Set text colour, font size, and font type
-    pdf.set_text_color(r=0,g=0,b=0)
-    pdf.set_font('Helvetica', '', 12)
-    pdf.write(5, words)
-############################ PDF REPORTING ############################
-
-
 
 def stratified_sample(df, stratify_cols, frac=0.01, min_count=3):
     df = df.copy()
     df['OriginalIndex'] = df.index
-    # Group by the stratification columns
     grouped = df.groupby(stratify_cols)
-    # Function to sample 1% of the data or skip if less than min_count
     def sample_or_skip(group):
         if len(group) < min_count:
-            return pd.DataFrame()  # Return an empty DataFrame if group has fewer rows than min_count
+            return group.iloc[0:0]  # empty frame with same columns
         return group.sample(frac=frac, random_state=42)
-
-    # Apply the function to each group
     sampled_df = grouped.apply(sample_or_skip)
-    #sampled_df = grouped.apply(sample_or_skip, include_groups=True)
-    # Remove the multi-level index created by groupby
+    # Remove grouping columns added by groupby.apply (future-proof)
+    if isinstance(sampled_df.index, pd.MultiIndex):
+        sampled_df.reset_index(level=stratify_cols, drop=True, inplace=True)
     sampled_df.reset_index(drop=True, inplace=True)
     return sampled_df
 
 
-def gather_annotations(pickle_files):
-    # Read the DataFrames from pickle files
+def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegative, minimunHoldoutThreshold):
     dataframes = []
     for file in pickle_files:
         print(f"Getting...{file}")
@@ -76,9 +40,7 @@ def gather_annotations(pickle_files):
         df[batchColumn] = dataframe_name
         dataframes.append(df)
     
-    # Concatenate all DataFrames
     merged_df = pd.concat(dataframes, ignore_index=True)
-    # merged_df = merged_df.sample(n=5000)  # remove this after testing
     merged_df[classColumn] = merged_df[classColumn].str.strip()
     merged_df = merged_df.dropna(subset=[classColumn])
     merged_df = merged_df.loc[~(merged_df[classColumn].isin(cellTypeNegative))]
@@ -87,27 +49,17 @@ def gather_annotations(pickle_files):
     ct = merged_df[classColumn].value_counts()
     pt = merged_df[classColumn].value_counts(normalize=True).mul(100).round(2).astype(str) + '%'
     
-    # Get the stratified sample
     holdoutDF = stratified_sample(merged_df, [batchColumn, classColumn], frac=holdoutFraction, min_count=minimunHoldoutThreshold)
     print(f"holdoutDF {holdoutDF.shape}")
-    #print(holdoutDF.columns.tolist())
     hd = holdoutDF[classColumn].value_counts()
     
     freqTable = pd.concat([ct,pt,hd], axis=1, keys=['counts', '%', 'holdout']).reset_index()
     freqTable.rename(columns={'index': classColumn}, inplace=True)
-    #print(freqTable)
-    # Apply styling to dataframe
-    styled_df = freqTable.style.format({'Cell Types': "{}",
-                      'Counts': "{:,}",
-                      'Frequency': "{:.4f}%",
-                      'Holdout': "{:,}"}).hide()
-    dfi.export(styled_df, 'cell_count_table.png', max_rows=-1)
+    # Export as HTML instead of PNG
+    freqTable.to_html('cell_count_table.html', index=False)
 
     keptFreq = freqTable[freqTable['holdout'].notna()]
-    
     keptFreq.columns = keptFreq.columns.str.strip()
-    #pprint(keptFreq)
-    #print(keptFreq.columns.tolist())
     if classColumn not in keptFreq.columns:
         raise ValueError(f"{classColumn} column is missing. Found columns: {keptFreq.columns.tolist()}")
     ctl = keptFreq[classColumn].tolist()
@@ -116,43 +68,86 @@ def gather_annotations(pickle_files):
         f_writer = csv.writer(csvfile, delimiter=',')
         for ln in ctl:
             f_writer.writerow([ln])
-    # holdoutDF = merged_df.groupby(batchColumn, group_keys=False).apply(lambda x: x.sample(frac=holdoutFraction))
     trainingDF = merged_df.loc[~merged_df.index.isin(holdoutDF['OriginalIndex'])]
     trainingDF = trainingDF[trainingDF[classColumn].isin(ctl)]
     trainingDF = trainingDF.reset_index(drop=True)
     print(f"trainingDF {trainingDF.shape}")
     print(trainingDF[classColumn].value_counts())
     
-    # Remove the multi-level index created by groupby
     holdoutDF.reset_index(drop=True, inplace=True)
     holdoutDF.to_pickle('holdout_dataframe.pkl')
     trainingDF.to_pickle('training_dataframe.pkl')
 
-if __name__ == "__main__":
-    pickle_files = "${norms_pkl_collected}".split(' ')
-    gather_annotations(pickle_files)
-    
-    # Create PDF
-    # standard letter size is 215.9 by 279.4 mm or 8.5 by 11 inches.
-    WIDTH = 215.9
-    HEIGHT = 279.4
-    pdf = FPDF() # A4 (210 by 297 mm)
-    
-    # Add 1st Page
-    pdf.add_page()
+def create_html_report(letterhead_path, holdoutFraction, cellTypeNegative):
+    from datetime import datetime
+    html = []
+    html.append('<!DOCTYPE html>')
+    html.append('<html lang="en"><head>')
+    html.append('<meta charset="UTF-8">')
+    html.append('<title>Training Data Split Report</title>')
+    html.append('<style>')
+    html.append("""
+        body { font-family: Helvetica, Arial, sans-serif; margin: 40px; }
+        .letterhead { width: 100%; max-width: 900px; }
+        .title { font-size: 2em; font-weight: bold; margin-top: 40px; }
+        .subtitle { color: #888; font-size: 1.2em; margin-bottom: 20px; }
+        .section { margin-top: 30px; }
+        table { border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ccc; padding: 6px 12px; }
+        th { background: #eee; }
+    """)
+    html.append('</style></head><body>')
 
-    # Add lettterhead and title
-    create_letterhead(pdf, WIDTH)
-    create_title("Training Data Split", pdf)
-    # Add some words to PDF
-    write_to_pdf(pdf, "Holdout Fraction : {}".format(holdoutFraction))  
-    pdf.ln(5)
-    write_to_pdf(pdf, "Negative Class Value (to skip): {}".format(cellTypeNegative))
-    pdf.ln(15)
-    # Add table
-    pdf.image('cell_count_table.png', w= (WIDTH*0.5) )
-    # Generate the PDF
-    pdf.output("annotation_report.pdf", 'F')
+    # Letterhead
+    if letterhead_path and os.path.exists(letterhead_path):
+        html.append(f'<img src="{letterhead_path}" class="letterhead" alt="Letterhead">')
+
+    # Title and date
+    html.append(f'<div class="title">Training Data Split</div>')
+    html.append(f'<div class="subtitle">{datetime.now().strftime("%d/%m/%Y")}</div>')
+
+    # Summary text
+    html.append(f'<div class="section"><b>Holdout Fraction:</b> {holdoutFraction}</div>')
+    html.append(f'<div class="section"><b>Negative Class Value (to skip):</b> {", ".join(cellTypeNegative)}</div>')
+
+    # Table
+    if os.path.exists('cell_count_table.html'):
+        with open('cell_count_table.html') as f:
+            table_html = f.read()
+        html.append('<div class="section"><b>Cell Count Table</b><br>')
+        html.append(table_html)
+        html.append('</div>')
+
+    html.append('</body></html>')
+
+    with open("annotation_report.html", 'w') as f:
+        f.write('\n'.join(html))
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Split annotations for training and holdout sets.")
+    parser.add_argument('--classColumn', required=True, help='Name of the classified column')
+    parser.add_argument('--holdoutFraction', type=float, required=True, help='Fraction of data to hold out')
+    parser.add_argument('--cellTypeNegative', required=True, help='Comma-separated list of negative class values')
+    parser.add_argument('--minimunHoldoutThreshold', type=int, required=True, help='Minimum label count for holdout')
+    parser.add_argument('--pickle_files', required=True, help='Space-separated list of pickle files')
+    parser.add_argument('--letterhead', required=True, help='Path to letterhead image for report')
+    args = parser.parse_args()
+
+    #print("Python version:")
+    #print(sys.version)
+    #print("Version info:")
+    #print(sys.version_info)
+
+    classColumn = args.classColumn
+    holdoutFraction = args.holdoutFraction
+    cellTypeNegative = args.cellTypeNegative.split(",")
+    cellTypeNegative.append("")
+    minimunHoldoutThreshold = args.minimunHoldoutThreshold
+    pickle_files = args.pickle_files.split(' ')
+    letterhead_path = args.letterhead
+
+    gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegative, minimunHoldoutThreshold)
+    create_html_report(letterhead_path, holdoutFraction, cellTypeNegative)
 
 
 
