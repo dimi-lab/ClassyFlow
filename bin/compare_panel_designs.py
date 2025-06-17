@@ -1,40 +1,31 @@
 #!/usr/bin/env python3
 
-import os, sys
+import os
+import sys
 import pandas as pd
 
-# Static variable inherited from Nextflow Config
-# quantType = '${params.qupath_object_type}'
-
 def compare_headers(pickle_files):
-	# Read the DataFrames from pickle files
-	dataframes = [pd.read_pickle(file) for file in pickle_files]
-	dataframe_names = [os.path.basename(file).replace('.pkl','').replace('merged_dataframe_','') for file in pickle_files]
-	dataframes = [df.filter(regex='(Mean)',axis=1) for df in dataframes]
+    # Read DataFrames and extract filtered headers
+    headers = []
+    dataframe_names = []
+    for file in pickle_files:
+        df = pd.read_pickle(file)
+        filtered_cols = [h.split(":")[0] for h in df.filter(regex='(Mean)', axis=1).columns]
+        headers.append(set(filtered_cols))
+        dataframe_names.append(os.path.basename(file).replace('.pkl','').replace('merged_dataframe_',''))
 
-	# Extract the headers (column names)
-	headers = [set( [h.split(":")[0] for h in df.columns]) for df in dataframes]
-	print(headers)
-	#headers = list(set([h.split(":")[0] for h in list(headers]))
+    # Union of all headers
+    all_headers = sorted(set.union(*headers))
 
-	# Get the union of all headers
-	all_headers = set.union(*headers)
+    # Build presence/absence DataFrame using a list comprehension
+    presence_matrix = [
+        [1 if header in df_headers else 0 for df_headers in headers]
+        for header in all_headers
+    ]
+    presence_df = pd.DataFrame(presence_matrix, index=all_headers, columns=dataframe_names)
 
-	# Create a dictionary to store the presence/absence table
-	presence_dict = {header: [] for header in all_headers}
-
-	# Fill the dictionary with 1 (present) or 0 (absent)
-	for header in all_headers:
-		for df_headers in headers:
-			presence_dict[header].append(1 if header in df_headers else 0)
-
-	# Create a DataFrame from the presence dictionary
-	presence_df = pd.DataFrame(presence_dict, index=dataframe_names).T
-
-	# Save the presence DataFrame to a CSV file
-	presence_df.to_csv('panel_design.csv')
+    # Save to CSV
+    presence_df.to_csv('panel_design.csv')
 
 if __name__ == "__main__":
-	pickle_files = "${tables_pkl_collected}".split(' ')
-	compare_headers(pickle_files)
-
+    compare_headers(sys.argv[1:])
