@@ -9,25 +9,15 @@ params.input_dirs = [
     "${workflow.projectDir}/data/TMAS1_4xB2"
 ]
 // Users can override this in their own config or with --input_dirs
-<<<<<<< Updated upstream
-params.output_dir = "${projectDir}/output"
-=======
 params.output_dir = "${workflow.projectDir}/output"
->>>>>>> Stashed changes
 
 //Static Assests for beautification
 params.letterhead = "${workflow.projectDir}/images/ClassyFlow_Letterhead.PNG"
 
 // Build Input List of Batches
-<<<<<<< Updated upstream
-Channel.from("${params.input_dirs}", type: 'dir')
-			.ifEmpty { error "No files found in ${params.input_dirs}" }
-			.set { batchDirs }
-=======
 Channel.fromList(params.input_dirs)
 		.ifEmpty { error "No files found in ${params.input_dirs}" }
 		.set { batchDirs }
->>>>>>> Stashed changes
 			
 // Import sub-workflows
 include { normalization_wf } from './modules/normalizations'
@@ -50,11 +40,7 @@ def helpMessage() {
     Options:
       --input_dirs      List of input directories containing image batches (set in nextflow.config)
       --outdir          Output directory for results (default: ./output, can be overridden in nextflow.config)
-<<<<<<< Updated upstream
-      -profile          Configuration profile to use
-=======
       -profile          Chose configuration profile to use [local, slurm, gcp] (default: local)
->>>>>>> Stashed changes
 
     For more details, see the
     """.stripIndent()
@@ -147,7 +133,7 @@ process generateTrainingNHoldout{
     path("holdout_dataframe.pkl"), emit: holdout
     path("training_dataframe.pkl"), emit: training
 	path("celltypes.csv"), emit: lableFile
-	path("annotation_report.pdf")
+	path("annotation_report.html")
 
     script:
     """

@@ -1,10 +1,5 @@
 //Split training data and binarize by class label
 process topLabelSplit {
-	executor "slurm"
-	memory "10G"
-	queue "cpu-short"
-	time "5:00:00"
-
 	input:
 	path(trainingDataframe)
 	val(celltype)
@@ -13,14 +8,19 @@ process topLabelSplit {
 	tuple val(celltype), path("binary_df*"), optional: true
 	
 	script:
-	template 'split_cell_type_labels.py'
+    """
+    split_cell_type_labels.py \
+        --trainingDataframe ${trainingDataframe} \
+        --celltype "${celltype}" \
+        --classColumn ${params.classifed_column_name} \
+        --varThreshold 0.01 \
+        --mim_class_label_threshold ${params.minimum_label_count} \
+        --ifSubsetData True \
+        --subSet_n 3000
+    """
 }
 
 process search_for_alphas {
-	executor "slurm"
-	memory "14G"
-	queue "cpu-short"
-	time "5:00:00"
 	
 	input:
 	tuple val(celltype), path(binary_dataframe), val(logspace_chunk)
@@ -29,7 +29,13 @@ process search_for_alphas {
     tuple val(celltype), path("alphas_params*"), emit: alphas
     
     script:
-    template 'search_all_alphas.py'
+    """
+    search_all_alphas.py \
+        --logspace_chunk "${logspace_chunk}" \
+        --binary_dataframe "${binary_dataframe}" \
+        --celltype "${celltype}" \
+        --n_folds 10
+    """
 }
 
 process merge_alphas_search_csv_files {
@@ -67,11 +73,6 @@ process select_best_alpha {
 
 
 process runAllRFE{
-	executor "slurm"
-    cpus 8
-	memory "5G"
-	queue "cpu-short"
-	time "6:50:00"
 
 	input:
 	tuple val(celltype), path(binary_dataframe), val(best_alpha), val(n_feats)
@@ -80,7 +81,17 @@ process runAllRFE{
     tuple val(celltype), path("rfe_scores*"), emit: feature_scores
     
     script:
-    template 'calculate_RFE.py'
+    """
+    calculate_RFE.py \
+        --binary_dataframe ${binary_dataframe} \
+        --celltype "${celltype}" \
+        --best_alpha ${best_alpha} \
+        --n_feats ${n_feats} \
+        --n_splits 4 \
+        --n_folds 9 \
+        --lasso_max_iteration 1000 \
+        --parallel_cpus 8
+    """
 }
 
 
@@ -103,14 +114,8 @@ process merge_rfe_score_csv_files {
 }
 
 
-
-
 // Need to generate a comma seperated list of Celltype labels from Pandas
 process examineClassLabel{
-	executor "slurm"
-    memory "20G"
-    queue "cpu-short"
-    time "4:00:00"
 
 	publishDir(
         path: "${params.output_dir}/celltype_reports",
@@ -126,7 +131,22 @@ process examineClassLabel{
 	path("*_Features.pdf")
     
     script:
-	template 'generate_cell_type_selection.py'
+    """
+    generate_cell_type_selection.py \
+        --trainingDataframe ${trainingDataframe} \
+        --celltype ${celltype} \
+        --rfe_scores ${rfe_scores} \
+        --best_alpha ${best_alpha} \
+        --alpha_scores ${alpha_scores} \
+        --classColumn ${params.classifed_column_name} \
+        --varThreshold 0.01 \
+        --n_features_to_RFE 20 \
+        --n_folds 12 \
+        --ifSubsetData True \
+        --max_workers 8 \
+        --mim_class_label_threshold 20 \
+        --n_alphas_to_search 8
+    """
 }
 
 process mergeAndSortCsv {
