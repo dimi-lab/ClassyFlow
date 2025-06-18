@@ -157,7 +157,7 @@ process predictAllCells_xgb{
     )
     
 	input:
-	tuple val(model_name), path(model_path)
+	tuple val(model_name), path(model_path), path(leEncoderFile)
 	tuple val(batchID), path(pickleTable)
 	
 	output:
@@ -167,7 +167,7 @@ process predictAllCells_xgb{
     """
     predict_celltypes.py \
         --classColumn ${params.predict_class_column} \
-        --leEncoderFile ${params.predict_le_encoder_file} \
+        --leEncoderFile ${leEncoderFile} \
         --batchID ${batchID} \
         --infile ${pickleTable} \
         --modelfile ${model_path} \

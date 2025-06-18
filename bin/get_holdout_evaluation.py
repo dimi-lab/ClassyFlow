@@ -18,15 +18,9 @@ import fpdf
 from fpdf import FPDF
 import dataframe_image as dfi
 
-## Static Variables: File Formatting
-classColumn = "${params.classifed_column_name}" # 'Classification'
-leEncoderFile = "${params.output_dir}/models/classes.npy"
-
-
-
 ############################ PDF REPORTING ############################
-def create_letterhead(pdf, WIDTH):
-    pdf.image("${projectDir}/images/ClassyFlow_Letterhead.PNG", 0, 0, WIDTH)   
+def create_letterhead(pdf, WIDTH, letterhead_path):
+    pdf.image(letterhead_path, 0, 0, WIDTH)   
 
 def create_title(title, pdf):
     # Add main title
@@ -51,7 +45,7 @@ def write_to_pdf(pdf, words):
 
 
 
-def check_holdout(toCheckDF, xgbM):
+def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile):
     allPDFText = {}
     X_holdout = toCheckDF[list(toCheckDF.select_dtypes(include=[np.number]).columns.values)]
     X_holdout = X_holdout[xgbM.feature_names]
@@ -145,54 +139,59 @@ def check_holdout(toCheckDF, xgbM):
     
     return allPDFText
 
-
-
-
-
 if __name__ == "__main__":
-    modelName = "${model_pickle}" #"XGBoost_Model_Second.pkl"
-    myData = pd.read_pickle("${holdoutDataframe}") 
-    with open("${select_features_csv}", 'r') as file:
-        next(file) # Skip header
-        featureList = file.readlines()
-    featureList = list(set([line.strip() for line in featureList]))
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Evaluate XGBoost model on holdout data and generate PDF report.")
+    parser.add_argument('--classColumn', required=True, help='Name of the classified column')
+    parser.add_argument('--leEncoderFile', required=True, help='Path to label encoder .npy file')
+    parser.add_argument('--letterhead', required=True, help='Path to letterhead image')
+    parser.add_argument('--model_pickle', required=True, help='Path to trained model pickle')
+    parser.add_argument('--holdoutDataframe', required=True, help='Path to holdout dataframe pickle')
+    parser.add_argument('--select_features_csv', required=True, help='Path to selected features CSV')
+    args = parser.parse_args()
+
+    classColumn = args.classColumn
+    leEncoderFile = args.leEncoderFile
+
+    myData = pd.read_pickle(args.holdoutDataframe)
+    with open(args.select_features_csv, 'r') as file:
+        next(file)  # Skip header
+        featureList = [line.strip() for line in file if line.strip()]
     if 'level_0' in featureList:
         featureList.remove('level_0')
     featureList.append(classColumn)
     focusData = myData[featureList]
+    focusData = focusData.loc[:, ~focusData.columns.duplicated()]
 
-    with open(modelName, 'rb') as file:
+    with open(args.model_pickle, 'rb') as file:
         xgbMdl = pickle.load(file)
-    textHsh = check_holdout(focusData, xgbMdl)
-    
+    textHsh = check_holdout(focusData, xgbMdl, classColumn, leEncoderFile)
+
     WIDTH = 215.9
     HEIGHT = 279.4
-    pdf = FPDF() # A4 (210 by 297 mm)
+    pdf = FPDF()
     pdf.add_page()
-    # Add lettterhead and title
-    create_letterhead(pdf, WIDTH)
+    create_letterhead(pdf, WIDTH, args.letterhead)
     create_title("Holdout Evaluation: XGBoost", pdf)
-    # Add some words to PDF
-    write_to_pdf(pdf, "Holdout Model Accuracy: %.2f%%" % (textHsh['accuracy'] * 100.0)) 
+    write_to_pdf(pdf, "Holdout Model Accuracy: %.2f%%" % (textHsh['accuracy'] * 100.0))
     pdf.ln(15)
-    pdf.image('label_bars.png', w= (WIDTH*0.85) )
+    pdf.image('label_bars.png', w=(WIDTH * 0.85))
     pdf.ln(15)
-    pdf.image('crosstab.png', w= (WIDTH*0.8) )
+    pdf.image('crosstab.png', w=(WIDTH * 0.8))
     pdf.ln(15)
-    pdf.image('auc_curve_stacked.png', w= (WIDTH*0.95) )
+    pdf.image('auc_curve_stacked.png', w=(WIDTH * 0.95))
+    pdf.output("Holdout_on_{}.pdf".format(os.path.basename(args.model_pickle).replace(".pkl", "")), 'F')
 
-    # Generate the PDF
-    pdf.output("Holdout_on_{}.pdf".format(modelName.replace(".pkl","")), 'F')
-    
-    # pprint(textHsh['min_auc'][-1])
-    # Create a DataFrame from the presence dictionary
-    performanceDF = pd.DataFrame({"Model":modelName, "Accuracy":textHsh['accuracy'], 
-        "Max AUC": textHsh['max_auc'][-1], "Min AUC": textHsh['min_auc'][-1] }, index=[0])
+    performanceDF = pd.DataFrame({
+        "Model": [args.model_pickle],
+        "Accuracy": [textHsh['accuracy']],
+        "Max AUC": [textHsh['max_auc'][-1]],
+        "Min AUC": [textHsh['min_auc'][-1]]
+    })
+    performanceDF.to_csv("holdout_{}.csv".format(os.path.basename(args.model_pickle).replace(".pkl", "")), index=False)
 
-    # Save the presence DataFrame to a CSV file
-    performanceDF.to_csv("holdout_{}.csv".format(modelName.replace(".pkl","")), index=False)
-    
-    
-    
+
+
 
 

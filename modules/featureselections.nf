@@ -166,10 +166,6 @@ process mergeAndSortCsv {
 // -------------------------------------- //
 
 
-
-
-
-
 workflow featureselection_wf {
 	take: 
 	trainingPickleTable
