@@ -17,35 +17,46 @@ process boxcox {
 	path("boxcox_report_${batchID}.pdf")
 	
 	script:
-	template 'boxcox_transformer.py'
-
+	"""
+	boxcox_transformer.py \
+		--pickleTable ${pickleTable} \
+		--batchID ${batchID} \
+		--quantType ${params.qupath_object_type} \
+		--nucMark ${params.nucleus_marker} \
+		--plotFraction ${params.plot_fraction} \
+		--letterhead ${params.letterhead}
+	"""
 }
     
     
 // Produce Batch based normalization - quantile
 process quantile {
 	tag { batchID }
-	executor "slurm"
-    memory "60G"
-    queue "cpu-short"
-    time "24:00:00"
-	
-	publishDir(
+
+    publishDir(
         path: "${params.output_dir}/normalization_reports",
         pattern: "*.pdf",
         mode: "copy"
     )
-	
-	input:
-	tuple val(batchID), path(pickleTable)
-	
-	output:
-	tuple val(batchID), path("quantile_transformed_${batchID}.tsv"), emit: norm_df
-	path("quantile_report_${batchID}.pdf")
-	
-	script:
-	template 'quantile_transformer.py'
 
+    input:
+    tuple val(batchID), path(pickleTable)
+
+    output:
+    tuple val(batchID), path("quantile_transformed_${batchID}.tsv"), emit: norm_df
+    path("quantile_report_${batchID}.pdf")
+
+    script:
+    """
+    quantile_transformer.py \
+        --pickleTable ${pickleTable} \
+        --batchID ${batchID} \
+        --quantType ${params.qupath_object_type} \
+        --nucMark ${params.nucleus_marker} \
+        --plotFraction ${params.plot_fraction} \
+        --quantileSplit ${params.quantile_split} \
+        --letterhead ${params.letterhead}
+    """
 }
 
 // Produce Batch based normalization - min/max scaling
