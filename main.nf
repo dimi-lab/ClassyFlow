@@ -4,16 +4,20 @@
 nextflow.enable.dsl=2
 
 // All of the default parameters are being set in `nextflow.config`
-params.input_dir = "${projectDir}/data"
-params.output_dir = "${projectDir}/output"
+params.input_dirs = [
+    "${workflow.projectDir}/data/TMA1990",
+    "${workflow.projectDir}/data/TMAS1_4xB2"
+]
+// Users can override this in their own config or with --input_dirs
+params.output_dir = "${workflow.projectDir}/output"
 
 //Static Assests for beautification
-params.letterhead = "${projectDir}/images/ClassyFlow_Letterhead.PNG"
+params.letterhead = "${workflow.projectDir}/images/ClassyFlow_Letterhead.PNG"
 
 // Build Input List of Batches
-Channel.fromPath("${params.input_dir}/*/", type: 'dir')
-			.ifEmpty { error "No subdirectories found in ${params.input_dir}" }
-			.set { batchDirs }
+Channel.fromList(params.input_dirs)
+		.ifEmpty { error "No files found in ${params.input_dirs}" }
+		.set { batchDirs }
 			
 // Import sub-workflows
 include { normalization_wf } from './modules/normalizations'
@@ -21,19 +25,24 @@ include { featureselection_wf } from './modules/featureselections'
 include { modelling_wf } from './modules/makemodels'
 
 
+
+
 // -------------------------------------- //
 // Function which prints help message text
 def helpMessage() {
-    log.info"""
-Usage:
+    """
+    This pipeline processes batches of images, where the list of input directories is specified in the configuration file (nextflow.config) using the 'input_dirs' parameter. 
+    By default, all output will be written to the 'output' directory within the Nextflow working directory, unless an alternative output directory is specified in the configuration file.
 
-nextflow run main.nf <ARGUMENTS>
+    Usage:
+      nextflow run main.nf
 
-Required Arguments:
+    Options:
+      --input_dirs      List of input directories containing image batches (set in nextflow.config)
+      --outdir          Output directory for results (default: ./output, can be overridden in nextflow.config)
+      -profile          Chose configuration profile to use [local, slurm, gcp] (default: local)
 
-  Input Data:
-  --input_dir        Folder containing subfolders of QuPath's Quantification Exported Measurements,
-                        each dir containing Quant files belonging to a common batch of images.
+    For more details, see the
     """.stripIndent()
 }
 
@@ -47,12 +56,25 @@ process mergeTabDelimitedFiles {
     path("merged_dataframe_${batchID}.pkl"), emit: batchtables
 
     script:
-    exMarks = "${params.exclude_markers}"
     batchID = subdir.baseName
-    template 'merge_files.py'
+    """
+    merge_files.py \
+        "$subdir" \
+        "${params.exclude_markers}" \
+        ${params.slide_contains_prefix == 'True' ? '--slide_by_prefix' : ''} \
+        ${params.folder_is_slide == 'True' ? '--folder_is_slide' : ''} \
+        --input_extension ${params.quant_file_extension} \
+        --input_delimiter '${params.quant_file_delimiter}' \
+        --batchID ${batchID}
+    """
 }
 
-// Identify 
+/* 
+ * For each input pickle file (merged quantification tables), extract all unique marker/channel names
+ * (from columns containing 'Mean'), and generate a presence/absence matrix showing which markers
+ * are present in each batch or panel. This matrix is saved as 'panel_design.csv' for downstream
+ * comparison of panel designs across
+ */
 process checkPanelDesign {
 	input:
 	path(tables_pkl_collected)
@@ -61,11 +83,18 @@ process checkPanelDesign {
     path 'panel_design.csv', emit: paneldesignfile
 
     script:
-    template 'compare_panel_designs.py'
+    """
+    compare_panel_designs.py ${tables_pkl_collected.join(' ')}
+    """
 }
 
-//Add back empty Markers, low noise (16-bit or 8-bit)
-process addEmptyMarkerNoise {
+/*
+ * For each batch's merged quantification table, this process checks the panel design to identify any markers
+ * that are missing from the data. For each missing marker, it generates a synthetic column of low-noise values
+ * (using sklearn's make_blobs) to fill in the missing features, ensuring all batches have a consistent set of markers.
+ * The modified table is saved for downstream normalization and modeling.
+ */
+ process addEmptyMarkerNoise {
 	input:
 	tuple val(batchID), path(pickleTable)
 	path designTable
@@ -74,8 +103,22 @@ process addEmptyMarkerNoise {
     tuple val(batchID), path("merged_dataframe_${batchID}_mod.pkl"), emit: modbatchtables
 
     script:
-    template 'add_empty_marker_noise.py'
+    """
+    add_empty_marker_noise.py \
+        --objtype ${params.qupath_object_type} \
+        --bitDepth ${params.bit_depth} \
+        --pickleTable ${pickleTable} \
+        --batchID ${batchID} \
+        --designTable ${designTable} \
+    """
 }
+
+/*
+ * This step combines all normalized annotation tables, filters out unwanted cell types,
+ * and splits the data into training and holdout sets using stratified sampling based on batch and cell type.
+ * It also generates a summary table and a PDF report showing the distribution of cell types in each set,
+ * ensuring balanced and reproducible training/validation splits for downstream modeling.
+ */
 process generateTrainingNHoldout{
 	publishDir(
         path: "${params.output_dir}/celltype_reports",
@@ -90,12 +133,21 @@ process generateTrainingNHoldout{
     path("holdout_dataframe.pkl"), emit: holdout
     path("training_dataframe.pkl"), emit: training
 	path("celltypes.csv"), emit: lableFile
-	path("annotation_report.pdf")
+	path("annotation_report.html")
 
     script:
-    template 'split_annotations_for_training.py'
+    """
+    split_annotations_for_training.py \
+        --classColumn ${params.classifed_column_name} \
+        --holdoutFraction ${params.holdout_fraction} \
+        --cellTypeNegative "${params.filter_out_junk_celltype_labels}" \
+        --minimunHoldoutThreshold ${params.minimum_label_count} \
+        --pickle_files "${norms_pkl_collected}" \
+        --letterhead "${params.letterhead}"
+    """
 
 }
+
 // Run model on everything make results
 process predictAllCells_xgb{
 	publishDir(
@@ -105,22 +157,28 @@ process predictAllCells_xgb{
     )
     
 	input:
-	tuple val(model_name), path(model_path)
+	tuple val(model_name), path(model_path), path(leEncoderFile)
 	tuple val(batchID), path(pickleTable)
 	
 	output:
 	path("*.tsv")
 	
 	script:
-    template 'predict_celltypes.py'
-
+    """
+    predict_celltypes.py \
+        --classColumn ${params.predict_class_column} \
+        --leEncoderFile ${leEncoderFile} \
+        --batchID ${batchID} \
+        --infile ${pickleTable} \
+        --modelfile ${model_path} \
+        --columnsToExport "${params.predict_columns_to_export}" \
+        --cpu_jobs ${params.predict_cpu_jobs}
+    """
 }
 // -------------------------------------- //
 
 
 
-
-// Main workflow
 workflow {
     // Show help message if the user specifies the --help flag at runtime
     // or if any required params are not provided
@@ -161,7 +219,5 @@ workflow {
     	predictAllCells_xgb(bestModel, normalizedDataFrames)
     	
     }
-    
-    
     
 }
