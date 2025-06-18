@@ -87,8 +87,8 @@ process runAllRFE{
         --celltype "${celltype}" \
         --best_alpha ${best_alpha} \
         --n_feats ${n_feats} \
-        --n_splits 4 \
-        --n_folds 9 \
+        --n_splits 2 \
+        --n_folds 3 \
         --lasso_max_iteration 1000 \
         --parallel_cpus 8
     """
@@ -134,18 +134,19 @@ process examineClassLabel{
     """
     generate_cell_type_selection.py \
         --trainingDataframe ${trainingDataframe} \
-        --celltype ${celltype} \
+        --celltype "${celltype}" \
         --rfe_scores ${rfe_scores} \
         --best_alpha ${best_alpha} \
         --alpha_scores ${alpha_scores} \
-        --classColumn ${params.classifed_column_name} \
+        --classColumn "${params.classifed_column_name}" \
         --varThreshold 0.01 \
         --n_features_to_RFE 20 \
         --n_folds 12 \
         --ifSubsetData True \
         --max_workers 8 \
         --mim_class_label_threshold 20 \
-        --n_alphas_to_search 8
+        --n_alphas_to_search 8 \
+        --letterhead "${params.letterhead}"
     """
 }
 
