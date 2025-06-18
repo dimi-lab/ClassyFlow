@@ -1,17 +1,18 @@
 process createXGBParams {
-	output:
-	path("xgb_iterate_params.csv"), emit: params
+    output:
+    path("xgb_iterate_params.csv"), emit: params
 
-	script:
-	template 'get_xgboost_parameter_search.py'
+    script:
+    """
+    get_xgboost_parameter_search.py \
+        --max_cv ${params.max_xgb_cv} \
+        --depth_start ${params.xgb_depth_start} \
+        --depth_stop ${params.xgb_depth_stop} \
+        --depth_step ${params.xgb_depth_step} \
+        --learnRates "${params.xgb_learn_rates}"
+    """
 }
 process xgboostingModel {
-	executor "slurm"
-    cpus 16
-    memory "30G"
-    queue "cpu-short"
-    time "8:00:00"
-
 	input:
 	path(trainingDataframe)
 	path(select_features_csv)
@@ -21,7 +22,18 @@ process xgboostingModel {
 	path("parameters_found_*.csv"), emit: behavior
 	
 	script:
-	template 'get_xgboost.py'
+    """
+    get_xgboost.py \
+        --classColumn ${params.classifed_column_name} \
+        --cpu_jobs 16 \
+        --uTaskID ${task.index} \
+        --mim_class_label_threshold ${params.minimum_label_count} \
+        --depth_d ${depth_d} \
+        --eta_l ${eta_l} \
+        --cv_c ${cv_c} \
+        --trainingDataframe ${trainingDataframe} \
+        --select_features_csv ${select_features_csv}
+    """
 
 }
 process mergeXgbCsv {
@@ -46,12 +58,7 @@ process mergeXgbCsv {
 }
 
 process xgboostingFinalModel {
-	executor "slurm"
-    memory "30G"
-    queue "cpu-short"
-    time "8:00:00"
-    
-	publishDir(
+  	publishDir(
         path: "${params.output_dir}/model_reports",
         pattern: "*.pdf",
         mode: "copy"
@@ -78,18 +85,21 @@ process xgboostingFinalModel {
 	path("XGBoost_Model_First.pkl"), emit: m1
 	path("XGBoost_Model_Second.pkl"), emit: m2
 	path("Model_Development_Xgboost.pdf")
-	path("classes.npy")
+	path("classes.npy"), emit: classes
 	
 	script:
-	template 'get_xgboost_winners.py'
-
+    """
+    get_xgboost_winners.py \
+        --classColumn ${params.classifed_column_name} \
+        --cpu_jobs 16 \
+        --mim_class_label_threshold ${params.minimum_label_count} \
+        --letterhead "${params.letterhead}" \
+        --model_performance_table ${model_performance_table} \
+        --trainingDataframe ${trainingDataframe} \
+        --select_features_csv ${select_features_csv}
+    """
 }
-process holdOutXgbEvaluation{
-	executor "slurm"
-    memory "30G"
-    queue "cpu-short"
-    time "8:00:00"
-    
+process holdOutXgbEvaluation{  
 	publishDir(
         path: "${params.output_dir}/model_reports",
         pattern: "*.pdf",
@@ -100,13 +110,22 @@ process holdOutXgbEvaluation{
 	path(holdoutDataframe)
 	path(select_features_csv)
 	path(model_pickle)
+	path(leEncoderFile)
 	
 	output:
 	path("holdout_*.csv"), emit: eval
 	path("Holdout_on_*.pdf")
 	
 	script:
-	template 'get_holdout_evaluation.py'
+    """
+    get_holdout_evaluation.py \
+        --classColumn ${params.classifed_column_name} \
+        --leEncoderFile ${leEncoderFile} \
+        --letterhead "${params.letterhead}" \
+        --model_pickle ${model_pickle} \
+        --holdoutDataframe ${holdoutDataframe} \
+        --select_features_csv ${select_features_csv}
+    """
 }
 process mergeHoldoutCsv {
 	publishDir(
@@ -170,27 +189,38 @@ workflow modelling_wf {
 	
 	/// Able to add more modelling modules here
 	
-	//allModelsTrained = Channel.fromPath( "${params.output_dir}/models/XGBoost_Model*.pkl" )
 	allModelsTrained = xgbModels.m1.concat(xgbModels.m2).flatten()
 	allModelsTrained.subscribe { println "Model: $it" }
 	//allModelsTrained.view()
 	
-	allHoldoutResults = holdOutXgbEvaluation(holdoutPickleTable, featuresCSV, allModelsTrained)
+	allHoldoutResults = holdOutXgbEvaluation(
+        holdoutPickleTable, 
+        featuresCSV, 
+        allModelsTrained, 
+        xgbModels.classes
+    )
 	
 	holdoutEval = mergeHoldoutCsv(allHoldoutResults.eval.collect())
 	selected = selectBestModel(holdoutEval.table)
 	
-	// Step 5: Emit the best model name and path
+	selected.outfile.subscribe { println "Selected outfile: $it" }
+	xgbModels.classes.subscribe { println "Classes file: $it" }
+
+    // Step 4: Create a channel that emits the best model info
+    // This will emit a tuple of (model_name, model_path, leEncoderFile)
+    // where model_name is the name of the best model,
+    // model_path is the path to the best model file,
+    // and leEncoderFile is the label encoder file.
+    
+    // Note: Assuming `xgbModels.classes` contains the label encoder file path
+    // and `selected.outfile` contains the best model information.
     best_model_info = selected.outfile.map { line -> 
         def (name, path) = line.text.split(',')
-        tuple(name.trim(), file(path.trim()))
+        tuple(name.trim(), file(path.trim()), xgbModels.classes.value)
     }
-    
     // Print the best model info
     best_model_info.subscribe { println "Best Model: $it" }
-	
+
 	emit:
 	best_model_info
-	
-}	
-	
+}
