@@ -25,14 +25,6 @@ flowchart TD
     H --> I[Prediction]
     E --> I
     I --> J[Results]
-    
-    classDef process fill:#6A1B9A,stroke:#4A148C,stroke-width:2px,color:#fff
-    classDef workflow fill:#2E7D32,stroke:#1B5E20,stroke-width:2px,color:#fff
-    classDef output fill:#D84315,stroke:#BF360C,stroke-width:2px,color:#fff
-    
-    class A,B,C,D process
-    class E,F,G,H workflow  
-    class I,J output
 ```
 
 ## Quick Start
@@ -143,12 +135,12 @@ nextflow run main.nf -c nextflow.config -profile gcp
 
 ```
 output/
-├── normalization_reports/ # Data normalization comparison reports
-├── celltype_reports/      # Feature analysis & training summaries
-├── model_reports/         # Training & validation performance report
-├── models/                # Trained classifiers
-├── celltypes/             # Final cell type predictions
-├── clusters/              # Optional clustering analysis using scimap
+├── normalization_reports/      # Data normalization comparison reports
+├── celltype_reports/           # Feature analysis & training summaries
+├── model_reports/              # Training & validation performance report
+├── models/                     # Trained classifiers
+├── celltypes/                  # Final cell type predictions
+├── clusters/                   # Optional clustering analysis using scimap
 ```
 
 ## Workflow Details
@@ -207,6 +199,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Homepage](https://github.com/dimi-lab/ClassyFlow)
 - [QuPath](https://qupath.github.io/)
 
----
-
-**Scalable • Reproducible • Validated • Open Source**
