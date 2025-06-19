@@ -4,7 +4,11 @@
 # Supervised Classifier Workflow
 Nextflow workflow specific to outlining approaches to building and testing dynamic ML classifiers
 
-## Requirements/Dependencies
+## Setup
+
+Copy `.envrc.template` to `.envrc`. Fill in the values appropriately.
+
+### Requirements/Dependencies
 
 -   Nextflow 23.04.2 (requires: bash, java 11 [or later, up to 21] git and docker)
 -   Python 3.10+
@@ -17,7 +21,27 @@ Nextflow workflow specific to outlining approaches to building and testing dynam
     - xgboost			1.6.2
     - scipy				1.12.0
     - scikit-learn		1.4.0
-     
+
+Install to the user site-packages.
+
+```
+pip install --user -r requirements.txt
+```
+
+Install the chromium headless browser tools:
+
+```
+apt install chromium-driver
+```
+
+### Run the sample pipeline
+
+To use the slurm backend, run this from the repository root:
+
+```sh
+nextflow run main.nf -c nextflow_ovtma.config
+```
+
 ------------------------------------------------------------------------
 
 ## Instructions
