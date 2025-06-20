@@ -15,6 +15,10 @@ steps:
       '--file', 'container/Dockerfile',
       '.',
     ]
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [ 'push', '${_GCP_CONTAINER}' ]
+
 substitutions:
   # Assumes these substitutions are available:
   # - $_GCP_REPOSITORY
