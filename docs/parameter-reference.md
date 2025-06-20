@@ -7,7 +7,7 @@ Complete configuration guide for ClassyFlow parameters.
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `help` | `false` | Display help message and exit |
-| `input_dir` | `"./input"` | Path to input directory |
+| `input_dir` | `["./data/TMA1990", "./data/TMAS1_4xB2"]` | A list of paths to batch directories, comma separated |
 | `output_dir` | `"./output"` | Output directory for all results |
 
 ## Input Data Configuration
