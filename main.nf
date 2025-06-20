@@ -12,7 +12,7 @@ params.input_dirs = [
 params.output_dir = "${workflow.projectDir}/output"
 
 //Static Assests for beautification
-params.letterhead = "${workflow.projectDir}/images/ClassyFlow_Letterhead.PNG"
+params.letterhead = "${projectDir}/images/ClassyFlow_Letterhead.PNG"
 
 // Build Input List of Batches
 Channel.fromList(params.input_dirs)
@@ -128,6 +128,7 @@ process generateTrainingNHoldout{
     
 	input:
 	path(norms_pkl_collected)
+	path(letterhead)
 
 	output:
     path("holdout_dataframe.pkl"), emit: holdout
@@ -143,7 +144,7 @@ process generateTrainingNHoldout{
         --cellTypeNegative "${params.filter_out_junk_celltype_labels}" \
         --minimunHoldoutThreshold ${params.minimum_label_count} \
         --pickle_files "${norms_pkl_collected}" \
-        --letterhead "${params.letterhead}"
+        --letterhead "${letterhead}"
     """
 
 }
@@ -200,19 +201,19 @@ workflow {
     	/*
     	 * - Subworkflow to handle all Normalization/Standardization Tasks - 
     	 */ 
-    	normalizedDataFrames = normalization_wf(addEmptyMarkerNoise.output.modbatchtables)
+    	normalizedDataFrames = normalization_wf(addEmptyMarkerNoise.output.modbatchtables, params.letterhead)
     	
-    	labledDataFrames = generateTrainingNHoldout(normalizedDataFrames.map{ it[1] }.collect())
+    	labledDataFrames = generateTrainingNHoldout(normalizedDataFrames.map{ it[1] }.collect(), params.letterhead)
     	
 		/*
     	 * - Subworkflow to examine Cell Type Specific interpetability & Feature Selections - 
     	 */ 
-		selectFeatures = featureselection_wf(labledDataFrames.training, labledDataFrames.lableFile)
+		selectFeatures = featureselection_wf(labledDataFrames.training, labledDataFrames.lableFile, params.letterhead)
     	
     	/*
     	 * - Subworkflow to generate models and then check them against the holdout - 
     	 */ 
-		bestModel = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures)
+		bestModel = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures, params.letterhead)
 		
 		
     	// Run the best model on the full input batches/files 

@@ -80,6 +80,7 @@ process xgboostingFinalModel {
 	path(trainingDataframe)
 	path(select_features_csv)
 	path(model_performance_table)
+	path(letterhead)
 	
 	output:
 	path("XGBoost_Model_First.pkl"), emit: m1
@@ -93,7 +94,7 @@ process xgboostingFinalModel {
         --classColumn ${params.classifed_column_name} \
         --cpu_jobs 16 \
         --mim_class_label_threshold ${params.minimum_label_count} \
-        --letterhead "${params.letterhead}" \
+        --letterhead "${letterhead}" \
         --model_performance_table ${model_performance_table} \
         --trainingDataframe ${trainingDataframe} \
         --select_features_csv ${select_features_csv}
@@ -111,6 +112,7 @@ process holdOutXgbEvaluation{
 	path(select_features_csv)
 	path(model_pickle)
 	path(leEncoderFile)
+	path(letterhead)
 	
 	output:
 	path("holdout_*.csv"), emit: eval
@@ -121,7 +123,7 @@ process holdOutXgbEvaluation{
     get_holdout_evaluation.py \
         --classColumn ${params.classifed_column_name} \
         --leEncoderFile ${leEncoderFile} \
-        --letterhead "${params.letterhead}" \
+        --letterhead "${letterhead}" \
         --model_pickle ${model_pickle} \
         --holdoutDataframe ${holdoutDataframe} \
         --select_features_csv ${select_features_csv}
@@ -175,6 +177,7 @@ workflow modelling_wf {
 	trainingPickleTable
 	holdoutPickleTable
 	featuresCSV
+	letterhead
 
 	main:
 	// Gerneate all the permutations for xgboost parameter search
@@ -185,7 +188,7 @@ workflow modelling_wf {
 	xgbHyper = xgboostingModel(trainingPickleTable, featuresCSV, params_channel)
 	paramSearch = mergeXgbCsv(xgbHyper.behavior.collect())
 	
-	xgbModels = xgboostingFinalModel(trainingPickleTable, featuresCSV, paramSearch.table)
+	xgbModels = xgboostingFinalModel(trainingPickleTable, featuresCSV, paramSearch.table, letterhead)
 	
 	/// Able to add more modelling modules here
 	
@@ -197,7 +200,8 @@ workflow modelling_wf {
         holdoutPickleTable, 
         featuresCSV, 
         allModelsTrained, 
-        xgbModels.classes
+        xgbModels.classes,
+        letterhead
     )
 	
 	holdoutEval = mergeHoldoutCsv(allHoldoutResults.eval.collect())
