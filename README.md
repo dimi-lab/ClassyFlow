@@ -27,10 +27,6 @@ flowchart TD
     H --> I[Prediction]
     E --> I
     I --> J[Results]
-    
-    class A,B,C,D process
-    class E,F,G,H workflow  
-    class I,J output
 ```
 
 ## Quick Start
