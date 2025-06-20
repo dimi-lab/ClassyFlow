@@ -49,7 +49,7 @@ pip install -r requirements.txt
 ```
 ### Test with example data
 ```
-nextflow run main.nf -c nextflow_ovtma.config
+nextflow run main.nf -c nextflow.config
 ```
 
 ### Running your own data

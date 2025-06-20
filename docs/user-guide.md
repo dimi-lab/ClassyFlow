@@ -3,9 +3,8 @@
 ## Table of Contents
 - [Installation & Setup](#installation--setup)
 - [Input Data Requirements](#input-data-requirements)
-- [Basic Usage](#basic-usage)
+- [Pipeline Usage](#pipeline-usage)
 - [Understanding Outputs](#understanding-outputs)
-- [Troubleshooting](#troubleshooting)
 
 ## Installation & Setup
 
@@ -53,21 +52,7 @@ nextflow run main.nf --help
 ```
 
 ## Input Data Requirements
-
-### File Organization
-ClassyFlow expects measurement tables (quantification files) generated using QuPath 0.5+ from segmented single cell MxIF images. The pipeline supports multiple batches as input, organized as follows:
-
-```
-input_directory/
-├── batch1/
-│   ├── sample1_QUANT.tsv
-│   ├── sample2_QUANT.tsv
-│   └── ...
-└── batch2/
-    ├── sample1_QUANT.tsv
-    ├── sample2_QUANT.tsv
-    └── ...
-```
+ClassyFlow expects measurement tables (quantification files) generated using QuPath 0.5+ from segmented single cell MxIF images. Each batch of samples should be placed in a separate directory. Additionally, a subset of cells must be annotated with cell type labels to be used for training and validation. It is recommended to have at least 30-50 annotations per cell type across multiple ROIs/samples.
 
 ### Quantification File Format
 
@@ -80,48 +65,41 @@ input_directory/
 | `Centroid Y µm` | Float | Y coordinate of cell centroid | `2890.34` |
 | `[Marker Intensity]` | Float | Marker intensity values exported from QuPath either as *CellObject* or *DetectionObject* | `CD3: Cell: Mean` |
 
-#### QuPath Object Types
+### QuPath Object Types
 
 ClassyFlow supports two QuPath object types that determine how marker intensities are measured and named:
 
-##### CellObject
+#### CellObject
 - **Components**: 4 measurement regions (Cell, Cytoplasm, Membrane, Nucleus)
 - **Column Format**: `[Marker]: [Component]: [Statistic]`
 - **Example**: `DAPI: Cell: Mean`, `CD3: Nucleus: Median`, `Ki67: Cytoplasm: Std Dev.`
 
-##### DetectionObject  
+#### DetectionObject  
 - **Components**: 1 measurement region (either nucleus or whole cell)
 - **Column Format**: `[Marker]: [Statistic]`
 - **Example**: `DAPI: Mean`, `CD3: Median`, `Ki67: Std Dev.`
 
-
 *Note: Don't forget to set the `qupath_object_type` with the appropriate value in your config file*
 
-### Data Requirements
-- **Training annotations**: Minimum 30-50 annotated cells per cell type
-- **File format**: Tab-delimited (.tsv) files
-- **Marker naming**: Follow QuPath convention (e.g., `CD3: Cell: Mean`)
 
-### Supported Input Formats
-- **QuPath exports**: Measurement tables from QuPath 0.5+
-- **CellObject**: Includes Cell, Cytoplasm, Membrane, Nucleus measurements
-- **DetectionObject**: Single whole cell or nucleus measurements
+## Pipeline Usage
 
-## Pipeline Usage - Under construction
-
-### Quick Start
+### Running modes
 ```bash
-# Run with example configuration
-nextflow run main.nf -c nextflow_ovtma.config
+# Run with example data
+nextflow run main.nf
 
-# Run with custom input directory
-nextflow run main.nf --input_dirs "/path/to/your/data"
+# Any configuration item can be overridden via the CLI. 
+#  For example, running with custom input directory
+nextflow run main.nf --input_dirs ["/path/to/your/data"]
 
-# Run with specific normalization
-nextflow run main.nf --override_normalization "quantile"
+# If re-running the pipeline, you may use the resume flag 
+#  to take advantage of nextflow's caching
+nextflow run main.nf -resume
 ```
 
 ### Execution Profiles
+ClassyFlow may be run locally, on a slurm cluster, or on Google Cloud Platform using a docker container. Configurations for these profiles can be found in the `conf/` directory.
 
 #### Local Execution (Default)
 ```bash
@@ -143,9 +121,9 @@ nextflow run main.nf -profile gcp
 ### Output Directory Structure
 ```
 classyflow_output/
-├── normalization_reports/      # Data transformation QC reports (PDF)
-├── celltype_reports/           # Feature selection analysis (PDF)
-├── model_reports/              # Training & validation reports (PDF)
+├── normalization_reports/      # Data transformation QC reports (HTML)
+├── celltype_reports/           # Feature selection analysis (HTML)
+├── model_reports/              # Training & validation reports (HTML)
 ├── models/                     # Trained classifiers & encoders
 ├── celltypes/                  # Final cell type predictions (TSV)
 └── clusters/                   # Optional clustering analysis
@@ -154,8 +132,8 @@ classyflow_output/
 ### Key Output Files
 
 #### Quality Control Reports
-- **normalization_reports/**: PDF reports comparing normalization methods
-- **celltype_reports/**: Feature selection analysis per cell type
+- **normalization_reports/**: HTML reports comparing normalization methods
+- **celltype_reports/**: HTML selection analysis per cell type
 - **model_reports/**: Model training and validation summaries
 
 #### Trained Models
@@ -175,15 +153,4 @@ Image               Centroid X µm   Centroid Y µm   CellTypePrediction
 TMA_Core_001.tif   1245.67         2890.34         T cell
 TMA_Core_001.tif   1356.78         2901.45         B cell
 ```
-
-#### Model Performance
-- **Typical Accuracy**: 88-95% on holdout data
-- **Model Reports**: Show feature importance and validation metrics
-- **Holdout Evaluation**: Unbiased performance assessment
-
-### Getting Help
-
-- **GitHub Issues**: [Report bugs or request features](https://github.com/dimi-lab/ClassyFlow/issues)
-- **Email Support**: your.email@mayo.edu
-- **Parameter Questions**: See [Parameter Reference](parameter-reference.md)
-- **Technical Details**: See [Pipeline Details](pipeline-details.md)
+These files can be loaded into your QuPath project to visualize and validate the predicted cell types.
