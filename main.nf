@@ -183,7 +183,7 @@ process predictAllCells_xgb{
 workflow {
     // Show help message if the user specifies the --help flag at runtime
     // or if any required params are not provided
-    if ( params.help || params.input_dir == false ){
+    if ( params.help || params.input_dirs == false ){
         // Invoke the function above which prints the help message
         helpMessage()
         // Exit out and do not run anything else
