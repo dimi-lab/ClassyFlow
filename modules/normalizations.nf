@@ -62,7 +62,6 @@ process quantile {
 // Produce Batch based normalization - min/max scaling
 process minmax {
 	tag { batchID }
-	executor "slurm"
     memory "50G"
     queue "cpu-short"
     time "24:00:00"
@@ -87,7 +86,6 @@ process minmax {
 
 process logscale {
 	tag { batchID }
-	executor "slurm"
     memory "50G"
     queue "cpu-short"
     time "24:00:00"
