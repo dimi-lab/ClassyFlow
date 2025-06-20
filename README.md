@@ -107,14 +107,74 @@ The quantification files need to include some annotated classification labels to
 
 ## Configuration
 
-### Key Parameters -- Under construction
+### Core Pipeline Settings
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `help` | `false` | Display help message and exit |
+| `input_dirs` | `"./input"` | Path to input directory |
+| `output_dir` | `"classyflow_output"` | Output directory for all results |
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `input_dirs` | Path to input directory | `"./input"` |
-| `output_dir` | Output directory for results | `"./output"` |
-| `bit_depth`  | Original Image Capture quality: 8-bit (pixel values will be 0-255) or 16-bit (pixel values will be 0-65,535) | `8-bit` |
-| `qupath_object_type` | "CellObject" has two ROIs, jointly and 4 components [Cell, Cytoplasm, Membrane, Nucleus] from QuPath; 'DetectionObject' is Single Whole Cell or Nucleus only | `CellObject` |
+### Input Data Configuration
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `slide_contains_prefix` | `"True"` | Image names contain "_" delimited slide prefix |
+| `folder_is_slide` | `"False"` | Folder represents single slide with multiple ROIs |
+| `quant_file_extension` | `".tsv"` | File extension for quantification files |
+| `quant_file_delimiter` | `"\\t"` | Column delimiter (tab or comma) |
+| `bit_depth` | `"16-bit"` | Original Image Capture quality: 8-bit (pixel values will be 0-255) or 16-bit (pixel values will be 0-65,535) |
+| `qupath_object_type` | `'DetectionObject'` | "CellObject" has two ROIs, jointly and 4 components [Cell, Cytoplasm, Membrane, Nucleus] from QuPath; 'DetectionObject' is Single Whole Cell or Nucleus only |
+
+### Marker and Feature Settings
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `nucleus_marker` | `"DAPI"` | Nuclear marker for normalization reference |
+| `housekeeping_marker` | `"S6"` | Housekeeping gene marker |
+| `classifed_column_name` | `"Classification"` | Column name containing cell type annotations |
+| `exclude_markers` | `"Arg1\|BAD\|B2M\|..."` | Pipe-delimited markers to exclude from analysis. Keep in mind that this is matched using regex, so if CD3 is included in this list, the algorithm will also exclude any markers with "CD3" (e.g. CD31, CD33, etc..) |
+| `plot_fraction` | `0.25` | Fraction of data that will be used for the quality control plots |
+
+### Normalization Parameters
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `override_normalization` | `"boxcox"` | Normalization method that will be used for downstream analyses |
+| `downsample_normalization_plots` | `0.5` | Fraction of data that will be used for normalization plots |
+| `quantile_split` | `1024` | Number of quantiles for QuantileTransformer. This is good for 16-bit, but not for 255-bit or Dualband/Hyperion |
+
+### Data Splitting and Training
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `holdout_fraction` | `0.1` | Fraction of data reserved for final validation |
+| `filter_out_junk_celltype_labels` | `"??,?,0,Negative,Ignore*"` | Cell types to exclude from training |
+| `minimum_label_count` | `20` | Minimum cells required per cell type to be included in the training set |
+
+### Feature Selection
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `min_rfe_nfeatures` | `2` | Minimum features for RFE evaluation |
+| `max_rfe_nfeatures` | `3` | Maximum features for RFE evaluation |
+
+### XGBoost Model Parameters
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `max_xgb_cv` | `10` | Maximum cross-validation iterations |
+| `xgb_depth_start` | `2` | Minimum tree depth for grid search |
+| `xgb_depth_stop` | `6` | Maximum tree depth for grid search |
+| `xgb_depth_step` | `3` | Step size for tree depth search |
+| `xgb_learn_rates` | `"0.1"` | Comma-separated learning rates to test |
+
+### Prediction Settings
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `predict_class_column` | `'CellType'` | Column name for predictions |
+| `predict_le_encoder_file` | `"${params.output_dir}/models/classes.npy"` | Path to label encoder |
+| `predict_columns_to_export` | `'Centroid X µm,Centroid Y µm,Image,CellTypePrediction'` | Columns to include in the output files |
+| `predict_cpu_jobs` | `16` | CPU cores to use for cell type prediction |
+
+### Optional Features
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `run_get_leiden_clusters` | `false` | Enable clustering-based (scimap) feature augmentation |
+| `scimap_resolution` | `0.5` | Resolution parameter for Leiden clustering |
 
 ### Execution Profiles
 
