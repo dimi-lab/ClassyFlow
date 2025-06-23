@@ -4,8 +4,11 @@ Welcome to the ClassyFlow documentation! This guide will help you get the most o
 
 ## Quick Navigation
 
+### 📦 **[Installation Instructions](installation.md)**
+Instructions for local and cloud installation
+
 ### 📚 **[User Guide](user-guide.md)**
-Complete manual covering installation, usage, and troubleshooting
+Complete manual covering input requirements, usage, and outputs
 
 ### ⚙️ **[Parameter Reference](parameter-reference.md)**
 Comprehensive configuration options
@@ -19,7 +22,6 @@ Technical documentation of each pipeline process
 - [Installation Instructions](user-guide.md#installation--setup)
 - [Input Data Requirements](user-guide.md#input-data-requirements)
 - [Understanding Outputs](user-guide.md#understanding-outputs)
-- [Troubleshooting](user-guide.md#troubleshooting)
 
 ## Support
 
