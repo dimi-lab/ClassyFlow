@@ -1,55 +1,12 @@
 # ClassyFlow User Guide
 
 ## Table of Contents
-- [Installation & Setup](#installation--setup)
 - [Input Data Requirements](#input-data-requirements)
 - [Pipeline Usage](#pipeline-usage)
 - [Understanding Outputs](#understanding-outputs)
 
-## Installation & Setup
-
-### Requirements
-
-- [Nextflow](https://www.nextflow.io/) ≥ 23.04.0
-- [Python](https://www.python.org/) ≥ 3.10
-- [Docker](https://www.docker.com/) or [Conda](https://docs.conda.io/) (recommended)
-
-### Python Dependencies
-```
-fpdf 1.7.2
-numpy 1.23.5
-matplotlib 3.8.0
-dataframe-image 0.2.3
-pandas 2.2.0
-seaborn 0.13.1
-xgboost 1.6.2
-scipy 1.12.0
-scikit-learn 1.4.0
-```
-
-### Installation Options
-
-#### Option 1: Local Installation
-```bash
-# Clone the repository
-git clone https://github.com/dimi-lab/ClassyFlow.git
-cd ClassyFlow
-
-# Create Conda environment (optional but recommended)
-conda create -n classyflow python=3.10
-conda activate classyflow
-
-# Install Python packages
-pip install -r requirements.txt
-
-# Test installation
-nextflow run main.nf --help
-```
-
-#### Option 2: Docker/GCP
-```bash
-### Add documentation here
-```
+## Installation
+Please refer to Installation Instructions for requirements and dependencies
 
 ## Input Data Requirements
 ClassyFlow expects measurement tables (quantification files) generated using QuPath 0.5+ from segmented single cell MxIF images. Each batch of samples should be placed in a separate directory. Additionally, a subset of cells must be annotated with cell type labels to be used for training and validation. It is recommended to have at least 30-50 annotations per cell type across multiple ROIs/samples.
