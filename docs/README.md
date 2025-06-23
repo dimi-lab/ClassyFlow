@@ -19,7 +19,7 @@ Technical documentation of each pipeline process
 
 ## Quick Links
 
-- [Installation Instructions](user-guide.md#installation--setup)
+- [Installation Instructions](installation.md)
 - [Input Data Requirements](user-guide.md#input-data-requirements)
 - [Understanding Outputs](user-guide.md#understanding-outputs)
 

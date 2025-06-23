@@ -12,29 +12,14 @@ Technical documentation of ClassyFlow's automated cell type classification workf
 
 ## Pipeline Overview
 
-ClassyFlow implements a systematic approach to cell type classification with the following key stages:
+ClassyFlow implements a systematic approach to cell type classification. Below are details of each step of the pipeline. For a visual representation of this pipeline, refer to the [ClassyFlow Workflow Diagram](detailed_workflow_diagram.mermaid)
 
-```mermaid
-flowchart TD
-    A[Input Batches] --> B[Data Integration]
-    B --> C[Panel QC] 
-    C --> D[Harmonization]
-    D --> E[Normalization]
-    E --> F[Train/Test Split]
-    F --> G[Feature Selection]
-    F --> H[Model Training]
-    G --> H
-    H --> I[Prediction]
-    E --> I
-    I --> J[Results]
-```
 
-### Expected Processing Times
+<!-- ### Expected Processing Times
 - **Small datasets** (< 10K cells): 30 minutes - 2 hours
 - **Medium datasets** (10K-100K cells): 2-6 hours  
-- **Large datasets** (> 100K cells): 6-24 hours
+- **Large datasets** (> 100K cells): 6-24 hours -->
 
-## Pipeline Overview
 
 ### 1. File merging and data filtering
 Combines quantification files from multiple batches into unified datasets. This step will also apply any marker exclusion filters as defined in the configuration file
@@ -43,7 +28,6 @@ Combines quantification files from multiple batches into unified datasets. This 
 ClassyFlow can work with multiple input batches. Since different batches may be coming from different projects, they may have different markers and study designs. First, the pipeline checks each batch and creates marker presence/absence matrix across all batches. For missing markers, the pipeline will generate synthetic, bakground noise using sklearn's [make_blobs](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.make_blobs.html). This ensures that all batches have identical feature sets
 
 ### 3. Normalization
-
 ClassyFlow supports multiple normalization approaches and generates comprehensive HTML reports to help the user choose the best normalization method for their dataset. The normalization method is specified in the `override_normalization` parameter in the config file.
 
 #### Box-Cox Transformation (`boxcox`)

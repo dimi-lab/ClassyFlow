@@ -11,24 +11,6 @@
 
 ClassyFlow is a comprehensive, automated, Nextflow pipeline for supervised cell type classification from multiplex imaging data.
 
-
-## Pipeline Architecture
-
-```mermaid
-flowchart TD
-    A[Input Batches] --> B[Data Integration]
-    B --> C[Panel QC] 
-    C --> D[Harmonization]
-    D --> E[Normalization]
-    E --> F[Train/Test Split]
-    F --> G[Feature Selection]
-    F --> H[Model Training]
-    G --> H
-    H --> I[Prediction]
-    E --> I
-    I --> J[Results]
-```
-
 ## Quick Start
 
 ### Requirements
@@ -47,6 +29,8 @@ cd ClassyFlow
 # Install Python dependencies
 pip install -r requirements.txt
 ```
+
+*For more advanced options, refer to [Installation Instructions](docs/installation.md)*
 ### Test with example data
 ```
 nextflow run main.nf -c nextflow.config
@@ -61,7 +45,7 @@ nextflow run main.nf -c nextflow.config
 ```bash
 nextflow run main.nf
 ```
-For more information on running ClassyFlow, see [Pipeline Usage](docs/user-guide.md#pipeline-usage)
+*For more information on running ClassyFlow, see [Pipeline Usage](docs/user-guide.md#pipeline-usage)*
 
 ## Output Structure
 
@@ -81,7 +65,8 @@ output/
 
 📚 **[Complete Documentation](docs/)** - Comprehensive user guide and technical reference
 
-- **[User Guide](docs/user-guide.md)** - Installation and usage
+- **[Installation Instructions](docs/installation.md)** - Installation options
+- **[User Guide](docs/user-guide.md)** - Usage
 - **[Parameter Reference](docs/parameter-reference.md)** - Complete configuration options
 - **[Pipeline Details](docs/pipeline-details.md)** - Technical workflow documentation
 
