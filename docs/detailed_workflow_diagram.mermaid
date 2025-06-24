@@ -1,0 +1,107 @@
+---
+config:
+  theme: redux
+  look: neo
+  layout: elk
+---
+flowchart TD
+ subgraph NORM["Normalization Pipeline"]
+    direction TB
+        E5["IDENTIFY_BEST<br><small>Compare &amp; select optimal</small>"]
+        E1["BoxCox Transform<br><small>Power transformation</small>"]
+        E2["Quantile Transform<br><small>Uniform distribution</small>"]
+        E3["MinMax Scaling<br><small>0-1 normalization</small>"]
+        E4["Log Transform<br><small>Log scale conversion</small>"]
+        E6["AUGMENT_WITH_LEIDEN<br><small>Optional Scimap clustering</small>"]
+  end
+ subgraph FEAT["Feature Selection Pipeline"]
+    direction TB
+        G2["search_for_alphas<br><small>LASSO regularization grid</small>"]
+        G1["topLabelSplit<br><small>Binary classification setup</small>"]
+        G3["merge_alphas_search<br><small>Consolidate alpha results</small>"]
+        G4["select_best_alpha<br><small>Optimal regularization</small>"]
+        G5["runAllRFE<br><small>Recursive feature elimination</small>"]
+        G6["merge_rfe_scores<br><small>Combine RFE results</small>"]
+        G7["examineClassLabel<br><small>Generate feature reports</small>"]
+        G8["mergeAndSortCsv<br><small>Final feature list</small>"]
+  end
+ subgraph MODEL["ML Model Development"]
+    direction TB
+        H2["xgboostingModel<br><small>Hyperparameter tuning</small>"]
+        H1["createXGBParams<br><small>Parameter search space</small>"]
+        H3["mergeXgbCsv<br><small>Combine training results</small>"]
+        H4["xgboostingFinalModel<br><small>Train best models</small>"]
+        H5["holdOutXgbEvaluation<br><small>Validation testing</small>"]
+        H6["mergeHoldoutCsv<br><small>Performance summary</small>"]
+        H7["selectBestModel<br><small>Choose optimal classifier</small>"]
+  end
+    A["Input Directories<br>"] --> B["mergeTabDelimitedFiles<br><small>Combine quantification data</small>"]
+    B --> C["checkPanelDesign<br><small>Analyze marker presence</small>"] & D["addEmptyMarkerNoise<br><small>Harmonize missing markers</small>"]
+    C --> D
+    D --> E["Normalization Workflow<br><small>Auto-select best method</small>"]
+    E --> F["generateTrainingNHoldout<br><small>70/30 stratified split</small>"] & I["predictAllCells_xgb<br><small>Apply best model to all data</small>"]
+    F --> G["Feature Selection Workflow<br><small>LASSO + RFE per cell type</small>"] & H["Modeling Workflow<br><small>XGBoost optimization</small>"]
+    G --> H
+    H --> I
+    E1 --> E5
+    E2 --> E5
+    E3 --> E5
+    E4 --> E5
+    E5 --> E6
+    G1 --> G2 & G5 & G7
+    G2 --> G3
+    G3 --> G4 & G7
+    G4 --> G5 & G7
+    G5 --> G6
+    G6 --> G7
+    G7 --> G8
+    H1 --> H2
+    H2 --> H3
+    H3 --> H4
+    H4 --> H5
+    H5 --> H6
+    H6 --> H7
+    I --> OUT1["Cell Type Predictions<br><small>TSV format results</small>"] & OUT2["Performance Reports<br><small>PDF validation summaries</small>"] & OUT3["Trained Models<br><small>Pickle format classifiers</small>"]
+    A@{ shape: rounded}
+     E5:::subprocessNode
+     E1:::subprocessNode
+     E2:::subprocessNode
+     E3:::subprocessNode
+     E4:::subprocessNode
+     E6:::subprocessNode
+     G2:::subprocessNode
+     G1:::subprocessNode
+     G3:::subprocessNode
+     G4:::subprocessNode
+     G5:::subprocessNode
+     G6:::subprocessNode
+     G7:::subprocessNode
+     G8:::subprocessNode
+     H2:::subprocessNode
+     H1:::subprocessNode
+     H3:::subprocessNode
+     H4:::subprocessNode
+     H5:::subprocessNode
+     H6:::subprocessNode
+     H7:::subprocessNode
+     A:::inputNode
+     B:::processNode
+     C:::processNode
+     D:::processNode
+     E:::workflowNode
+     F:::processNode
+     I:::workflowNode
+     G:::workflowNode
+     H:::workflowNode
+     OUT1:::outputNode
+     OUT2:::outputNode
+     OUT3:::outputNode
+    classDef inputNode fill:#1565C0,stroke:#0D47A1,stroke-width:3px,color:#fff,font-weight:bold
+    classDef processNode fill:#6A1B9A,stroke:#4A148C,stroke-width:2px,color:#fff,font-weight:bold
+    classDef workflowNode fill:#2E7D32,stroke:#1B5E20,stroke-width:3px,color:#fff,font-weight:bold
+    classDef subprocessNode fill:#5E35B1,stroke:#311B92,stroke-width:2px,color:#fff
+    classDef outputNode fill:#D84315,stroke:#BF360C,stroke-width:3px,color:#fff,font-weight:bold
+    classDef subgraphStyle fill:#F5F5F5,stroke:#424242,stroke-width:2px,color:#212121
+    style NORM fill:#E8F5E8,stroke:#2E7D32,stroke-width:3px
+    style FEAT fill:#FFF3E0,stroke:#F57C00,stroke-width:3px  
+    style MODEL fill:#E3F2FD,stroke:#1976D2,stroke-width:3px
