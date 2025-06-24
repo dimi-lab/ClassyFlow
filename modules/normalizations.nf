@@ -1,10 +1,9 @@
 // Produce Batch based normalization - boxcox
-process boxcox {
+process BOXCOX {
 	tag { batchID }
-    label 'normalization_parallel'
 
 	publishDir(
-        path: "${params.output_dir}/normalization_reports",
+        path: "${params.output_dir}/normalization",
         pattern: "*.pdf",
         mode: "copy"
     )
@@ -30,11 +29,11 @@ process boxcox {
     
     
 // Produce Batch based normalization - quantile
-process quantile {
+process QUANTILE {
 	tag { batchID }
 
     publishDir(
-        path: "${params.output_dir}/normalization_reports",
+        path: "${params.output_dir}/normalization",
         pattern: "*.pdf",
         mode: "copy"
     )
@@ -60,15 +59,10 @@ process quantile {
 }
 
 // Produce Batch based normalization - min/max scaling
-process minmax {
+process MINMAX {
 	tag { batchID }
-	executor "slurm"
-    memory "50G"
-    queue "cpu-short"
-    time "24:00:00"
-    
 	publishDir(
-        path: "${params.output_dir}/normalization_reports",
+        path: "${params.output_dir}/normalization",
         pattern: "*.pdf",
         mode: "copy"
     )
@@ -85,15 +79,10 @@ process minmax {
 
 }
 
-process logscale {
+process LOGSCALE {
 	tag { batchID }
-	executor "slurm"
-    memory "50G"
-    queue "cpu-short"
-    time "24:00:00"
-    
 	publishDir(
-        path: "${params.output_dir}/normalization_reports",
+        path: "${params.output_dir}/normalization",
         pattern: "*.pdf",
         mode: "copy"
     )
@@ -114,17 +103,11 @@ process logscale {
 // Look at all of the normalizations within a batch and attempt to idendity the best approach
 process IDENTIFY_BEST{
 	publishDir(
-        path: "${params.output_dir}/normalization_reports",
+        path: "${params.output_dir}/normalization",
         pattern: "*.pdf",
         mode: "copy"
     )
 
-	publishDir(
-        path: "${params.output_dir}/normalization_files",
-        pattern: "normalized_*.tsv",
-        mode: "copy"
-    )
-    
 	input:
 	tuple val(batchID), path(all_possible_tables)
 	
@@ -155,6 +138,30 @@ process AUGMENT_WITH_LEIDEN_CLUSTERS{
     script:
     template 'scimap_clustering.py'
 }
+
+process GMM_GATING {
+    tag { batchID }
+    publishDir(
+        path: "${params.output_dir}/normalization",
+        pattern: "*.html",
+        mode: "copy"
+    )
+    input:
+    tuple val(batchID), path(norm_table)
+
+    output:
+    tuple val(batchID), path("gmm_gated_${batchID}.tsv"), emit: norm_df
+    path("gmm_gated_${batchID}.html")
+    
+    script:
+    """
+    gmm_gating.py \
+        --input ${norm_table} \
+        --output gmm_gated_${batchID}.tsv \
+        --html_report gmm_gated_${batchID}.html
+    """
+}
+
 // -------------------------------------- //
 
 
@@ -165,26 +172,26 @@ workflow normalization_wf {
     main:
 	def best_ch
     if (params.override_normalization == "boxcox") {
-        def bc = boxcox(batchPickleTable)
+        def bc = BOXCOX(batchPickleTable)
         best_ch = bc.norm_df
     }
     else if (params.override_normalization == "quantile") {
-        def qt = quantile(batchPickleTable)
+        def qt = QUANTILE(batchPickleTable)
         best_ch = qt.norm_df
     }
     else if (params.override_normalization == "minmax") {
-        def mm = minmax(batchPickleTable)
+        def mm = MINMAX(batchPickleTable)
         best_ch = mm.norm_df
     }
     else if (params.override_normalization == "logscale") {
-        def lg = logscale(batchPickleTable)
+        def lg = LOGSCALE(batchPickleTable)
         best_ch = lg.norm_df
     }
     else {
-        def bc = boxcox(batchPickleTable).norm_df
-        def qt = quantile(batchPickleTable).norm_df
-        def mm = minmax(batchPickleTable).norm_df
-        def lg = logscale(batchPickleTable).norm_df
+        def bc = BOXCOX(batchPickleTable).norm_df
+        def qt = QUANTILE(batchPickleTable).norm_df
+        def mm = MINMAX(batchPickleTable).norm_df
+        def lg = LOGSCALE(batchPickleTable).norm_df
 
         def mxchannels = batchPickleTable.mix(bc, qt, mm, lg).groupTuple()
         mxchannels.dump(tag: 'debug_normalization_channels', pretty: true)
@@ -193,10 +200,18 @@ workflow normalization_wf {
         best_ch = best.norm_df
     }
 
+    // Insert GMM gating after normalization
+    def gmm_gated = GMM_GATING(best_ch)
+    best_ch = gmm_gated.norm_df
+
     if (params.run_get_leiden_clusters) {
         def leiden_augmented = AUGMENT_WITH_LEIDEN_CLUSTERS(best_ch)
         best_ch = leiden_augmented.norm_df
     }
+
+    // ## future add flag column for bin density ##
+
+    // ## add column for sig sum ##
 
     emit:
     normalized = best_ch
