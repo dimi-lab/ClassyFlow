@@ -1,1 +1,20 @@
+# GCP CONFIGURATION
+
+export GCP_PROJECT_ID=project-id
+export GCP_WORKDIR=gs://a-bucket/a-path
+export GCP_CONTAINER=us-central1-docker.pkg.dev/project_id/repository_id/classyflow:latest
+
+# Comment out if not using Cloud Build.
 export GCP_ARTIFACT_REPOSITORY=your-repository-name
+
+# Comment out if not using a service account.
+export GCP_SERVICE_ACCOUNT=serviceaccount@project.iam.gserviceaccount.com
+
+# Comment out if not using custom networking.
+export GCP_NETWORK=projects/project_id/global/networks/network_id
+export GCP_SUBNETWORK=projects/project_id/regions/region/subnetworks/subnetwork_id
+
+# Set to false if you need a public IP address.
+export GCP_USE_PRIVATE_ADDRESS=true
+
+# END GCP CONFIGURATION
