@@ -4,6 +4,7 @@ public
 results
 work
 output
+classyflow_output
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

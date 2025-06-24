@@ -1,9 +1,8 @@
-<img src="https://github.com/dimi-lab/ClassyFlow/blob/main/images/classyFlow_banner.PNG" width="1000"/>
-
-
-# ClassyFlow: Automated ML Pipeline for Multiplex Immunofluorescence Cell Classification
+# ClassyFlow: Simplified ML Pipeline for Multiplex Immunofluorescence Cell Classification
 
 **ClassyFlow** is a robust, modular Nextflow pipeline designed to streamline and automate the process of building, evaluating, and deploying machine learning models for multiplex immunofluorescence (MxIF) single-cell image data. 
+
+<img src="https://github.com/dimi-lab/ClassyFlow/blob/main/images/classyFlow_banner.PNG" width="1000"/>
 
 ## What Does This Pipeline Do?
 
@@ -47,29 +46,42 @@ Note: This pipeline requires exported QuPath (0.5+) measurement tables (quantifi
 
 <img src="https://github.com/dimi-lab/ClassyFlow/blob/main/images/qupath_example_exporting.PNG" width="750"/>
 
-1. 
+ 
+### Configurable Parameters
 
-
-
-
-
-
-### Configurable parameters
-
-| Field               |Description   |
-|-------------|-----------------------------------------------------------|
-| bit_depth | Original Image Capture quality: 8-bit (pixel values will be 0-255) or 16-bit (pixel values will be 0-65,535) |
-| qupath\_object\_type |  "CellObject" has two ROIs, jointly and 4 components [Cell, Cytoplasm, Membrane, Nucleus] from QuPath; 'DetectionObject' is Single Whole Cell or Nucleus only|
-| classifed\_column_name| |
-| exclude_markers | |
-| nucleus_marker | |
-| override_normalization | |
-| downsample\_normalization_plots | |
-| holdout_fraction | |
-| filter_out\_junk\_celltype_labels | |
-| minimum\_label_count | |
-| max\_xgb_cv | |
-
+| Parameter                     | Small Data Defaults                        | Description                                                                                   |
+|-------------------------------|--------------------------------------|-----------------------------------------------------------------------------------------------|
+| `output_dir`                  | `classyflow_output`                  | Output directory for all pipeline results                                                     |
+| `slide_contains_prefix`        | `True`                               | If true, assumes folder is a batch of slides & image name contains "_" delimited prefix       |
+| `folder_is_slide`              | `False`                              | If true, assumes folder contains multiple ROIs for a single slide/sample                      |
+| `quant_file_extension`         | `.tsv`                               | File extension for quantification tables                                                      |
+| `quant_file_delimiter`         | `\t`                                 | Delimiter for quantification tables (`\t` for tab, `,` for comma)                             |
+| `bit_depth`                    | `16-bit`                             | Image bit depth: `8-bit` (0-255) or `16-bit` (0-65535)                                        |
+| `qupath_object_type`           | `DetectionObject`                    | QuPath object type: `CellObject` or `DetectionObject`                                         |
+| `nucleus_marker`               | `DAPI_AF_R01`                        | Marker name for nucleus identification                                                        |
+| `plot_fraction`                | `0.25`                               | Fraction of data to use for plotting                                                          |
+| `classifed_column_name`        | `Classification`                     | Column name in quantification tables for cell type labels                                     |
+| `exclude_markers`              | See config                           | Pipe-delimited list of marker names to exclude (regex supported)                              |
+| `housekeeping_marker`          | `S6`                                 | Marker used as a housekeeping control                                                         |
+| `override_normalization`       | `boxcox`                             | Normalization method: `minmax`, `boxcox`, `log`, `quantile`, or `null` for auto              |
+| `downsample_normalization_plots`| `0.5`                               | Fraction of data to use for normalization plots                                               |
+| `quantile_split`               | `1024`                               | Number of quantiles for quantile normalization (good for 16-bit images)                       |
+| `max_xgb_cv`                   | `10`                                 | Maximum number of cross-validation folds for XGBoost                                          |
+| `xgb_depth_start`              | `2`                                  | Starting value for XGBoost tree depth                                                         |
+| `xgb_depth_stop`               | `6`                                  | Stopping value for XGBoost tree depth                                                         |
+| `xgb_depth_step`               | `3`                                  | Step size for XGBoost tree depth                                                              |
+| `xgb_learn_rates`              | `0.1`                                | Learning rates for XGBoost (comma-separated string)                                           |
+| `predict_class_column`         | `CellType`                           | Column name for predicted cell type                                                           |
+| `predict_le_encoder_file`      | `${params.output_dir}/models/classes.npy` | Path to label encoder file for predictions                                              |
+| `predict_columns_to_export`    | `Centroid X µm,Centroid Y µm,Image,CellTypePrediction` | Columns to export in prediction output                                 |
+| `predict_cpu_jobs`             | `16`                                 | Number of CPUs to use for prediction                                                          |
+| `run_get_leiden_clusters`      | `false`                              | Whether to run Leiden clustering for feature engineering                                      |
+| `scimap_resolution`            | `0.5`                                | Resolution parameter for scimap clustering                                                    |
+| `holdout_fraction`             | `0.1`                                | Fraction of data per batch to withhold for holdout evaluation                                 |
+| `filter_out_junk_celltype_labels`| `??,?,0,Negative,Ignore*`          | Cell type labels to filter out                                                                |
+| `minimum_label_count`          | `20`                                 | Minimum number of cells per label for inclusion                                               |
+| `min_rfe_nfeatures`            | `2`                                  | Minimum number of features for RFE                                                            |
+| `max_rfe_nfeatures`            | `3`                                  | Maximum number of features for RFE                                                            |
 
 
 
