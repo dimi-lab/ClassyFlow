@@ -11,6 +11,7 @@ process boxcox {
 	
 	input:
 	tuple val(batchID), path(pickleTable)
+	path(letterhead)
 	
 	output:
 	tuple val(batchID), path("boxcox_transformed_${batchID}.tsv"), emit: norm_df
@@ -24,7 +25,7 @@ process boxcox {
 		--quantType ${params.qupath_object_type} \
 		--nucMark ${params.nucleus_marker} \
 		--plotFraction ${params.plot_fraction} \
-		--letterhead ${params.letterhead}
+		--letterhead ${letterhead}
 	"""
 }
     
@@ -62,7 +63,6 @@ process quantile {
 // Produce Batch based normalization - min/max scaling
 process minmax {
 	tag { batchID }
-	executor "slurm"
     memory "50G"
     queue "cpu-short"
     time "24:00:00"
@@ -87,7 +87,6 @@ process minmax {
 
 process logscale {
 	tag { batchID }
-	executor "slurm"
     memory "50G"
     queue "cpu-short"
     time "24:00:00"
@@ -161,11 +160,12 @@ process AUGMENT_WITH_LEIDEN_CLUSTERS{
 workflow normalization_wf {
     take:
     batchPickleTable
+    letterhead
 
     main:
 	def best_ch
     if (params.override_normalization == "boxcox") {
-        def bc = boxcox(batchPickleTable)
+        def bc = boxcox(batchPickleTable, letterhead)
         best_ch = bc.norm_df
     }
     else if (params.override_normalization == "quantile") {
@@ -181,7 +181,7 @@ workflow normalization_wf {
         best_ch = lg.norm_df
     }
     else {
-        def bc = boxcox(batchPickleTable).norm_df
+        def bc = boxcox(batchPickleTable, letterhead).norm_df
         def qt = quantile(batchPickleTable).norm_df
         def mm = minmax(batchPickleTable).norm_df
         def lg = logscale(batchPickleTable).norm_df
