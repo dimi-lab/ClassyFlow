@@ -1,66 +1,8 @@
-# ClassyFlow
+# ClassyFlow: Simplified ML Pipeline for Multiplex Immunofluorescence Cell Classification
 
-**Automated Cell Type Classification Pipeline for Multiplex Imaging Data**
+**ClassyFlow** is a robust, modular Nextflow pipeline designed to streamline and automate the process of building, evaluating, and deploying machine learning models for multiplex immunofluorescence (MxIF) single-cell image data. 
 
-[![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A523.04.0-23aa62.svg)](https://www.nextflow.io/)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](docs/)
-
-## Overview
-
-ClassyFlow is a comprehensive, automated, Nextflow pipeline for supervised cell type classification from multiplex imaging data.
-
-<img src="https://github.com/dimi-lab/ClassyFlow/blob/main/images/classyFlow_banner.PNG" width="600"/>
-
-## Quick Start
-
-### Requirements
-
-- [Nextflow](https://www.nextflow.io/) ≥ 23.04.0
-- [Python](https://www.python.org/) ≥ 3.10
-- [Docker](https://www.docker.com/) or [Conda](https://docs.conda.io/) (recommended)
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/dimi-lab/ClassyFlow.git
-cd ClassyFlow
-
-# Install Python dependencies
-pip install -r requirements.txt
-```
-
-*For more advanced options, refer to [Installation Instructions](docs/installation.md)*
-### Test with example data
-```
-nextflow run main.nf -c nextflow.config
-```
-
-### Running your own data
-
-1. Organize input data. See [Input Data Requirements](docs/user-guide.md#input-data-requirements)
-2. Adjust configurations in `nextflow.config`. See [Parameter Reference](docs/parameter-reference.md)
-3. Run ClassyFlow
-
-```bash
-nextflow run main.nf -profile <>
-```
-*For more information on running ClassyFlow, see [Pipeline Usage](docs/user-guide.md#pipeline-usage)*
-
-## Output Structure
-
-```
-output/
-├── celltype_reports/      # Feature analysis & training summaries (PDF)
-├── normalization_reports/ # Data transformation comparisons (PDF)
-├── model_reports/         # Training & validation performance (PDF)
-├── models/               # Trained classifiers & encoders (PKL)
-├── celltypes/            # Final predictions (TSV)
-├── clusters/             # Optional clustering analysis
-└── normalization_files/  # Processed data files (TSV)
-```
+<img src="https://github.com/dimi-lab/ClassyFlow/blob/main/images/classyFlow_banner.PNG" width="1000"/>
 
 ## What Does This Pipeline Do?
 
@@ -90,34 +32,58 @@ output/
 **ClassyFlow** is ideal for researchers and bioinformaticians seeking a fast, reliable, and transparent way to generate high-quality cell classification models from multiplexed imaging data.
 
 
-## Documentation
 
-📚 **[Complete Documentation](docs/)** - Comprehensive user guide and technical reference
+## Requirements/Dependencies
 
-- **[Installation Instructions](docs/installation.md)** - Installation options
-- **[User Guide](docs/user-guide.md)** - Usage
-- **[Parameter Reference](docs/parameter-reference.md)** - Complete configuration options
-- **[Pipeline Details](docs/pipeline-details.md)** - Technical workflow documentation
+-   Nextflow 23.04.2 (requires: bash, java 11 [or later, up to 21] git and docker)
+-   Python 3.10+ requirements file available.
+     
+------------------------------------------------------------------------
 
-## Getting Help
+## Instructions
 
-- 📖 [Documentation](docs/)
-- 🐛 [Issue Tracker](https://github.com/dimi-lab/ClassyFlow/issues)
+Note: This pipeline requires exported QuPath (0.5+) measurement tables (quantification files) generated from segmented single cell MxIF images. Those exported files need to include some annotated classification lables.
 
-## Citation
+<img src="https://github.com/dimi-lab/ClassyFlow/blob/main/images/qupath_example_exporting.PNG" width="750"/>
 
-If you use ClassyFlow in your research, please cite:
+ 
+### Configurable Parameters
 
-```bibtex
-@software{ClassyFlow2024,
-  title={ClassyFlow: Automated Cell Type Classification Pipeline for Multiplex Imaging},
-  author={Raymond Moore},
-  year={2024},
-  url={https://github.com/dimi-lab/ClassyFlow},
-  version={1.0.0}
-}
-```
+| Parameter                     | Small Data Defaults                        | Description                                                                                   |
+|-------------------------------|--------------------------------------|-----------------------------------------------------------------------------------------------|
+| `output_dir`                  | `classyflow_output`                  | Output directory for all pipeline results                                                     |
+| `slide_contains_prefix`        | `True`                               | If true, assumes folder is a batch of slides & image name contains "_" delimited prefix       |
+| `folder_is_slide`              | `False`                              | If true, assumes folder contains multiple ROIs for a single slide/sample                      |
+| `quant_file_extension`         | `.tsv`                               | File extension for quantification tables                                                      |
+| `quant_file_delimiter`         | `\t`                                 | Delimiter for quantification tables (`\t` for tab, `,` for comma)                             |
+| `bit_depth`                    | `16-bit`                             | Image bit depth: `8-bit` (0-255) or `16-bit` (0-65535)                                        |
+| `qupath_object_type`           | `DetectionObject`                    | QuPath object type: `CellObject` or `DetectionObject`                                         |
+| `nucleus_marker`               | `DAPI_AF_R01`                        | Marker name for nucleus identification                                                        |
+| `plot_fraction`                | `0.25`                               | Fraction of data to use for plotting                                                          |
+| `classifed_column_name`        | `Classification`                     | Column name in quantification tables for cell type labels                                     |
+| `exclude_markers`              | See config                           | Pipe-delimited list of marker names to exclude (regex supported)                              |
+| `housekeeping_marker`          | `S6`                                 | Marker used as a housekeeping control                                                         |
+| `override_normalization`       | `boxcox`                             | Normalization method: `minmax`, `boxcox`, `log`, `quantile`, or `null` for auto              |
+| `downsample_normalization_plots`| `0.5`                               | Fraction of data to use for normalization plots                                               |
+| `quantile_split`               | `1024`                               | Number of quantiles for quantile normalization (good for 16-bit images)                       |
+| `max_xgb_cv`                   | `10`                                 | Maximum number of cross-validation folds for XGBoost                                          |
+| `xgb_depth_start`              | `2`                                  | Starting value for XGBoost tree depth                                                         |
+| `xgb_depth_stop`               | `6`                                  | Stopping value for XGBoost tree depth                                                         |
+| `xgb_depth_step`               | `3`                                  | Step size for XGBoost tree depth                                                              |
+| `xgb_learn_rates`              | `0.1`                                | Learning rates for XGBoost (comma-separated string)                                           |
+| `predict_class_column`         | `CellType`                           | Column name for predicted cell type                                                           |
+| `predict_le_encoder_file`      | `${params.output_dir}/models/classes.npy` | Path to label encoder file for predictions                                              |
+| `predict_columns_to_export`    | `Centroid X µm,Centroid Y µm,Image,CellTypePrediction` | Columns to export in prediction output                                 |
+| `predict_cpu_jobs`             | `16`                                 | Number of CPUs to use for prediction                                                          |
+| `run_get_leiden_clusters`      | `false`                              | Whether to run Leiden clustering for feature engineering                                      |
+| `scimap_resolution`            | `0.5`                                | Resolution parameter for scimap clustering                                                    |
+| `holdout_fraction`             | `0.1`                                | Fraction of data per batch to withhold for holdout evaluation                                 |
+| `filter_out_junk_celltype_labels`| `??,?,0,Negative,Ignore*`          | Cell type labels to filter out                                                                |
+| `minimum_label_count`          | `20`                                 | Minimum number of cells per label for inclusion                                               |
+| `min_rfe_nfeatures`            | `2`                                  | Minimum number of features for RFE                                                            |
+| `max_rfe_nfeatures`            | `3`                                  | Maximum number of features for RFE                                                            |
 
-## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+
+
