@@ -43,115 +43,120 @@ def get_max_value(df):
     return max_value
 
 def collect_and_transform(df, batchName, quantType, nucMark, plotFraction):
-    df['Image'] = [e.replace('.ome.tiff', '') for e in df['Image'].tolist() ]
+    # Vectorized string replacement
+    df['Image'] = df['Image'].str.replace('.ome.tiff', '', regex=False)
 
-    smTble = df.groupby('Slide').apply(lambda x: x.sample(frac=plotFraction)) 
-    df_batching = smTble.filter(regex='(Mean|Median|Slide)',axis=1)
-    df_melted = pd.melt(df_batching, id_vars=["Slide"])
+    smTble = df.groupby('Slide', group_keys=False).apply(lambda x: x.sample(frac=plotFraction))
+    # Precompute filters
+    mean_median_slide_cols = smTble.filter(regex='(Mean|Median|Slide)', axis=1)
+    df_melted = pd.melt(mean_median_slide_cols, id_vars=["Slide"])
     fig, ax1 = plt.subplots(figsize=(20,8))
-    origVals = sns.boxplot(x='Slide', y='value', color="#CD7F32", data=df_melted, ax=ax1, showfliers = False)
+    sns.boxplot(x='Slide', y='value', color="#CD7F32", data=df_melted, ax=ax1, showfliers=False)
     plt.setp(ax1.get_xticklabels(), rotation=40, ha="right")
     ax1.set_title('Combined Marker Distribution (original values)')
-    fig = origVals.get_figure()
-    fig.savefig("original_marker_sample_boxplots.png") 
-    
-    df_batching = smTble.filter(regex='(Mean|Median|Image|Slide)',axis=1)
-    df_melted = pd.melt(df_batching, id_vars=["Image","Slide"])
+    fig.savefig("original_marker_sample_boxplots.png")
+    plt.close(fig)
+
+    mean_median_image_slide_cols = smTble.filter(regex='(Mean|Median|Image|Slide)', axis=1)
+    df_melted = pd.melt(mean_median_image_slide_cols, id_vars=["Image", "Slide"])
     fig, ax1 = plt.subplots(figsize=(20,8))
-    origVals = sns.boxplot(x='Image', y='value', hue="Slide", data=df_melted, ax=ax1, showfliers = False)
+    sns.boxplot(x='Image', y='value', hue="Slide", data=df_melted, ax=ax1, showfliers=False)
     plt.setp(ax1.get_xticklabels(), rotation=40, ha="right")
     ax1.set_title('Combined Marker Distribution (original values)')
-    fig = origVals.get_figure()
     fig.savefig("original_marker_roi_boxplots.png")
-    
+    plt.close(fig)
+
     if quantType == 'CellObject':
-        df_batching2 = smTble.filter(regex='Cell: Mean',axis=1)
-    else: 
-        df_batching2 = smTble.filter(regex='Mean',axis=1)
-    
+        df_batching2 = smTble.filter(regex='Cell: Mean', axis=1)
+    else:
+        df_batching2 = smTble.filter(regex='Mean', axis=1)
+    # Remove columns with only one unique value
     df_batching2 = df_batching2.loc[:, df_batching2.nunique() > 1]
-    
+
     metrics = []
-    bcDf = df.copy(deep=True).fillna(0)
-    for fld in list(bcDf.filter(regex='(Min|Max|Median|Mean|StdDev)')):
+    bcDf = df.fillna(0).copy()
+    stat_cols = list(bcDf.filter(regex='(Min|Max|Median|Mean|StdDev)'))
+    for fld in stat_cols:
         preMu = bcDf[fld].mean()
         try:
             nArr, mxLambda = boxcox(bcDf[fld].add(1).values)
             bcDf[fld] = nArr
-            mxLambda = "{:.3f}".format(mxLambda)
-        except:
+            mxLambda = f"{mxLambda:.3f}"
+        except Exception:
             bcDf[fld] = 0
             mxLambda = 'Failed'
-        metrics.append([fld,preMu,mxLambda,bcDf[fld].mean(),bcDf[fld].min(),bcDf[fld].max()])
-        
-    bxcxMetrics = pd.DataFrame(metrics, columns =['Feature','Pre_Mean','Lambda','Post_Mean','Post_Min','Post_Max'])
-    bxcxMetrics.to_csv("BoxCoxRecord.csv")
-    
+        metrics.append([fld, preMu, mxLambda, bcDf[fld].mean(), bcDf[fld].min(), bcDf[fld].max()])
+
+    bxcxMetrics = pd.DataFrame(metrics, columns=['Feature', 'Pre_Mean', 'Lambda', 'Post_Mean', 'Post_Min', 'Post_Max'])
+    bxcxMetrics.to_csv("BoxCoxRecord.csv", index=False)
+
     tmpPlot = bxcxMetrics.loc[bxcxMetrics['Lambda'] != 'Failed']
-    bcPP = bxcxMetrics.plot.scatter(y='Pre_Mean', x='Post_Mean', figsize = (10, 10) )
+    bcPP = bxcxMetrics.plot.scatter(y='Pre_Mean', x='Post_Mean', figsize=(10, 10))
     plt.title("Feature Avg Pre v. Post (BoxCox)")
     fig = bcPP.get_figure()
     fig.savefig("boxcox_delta_values.png")
-    
-    myFields = df_batching2.columns.to_list()
-    NucOnly = list(filter(lambda x:nucMark in x, myFields))[0]
-    for idx, fld in enumerate(myFields):
-        if fld == NucOnly:
-            continue    
-        da = df_batching2[[NucOnly,fld]].add_suffix(' Original')
-        dB = bcDf[[NucOnly,fld]].add_suffix(' Transformed')
-        tmpMerge = pd.concat([da,dB], axis=0, ignore_index=True)
-        maxX = get_max_value(tmpMerge)
+    plt.close(fig)
 
-        denstPlt = tmpMerge.plot.density(figsize = (8, 3),linewidth = 3)
-        plt.title("{} Distributions".format(fld))
-        plt.xlim(0, maxX)
-        fig = denstPlt.get_figure()
-        fig.savefig("original_value_density_{}.png".format(idx))
-    
-    smTble = bcDf.groupby('Slide').apply(lambda x: x.sample(frac=plotFraction)) 
-    df_batching = smTble.filter(regex='(Mean|Median|Slide)',axis=1)
-    df_melted = pd.melt(df_batching, id_vars=["Slide"])
+    myFields = df_batching2.columns.to_list()
+    NucOnly = next((x for x in myFields if nucMark in x), None)
+    if NucOnly:
+        for idx, fld in enumerate(myFields):
+            if fld == NucOnly:
+                continue
+            da = df_batching2[[NucOnly, fld]].add_suffix(' Original')
+            dB = bcDf[[NucOnly, fld]].add_suffix(' Transformed')
+            tmpMerge = pd.concat([da, dB], axis=0, ignore_index=True)
+            maxX = get_max_value(tmpMerge)
+            denstPlt = tmpMerge.plot.density(figsize=(8, 3), linewidth=3)
+            plt.title(f"{fld} Distributions")
+            plt.xlim(0, maxX)
+            fig = denstPlt.get_figure()
+            fig.savefig(f"original_value_density_{idx}.png")
+            plt.close(fig)
+
+    smTble = bcDf.groupby('Slide', group_keys=False).apply(lambda x: x.sample(frac=plotFraction))
+    mean_median_slide_cols = smTble.filter(regex='(Mean|Median|Slide)', axis=1)
+    df_melted = pd.melt(mean_median_slide_cols, id_vars=["Slide"])
     fig, ax1 = plt.subplots(figsize=(20,8))
-    origVals = sns.boxplot(x='Slide', y='value', color="#50C878", data=df_melted, ax=ax1, showfliers = False)
+    sns.boxplot(x='Slide', y='value', color="#50C878", data=df_melted, ax=ax1, showfliers=False)
     plt.setp(ax1.get_xticklabels(), rotation=40, ha="right")
     ax1.set_title('Combined Marker Distribution (quantile values)')
-    fig = origVals.get_figure()
-    fig.savefig("normlize_marker_sample_boxplots.png") 
-    
-    df_batching = smTble.filter(regex='(Mean|Median|Image|Slide)',axis=1)
-    df_melted = pd.melt(df_batching, id_vars=["Image","Slide"])
+    fig.savefig("normlize_marker_sample_boxplots.png")
+    plt.close(fig)
+
+    mean_median_image_slide_cols = smTble.filter(regex='(Mean|Median|Image|Slide)', axis=1)
+    df_melted = pd.melt(mean_median_image_slide_cols, id_vars=["Image", "Slide"])
     fig, ax1 = plt.subplots(figsize=(10,8))
-    origVals = sns.boxplot(x='Image', y='value', hue="Slide", data=df_melted, ax=ax1, showfliers = False)
+    sns.boxplot(x='Image', y='value', hue="Slide", data=df_melted, ax=ax1, showfliers=False)
     plt.setp(ax1.get_xticklabels(), rotation=40, ha="right")
     ax1.set_title('Combined Marker Distribution (original values)')
-    fig = origVals.get_figure()
-    fig.savefig("normlize_marker_roi_boxplots.png") 
+    fig.savefig("normlize_marker_roi_boxplots.png")
+    plt.close(fig)
+
+    colNames = [x for x in df.columns if 'Mean' in x]
+    NucOnly = next((x for x in colNames if nucMark in x), None)
+    if NucOnly:
+        for i in range(0, len(colNames), 4):
+            fig, axs = plt.subplots(2, 2, figsize=(8, 8))
+            axs = axs.flatten()
+            for j in range(4):
+                if i + j < len(colNames):
+                    hd = colNames[i + j]
+                    nuc1 = pd.DataFrame({"Original_Value": df[NucOnly], "Transformed_Value": bcDf[NucOnly]})
+                    nuc1['Mark'] = nucMark
+                    mk2 = pd.DataFrame({"Original_Value": df[hd], "Transformed_Value": bcDf[hd]})
+                    mk2['Mark'] = hd.split(":")[0]
+                    qqDF = pd.concat([nuc1, mk2], ignore_index=True)
+                    ax2 = axs[j]
+                    sns.scatterplot(x='Original_Value', y='Transformed_Value', data=qqDF, hue="Mark", ax=ax2)
+                    ax2.set_title(f"BoxCox: {hd}")
+                    ax2.axline((0, 0), (nuc1['Original_Value'].max(), nuc1['Transformed_Value'].max()), linewidth=2, color='r')
+                else:
+                    axs[j].axis('off')
+            fig.savefig(f"normlize_qrq_{i}.png")
+            plt.close(fig)
+    bcDf.to_csv(f"boxcox_transformed_{batchName}.tsv", sep="\t", index=False)
     
-    colNames = list(filter(lambda x:'Mean' in x, df.columns.tolist()))
-    NucOnly = list(filter(lambda x:nucMark in x, colNames))[0]
-    for i in range(0, len(colNames), 4):
-        fig, axs = plt.subplots(2, 2, figsize=(8, 8))
-        axs = axs.flatten()
-
-        for j in range(4):
-            if i + j < len(colNames):
-                hd = colNames[(i + j)]
-                nuc1 = pd.DataFrame({"Original_Value": df[NucOnly], "Transformed_Value":bcDf[NucOnly]})
-                nuc1['Mark'] = nucMark
-                mk2 = pd.DataFrame({"Original_Value": df[hd], "Transformed_Value":bcDf[hd]})
-                mk2['Mark'] = hd.split(":")[0]
-                qqDF = pd.concat([nuc1,mk2], ignore_index=True)
-
-                ax2 = axs[j]
-                sns.scatterplot(x='Original_Value', y='Transformed_Value', data=qqDF, hue="Mark", ax=ax2)
-                ax2.set_title("BoxCox: {}".format(hd))
-                ax2.axline((0, 0), (nuc1['Original_Value'].max(), nuc1['Transformed_Value'].max()), linewidth=2, color='r')
-            else:
-                axs[j].axis('off')
-        fig.savefig("normlize_qrq_{}.png".format(i))
-    bcDf.to_csv("boxcox_transformed_{}.tsv".format(batchName), sep="\t")    
-
 def generate_pdf_report(outfilename, batchName, letterhead):
     WIDTH = 215.9
     pdf = FPDF()
@@ -195,7 +200,6 @@ if __name__ == "__main__":
     parser.add_argument('--letterhead', required=True, help='Path to letterhead image for PDF report')
 
     args = parser.parse_args()
-
     myData = pd.read_pickle(args.pickleTable)
     myFileIdx = args.batchID
     quantType = args.quantType
