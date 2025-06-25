@@ -11,6 +11,8 @@ rcParams.update({'figure.autolayout': True})
 from matplotlib import pyplot
 from numpy import mean
 from numpy import std
+from datetime import datetime
+import json
 
 import concurrent.futures
 from functools import partial
@@ -24,174 +26,250 @@ from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.model_selection import cross_val_score, RepeatedStratifiedKFold
 from sklearn.feature_selection import RFE, VarianceThreshold
 
-import fpdf
-from fpdf import FPDF
-import dataframe_image as dfi
-
 batchColumn = 'Batch'
 
-
-
-############################ PDF REPORTING ############################
-def create_letterhead(pdf, WIDTH, letterhead_path):
-    pdf.image(letterhead_path, 0, 0, WIDTH)
-
-def create_title(title, pdf):
-    # Add main title
-    pdf.set_font('Helvetica', 'b', 20)  
-    pdf.ln(40)
-    pdf.write(5, title)
-    pdf.ln(10)
-    # Add date of report
-    pdf.set_font('Helvetica', '', 14)
-    pdf.set_text_color(r=128,g=128,b=128)
-    today = time.strftime("%d/%m/%Y")
-    pdf.write(4, f'{today}')
-    # Add line break
-    pdf.ln(10)
-
-def write_to_pdf(pdf, words):
-    # Set text colour, font size, and font type
-    pdf.set_text_color(r=0,g=0,b=0)
-    pdf.set_font('Helvetica', '', 12)
-    pdf.write(5, words)
-def error_to_pdf(pdf, words):
-    # Set text colour, font size, and font type
-    pdf.set_text_color(r=200,g=0,b=55)
-    pdf.set_font('Helvetica', '', 16)
-    pdf.write(5, words)
-############################ PDF REPORTING ############################
-
-# evaluate a give model using cross-validation
-# sklearn.metrics.SCORERS.keys()
-## Passing in models by parameters will not work with Concurrent Processing...needs to be internal, like this.
-def evaluate_model(idx, x, y, a):
-	print(f"Starting task {idx}")
-	rfe = RFE(estimator=Lasso(), n_features_to_select=idx)
-	model = Lasso(alpha=a, max_iter=lasso_max_iteration)
-	pipeline = Pipeline(steps=[('s',rfe),('m',model)])
-	cv = RepeatedStratifiedKFold(n_splits=n_folds, n_repeats=n_folds, random_state=1)
-
-	with warnings.catch_warnings():
-		warnings.filterwarnings("ignore", category=ConvergenceWarning)
-		scores = cross_val_score(pipeline, x, y, scoring='neg_root_mean_squared_error', cv=cv, n_jobs=-1, error_score='raise')
-	return idx, scores
-	
-	
-def summary_table(data):
-	# Create lists to store the data
-	element = []
-	mean_values = []
-	std_values = []
-
-	# Iterate over the data to extract mean and standard deviation
-	for key, (elem, values) in data.items():
-		element.append(elem)
-		mean_values.append(np.mean(values))
-		std_values.append(np.std(values))
-
-	# Create a DataFrame
-	summary_df = pd.DataFrame({
-		'Features': element,
-		'Mean': mean_values,
-		'StdDev': std_values
-	})
-
-	return summary_df
-
-
-def get_lasso_classification_features(
-    df, celltype, a, aTbl, rfeTbl, varThreshold, n_folds, n_features_to_RFE, ifSubsetData, max_workers, mim_class_label_threshold, classColumn
-):
-    allPDFText = {}
-    allPDFText['best_alpha'] = a
-    print(df.groupby([batchColumn, 'Lasso_Binary']).size())
+############################ PLOT AND TABLE GENERATION ############################
+def create_binary_count_table(df, output_path):
+    """Create binary count table and save to CSV"""
     binaryCntTbl = df.groupby([batchColumn, 'Lasso_Binary']).size().reset_index()
-    styled_df = binaryCntTbl.style.format({'Batches': "{}",
-                      'Binary': "{:,}",
-                      'Frequency': "{:,}"}).hide()
-    dfi.export(styled_df, 'binary_count_table.png'.format(celltype), table_conversion='matplotlib')
+    binaryCntTbl.columns = ['Batch', 'Lasso_Binary', 'Count']
+    binaryCntTbl.to_csv(output_path, index=False)
+    print(f"Binary count table saved: {output_path}")
+    return binaryCntTbl
 
-    print("Best Alpha: {}".format(allPDFText['best_alpha']))
-    scores = aTbl["mean_test_score"]
-    scores_std = aTbl["std_test_score"]
-    alphas = list(aTbl["input_a"].str.split('-').str[0].astype(float))
+def plot_best_alpha(scores, scores_std, alphas, best_alpha, n_folds, output_path):
+    """Create best alpha plot and save to file"""
     plt.figure().set_size_inches(9, 6)
     plt.semilogx(alphas, scores)
     std_error = scores_std / np.sqrt(n_folds)
     plt.semilogx(alphas, scores + std_error, "b--")
     plt.semilogx(alphas, scores - std_error, "b--")
     plt.fill_between(alphas, scores + std_error, scores - std_error, alpha=0.2)
-    plt.axvline(allPDFText['best_alpha'], linestyle="--", color="green", label="alpha: Best Fit")
+    plt.axvline(best_alpha, linestyle="--", color="green", label="alpha: Best Fit")
     plt.ylabel("CV score +/- std error")
     plt.xlabel("alpha")
     plt.axhline(np.max(scores), linestyle="--", color=".5")
     plt.xlim([alphas[0], alphas[-1]])
-    plt.savefig("best_alpha_plot.png", dpi=300, bbox_inches='tight')
+    plt.title('Alpha Parameter Optimization')
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Best alpha plot saved: {output_path}")
 
-    XAll = df[list(df.select_dtypes(include=[np.number]).columns.values)]
-    XAll = XAll[XAll.columns.drop(list(XAll.filter(regex='(Centroid|Binary|cnt|Name)')))].fillna(0)
-    yAll = df['Lasso_Binary']
+def plot_feature_ranking(featureRankDF, output_path):
+    """Create feature ranking plot and save to file"""
+    fig, ax = plt.subplots(figsize=(8, 12))
+    top_features = featureRankDF.nlargest(35, columns="score").sort_values(by="score", ascending=True)
+    bars = ax.barh(range(len(top_features)), top_features['score'], color='steelblue', alpha=0.7)
+    ax.set_yticks(range(len(top_features)))
+    ax.set_yticklabels(top_features.index)
+    ax.set_xlabel('Feature Importance (|Coefficient|)')
+    ax.set_title('Top 35 Feature Rankings from Lasso')
+    ax.grid(True, alpha=0.3, axis='x')
+    
+    # Add value labels
+    for i, bar in enumerate(bars):
+        width = bar.get_width()
+        ax.text(width + max(top_features['score'])*0.01, bar.get_y() + bar.get_height()/2, 
+               f'{width:.3f}', ha='left', va='center', fontsize=8)
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Feature ranking plot saved: {output_path}")
 
-    sel = VarianceThreshold(threshold=varThreshold)
-    sel.fit(XAll)
-    nonVarFeatures = [x for x in XAll.columns if x not in XAll.columns[sel.get_support()]]
-    print("NonVariant Features: "+', '.join(nonVarFeatures))
-    allPDFText['nonVarFeatures'] = ', '.join(nonVarFeatures)
+def create_rfe_summary_table(rfeTbl, output_path):
+    """Create RFE summary table and save to CSV"""
+    summary_df = rfeTbl.groupby('n_features')['rfe_score'].agg(['mean', 'std', 'median']).reset_index()
+    summary_df.columns = ['n_features', 'mean_score', 'std_score', 'median_score']
+    summary_df.to_csv(output_path, index=False)
+    print(f"RFE summary table saved: {output_path}")
+    return summary_df
 
-    clf = Lasso(alpha=a)
-    clf.fit(XAll, yAll)
-    features = XAll.columns.values.tolist()
-    coefficients = clf.coef_
-    importance = np.abs(coefficients)
-    featureRankDF = pd.DataFrame(data=importance, index=features, columns=["score"])
-    frPlot = featureRankDF.nlargest(35, columns="score").sort_values(by = "score", ascending=True).plot(kind='barh', figsize = (8,12)) 
-    fig = frPlot.get_figure()
-    fig.savefig("feature_ranking_plot.png")
-
-    dfF = pd.DataFrame(list(zip(features, importance)), columns=['Name', 'Feature_Importance'])
-    dfF = dfF.sort_values(by=['Feature_Importance'], ascending=False)
-
-    summary_df = rfeTbl.groupby('n_features')['rfe_score'].agg(['mean', 'std', 'median'])
-    styled_df = summary_df.style.format({'Number of Features': "{}",
-                      'Mean (-RMSE)': "{:,}",
-                      'Std.Dev. (-RMSE)': "{:,}"}).hide()
-    dfi.export(styled_df, 'ref_summary_table.png', table_conversion='matplotlib')
-
+def plot_recursive_elimination(rfeTbl, summary_df, output_path):
+    """Create recursive feature elimination plot and save to file"""
     categories = sorted(rfeTbl['n_features'].unique())
     grouped_data = [rfeTbl[rfeTbl['n_features'] == cat]['rfe_score'] for cat in categories]
 
-    pyplot.cla()  
-    box = pyplot.boxplot(grouped_data, labels=categories, patch_artist=True, showmeans=True)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    box = ax.boxplot(grouped_data, labels=categories, patch_artist=True, showmeans=True)
 
+    # Calculate optimal number of features
     global_median = rfeTbl['rfe_score'].median()
-    global_sd = ( rfeTbl['rfe_score'].std() / 8 )
-    filtered = summary_df[summary_df['median'] >= (global_median-global_sd)]
-    featureCutoff = filtered.index.min()    
-    allPDFText['Optimal_N_Features'] = featureCutoff
+    global_sd = (rfeTbl['rfe_score'].std() / 8)
+    filtered = summary_df[summary_df['median_score'] >= (global_median - global_sd)]
+    featureCutoff = int(filtered['n_features'].min())
 
+    # Color the optimal box
     for patch, category in zip(box['boxes'], categories):
         if category == featureCutoff:
             patch.set_facecolor('lightgreen')
         else:
             patch.set_facecolor('white')
+    
     for element in ['medians', 'means', 'whiskers', 'caps', 'fliers']:
         plt.setp(box[element], color='black')
 
-    pyplot.xlabel('Number of Features')  
-    pyplot.ylabel('RFE Score')  
-    pyplot.title('Recursive Feature Elimination Plot')  
-    pyplot.savefig("recursive_elimination_plot.png")
+    ax.set_xlabel('Number of Features')
+    ax.set_ylabel('RFE Score')
+    ax.set_title('Recursive Feature Elimination Analysis')
+    ax.grid(True, alpha=0.3)
+    
+    # Add optimal feature count annotation
+    ax.axvline(x=categories.index(featureCutoff) + 1, color='red', linestyle='--', alpha=0.7)
+    ax.text(categories.index(featureCutoff) + 1, ax.get_ylim()[1] * 0.95, 
+           f'Optimal: {featureCutoff}', ha='center', va='top', 
+           bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7))
 
-    ctl = dfF['Name'].tolist()[:featureCutoff]    
-    with open("top_rank_features_{}.csv".format(celltype.replace(' ','_').replace('|','_').replace('/','')), 'w', newline='') as csvfile:
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Recursive elimination plot saved: {output_path}")
+    
+    return featureCutoff
+
+def save_top_features(dfF, featureCutoff, celltype, output_path):
+    """Save top ranked features to CSV"""
+    top_features = dfF['Name'].tolist()[:featureCutoff]
+    
+    with open(output_path, 'w', newline='') as csvfile:
         f_writer = csv.writer(csvfile)
         f_writer.writerow(["Features"])
-        for ln in ctl:
-            f_writer.writerow([ln])
+        for feature in top_features:
+            f_writer.writerow([feature])
+    
+    print(f"Top {featureCutoff} features saved: {output_path}")
+    return top_features
+############################ PLOT AND TABLE GENERATION ############################
 
-    allPDFText['too_few'] = ""
-    return allPDFText
+def get_lasso_classification_features(
+    df, celltype, a, aTbl, rfeTbl, varThreshold, n_folds, n_features_to_RFE, 
+    ifSubsetData, max_workers, mim_class_label_threshold, classColumn, output_prefix
+):
+    """Perform feature selection analysis and save outputs as separate files"""
+    
+    results = {
+        'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'celltype': celltype,
+        'output_prefix': output_prefix,
+        'best_alpha': float(a),
+        'variance_threshold': float(varThreshold),
+        'n_folds': n_folds,
+        'n_features_to_RFE': n_features_to_RFE,
+        'min_class_threshold': mim_class_label_threshold,
+        'class_column': classColumn
+    }
+    
+    print(f"\n=== FEATURE SELECTION FOR {celltype} ===")
+    print(df.groupby([batchColumn, 'Lasso_Binary']).size())
+    
+    # Create binary count table
+    binary_table_path = f"{output_prefix}_binary_counts.csv"
+    binary_table = create_binary_count_table(df, binary_table_path)
+    results['binary_count_table_path'] = binary_table_path
+    results['binary_counts'] = binary_table.to_dict('records')
+
+    # Process alpha optimization results
+    print(f"Best Alpha: {results['best_alpha']}")
+    scores = aTbl["mean_test_score"].values
+    scores_std = aTbl["std_test_score"].values
+    alphas = list(aTbl["input_a"].str.split('-').str[0].astype(float))
+    
+    results['alpha_optimization'] = {
+        'alphas_tested': alphas,
+        'cv_scores': scores.tolist(),
+        'cv_scores_std': scores_std.tolist(),
+        'best_alpha': float(a),
+        'best_score': float(max(scores))
+    }
+    
+    # Create alpha plot
+    alpha_plot_path = f"{output_prefix}_alpha_optimization.png"
+    plot_best_alpha(scores, scores_std, alphas, a, n_folds, alpha_plot_path)
+    results['alpha_plot_path'] = alpha_plot_path
+
+    # Prepare feature data
+    print("\n=== PROCESSING FEATURES ===")
+    XAll = df[list(df.select_dtypes(include=[np.number]).columns.values)]
+    XAll = XAll[XAll.columns.drop(list(XAll.filter(regex='(Centroid|Binary|cnt|Name)')))].fillna(0)
+    yAll = df['Lasso_Binary']
+
+    # Variance threshold filtering
+    sel = VarianceThreshold(threshold=varThreshold)
+    sel.fit(XAll)
+    nonVarFeatures = [x for x in XAll.columns if x not in XAll.columns[sel.get_support()]]
+    print(f"Non-variant Features: {', '.join(nonVarFeatures)}")
+    
+    results['variance_filtering'] = {
+        'non_variant_features': nonVarFeatures,
+        'features_removed': len(nonVarFeatures),
+        'features_remaining': len(XAll.columns[sel.get_support()]),
+        'original_feature_count': len(XAll.columns)
+    }
+
+    # Feature importance from Lasso
+    clf = Lasso(alpha=a)
+    clf.fit(XAll, yAll)
+    features = XAll.columns.values.tolist()
+    coefficients = clf.coef_
+    importance = np.abs(coefficients)
+    
+    featureRankDF = pd.DataFrame(data=importance, index=features, columns=["score"])
+    
+    # Create feature ranking plot
+    feature_ranking_path = f"{output_prefix}_feature_ranking.png"
+    plot_feature_ranking(featureRankDF, feature_ranking_path)
+    results['feature_ranking_plot_path'] = feature_ranking_path
+
+    # Create feature importance dataframe
+    dfF = pd.DataFrame(list(zip(features, importance)), columns=['Name', 'Feature_Importance'])
+    dfF = dfF.sort_values(by=['Feature_Importance'], ascending=False)
+    
+    # Save feature importance table
+    feature_importance_path = f"{output_prefix}_feature_importance.csv"
+    dfF.to_csv(feature_importance_path, index=False)
+    print(f"✓ Feature importance table saved: {feature_importance_path}")
+    results['feature_importance_csv_path'] = feature_importance_path
+
+    # Process RFE results
+    print("\n=== PROCESSING RFE RESULTS ===")
+    rfe_summary_path = f"{output_prefix}_rfe_summary.csv"
+    summary_df = create_rfe_summary_table(rfeTbl, rfe_summary_path)
+    results['rfe_summary_csv_path'] = rfe_summary_path
+    results['rfe_summary_data'] = summary_df.to_dict('records')
+
+    # Create RFE plot and determine optimal features
+    rfe_plot_path = f"{output_prefix}_rfe_analysis.png"
+    featureCutoff = plot_recursive_elimination(rfeTbl, summary_df, rfe_plot_path)
+    results['rfe_plot_path'] = rfe_plot_path
+    results['optimal_n_features'] = int(featureCutoff)
+
+    # Save top features
+    top_features_path = f"{output_prefix}_top_features.csv"
+    top_features = save_top_features(dfF, featureCutoff, celltype, top_features_path)
+    results['top_features_csv_path'] = top_features_path
+    results['selected_features'] = top_features
+    results['selected_features_count'] = len(top_features)
+
+    # Feature selection summary
+    results['feature_selection_summary'] = {
+        'original_features': len(features),
+        'non_variant_removed': len(nonVarFeatures),
+        'features_after_variance_filter': len(XAll.columns[sel.get_support()]),
+        'optimal_features_selected': len(top_features),
+        'selection_ratio': round(len(top_features) / len(features), 3),
+        'best_rfe_score': float(summary_df[summary_df['n_features'] == featureCutoff]['median_score'].iloc[0])
+    }
+
+    print(f"\n=== FEATURE SELECTION COMPLETE ===")
+    print(f"Original features: {len(features)}")
+    print(f"Non-variant features removed: {len(nonVarFeatures)}")
+    print(f"Optimal features selected: {len(top_features)}")
+    print(f"Selection ratio: {len(top_features) / len(features):.3f}")
+
+    return results
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Feature selection and reporting for cell type classification.")
@@ -208,16 +286,41 @@ if __name__ == "__main__":
     parser.add_argument('--max_workers', type=int, default=8, help='Number of parallel workers')
     parser.add_argument('--mim_class_label_threshold', type=int, default=20, help='Minimum class label threshold')
     parser.add_argument('--n_alphas_to_search', type=int, default=8, help='Number of alphas to search')
-    parser.add_argument('--letterhead', required=True, help='Path to letterhead image for report')
     args = parser.parse_args()
 
+    # Load data
     myData = pd.read_pickle(args.trainingDataframe)
     myLabel = args.celltype.replace('[', '').replace(']', '')
     rfeScores = pd.read_csv(args.rfe_scores)
     best_alpha = args.best_alpha
     alphaScores = pd.read_csv(args.alpha_scores)
 
-    hshResults = get_lasso_classification_features(
+    # Create output prefix from celltype
+    safe_celltype = myLabel.replace(' ', '_').replace('|', '_').replace('/', '')
+    output_prefix = f"feature_selection_{safe_celltype}"
+
+    # Store input information
+    input_info = {
+        'celltype_original': args.celltype,
+        'celltype_safe': safe_celltype,
+        'training_dataframe': args.trainingDataframe,
+        'rfe_scores_file': args.rfe_scores,
+        'alpha_scores_file': args.alpha_scores,
+        'input_data_shape': list(myData.shape),
+        'analysis_parameters': {
+            'variance_threshold': args.varThreshold,
+            'n_features_to_RFE': args.n_features_to_RFE,
+            'n_folds': args.n_folds,
+            'subset_data': args.ifSubsetData,
+            'max_workers': args.max_workers,
+            'min_class_threshold': args.mim_class_label_threshold,
+            'n_alphas_searched': args.n_alphas_to_search
+        }
+    }
+
+
+    # Run feature selection analysis
+    feature_results = get_lasso_classification_features(
         myData,
         myLabel,
         best_alpha,
@@ -229,35 +332,32 @@ if __name__ == "__main__":
         args.ifSubsetData,
         args.max_workers,
         args.mim_class_label_threshold,
-        args.classColumn
+        args.classColumn,
+        output_prefix
     )
 
-    WIDTH = 215.9
-    HEIGHT = 279.4
-    pdf = FPDF()
-    pdf.add_page()
-    create_letterhead(pdf, WIDTH, args.letterhead)
-    create_title("Feature Evaluation: {}".format(myLabel), pdf)
-    if hshResults['too_few'] == "":
-        write_to_pdf(pdf, "In-Variant Feature Threshold: {}".format(args.varThreshold))    
-        pdf.ln(5)
-        pdf.image('binary_count_table.png', w= (WIDTH*0.3) )
-        pdf.ln(10)
-        write_to_pdf(pdf, "In-Variant Features: {}".format(hshResults['nonVarFeatures']))
-        pdf.ln(10)
-        write_to_pdf(pdf, "Best Alpha: {}".format( hshResults['best_alpha'] ))
-        pdf.ln(5)
-        pdf.image('best_alpha_plot.png', w= (WIDTH*0.8) )
-        pdf.image('feature_ranking_plot.png', w= (WIDTH*0.8) )
-        pdf.image('ref_summary_table.png', w= (WIDTH*0.4) )
-        write_to_pdf(pdf, "Optimal Number of Features: {}".format(hshResults['Optimal_N_Features']))
-        pdf.ln(10)
-        pdf.image('recursive_elimination_plot.png', w= (WIDTH*0.8), h=(HEIGHT*0.58) )
-    else:
-        error_to_pdf(pdf,hshResults['too_few'])
-        with open("top_rank_features_{}.csv".format(myLabel.replace(' ','_').replace('|','_').replace('/','')), 'w', newline='') as csvfile:
-            f_writer = csv.writer(csvfile)
-            f_writer.writerow(["Features"])
-    pdf.output("{}_Features.pdf".format(myLabel.replace(' ','_').replace('|','_').replace('/','')), 'F')
+    # Combine input info with results
+    complete_results = {**input_info, **feature_results}
 
+    # Save comprehensive results as JSON
+    json_path = f"{output_prefix}_results.json"
+    with open(json_path, 'w') as f:
+        json.dump(complete_results, f, indent=2)
+    print(f"✓ Results JSON saved: {json_path}")
 
+    print(f"\n=== FEATURE SELECTION PIPELINE COMPLETE ===")
+    print(f"Cell type: {myLabel}")
+    print(f"Input data: {myData.shape[0]} samples, {myData.shape[1]} features")
+    print(f"Best alpha: {best_alpha}")
+    print(f"Optimal features selected: {complete_results['optimal_n_features']}")
+    print(f"Feature selection ratio: {complete_results['feature_selection_summary']['selection_ratio']}")
+
+    print(f"\n=== OUTPUT FILES GENERATED ===")
+    print(f"• Feature selection results JSON: {json_path}")
+    print(f"• Binary counts table: {complete_results['binary_count_table_path']}")
+    print(f"• Alpha optimization plot: {complete_results['alpha_plot_path']}")
+    print(f"• Feature ranking plot: {complete_results['feature_ranking_plot_path']}")
+    print(f"• Feature importance CSV: {complete_results['feature_importance_csv_path']}")
+    print(f"• RFE summary CSV: {complete_results['rfe_summary_csv_path']}")
+    print(f"• RFE analysis plot: {complete_results['rfe_plot_path']}")
+    print(f"• Selected features CSV: {complete_results['top_features_csv_path']}")

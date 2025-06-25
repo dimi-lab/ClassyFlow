@@ -116,19 +116,13 @@ process MERGE_RFE_SCORE_CSV_FILES {
 
 // Need to generate a comma seperated list of Celltype labels from Pandas
 process EXAMINE_CLASS_LABEL{
-
-	publishDir(
-        path: "${params.output_dir}/celltype_reports",
-        pattern: "*.pdf",
-        mode: "copy"
-    )
-    
 	input:
 	tuple val(celltype), path(trainingDataframe), val(best_alpha), path(rfe_scores), path(alpha_scores)
+	path(letterhead)
 	
 	output:
-	path("top_rank_features_*.csv"), emit: feature_list
-	path("*_Features.pdf")
+	path("feature_selection_*_top_features.csv"), emit: feature_list
+	tuple path("feature_selection_*_binary_counts.csv"), path("feature_selection_*_rfe_summary.csv"), path("feature_selection_*_rfe_analysis.png"), path("feature_selection_*_feature_ranking.png"), path("feature_selection_*_feature_importance.csv"), emit: feature_selection_results
     
     script:
     """
@@ -146,7 +140,6 @@ process EXAMINE_CLASS_LABEL{
         --max_workers 8 \
         --mim_class_label_threshold 20 \
         --n_alphas_to_search 8 \
-        --letterhead "${params.letterhead}"
     """
 }
 
