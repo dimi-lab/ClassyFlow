@@ -97,28 +97,22 @@ process XGBOOSTING_FINAL_MODEL {
 }
 
 process HOLDOUT_XGB_EVALUATION {  
-    publishDir(
-        path: "${params.output_dir}/model_reports",
-        pattern: "*.pdf",
-        mode: "copy"
-    )
-	
 	input:
 	path(holdoutDataframe)
 	path(select_features_csv)
 	path(model_pickle)
 	path(leEncoderFile)
-	
+
 	output:
-	path("holdout_*.csv"), emit: eval
-	path("Holdout_on_*.pdf")
+	tuple path("XGBoost_Model_*.png"), path("XGBoost_Model_*_auc_rankings.csv"), path("XGBoost_Model_*_results.json"), emit: holdoutEval_output
+    path("holdout_*.csv"), emit: eval
+
 	
 	script:
     """
     get_holdout_evaluation.py \
         --classColumn ${params.classifed_column_name} \
         --leEncoderFile ${leEncoderFile} \
-        --letterhead "${params.letterhead}" \
         --model_pickle ${model_pickle} \
         --holdoutDataframe ${holdoutDataframe} \
         --select_features_csv ${select_features_csv}
