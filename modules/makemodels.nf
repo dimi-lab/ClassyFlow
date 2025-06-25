@@ -71,25 +71,26 @@ process XGBOOSTING_FINAL_MODEL {
         overwrite: true,
         mode: "copy"
     )
-    
-    input:
-    path(trainingDataframe)
-    path(select_features_csv)
-    path(model_performance_table)
-    
-    output:
-    path("XGBoost_Model_First.pkl"), emit: m1
-    path("XGBoost_Model_Second.pkl"), emit: m2
-    path("Model_Development_Xgboost.pdf")
-    path("classes.npy"), emit: classes
-    
-    script:
+	
+	input:
+	path(trainingDataframe)
+	path(select_features_csv)
+	path(model_performance_table)
+	path(letterhead)
+	
+	output:
+	path("XGBoost_Model_First.pkl"), emit: m1
+	path("XGBoost_Model_Second.pkl"), emit: m2
+	path("Model_Development_Xgboost.pdf")
+	path("classes.npy"), emit: classes
+	
+	script:
     """
     get_xgboost_winners.py \
         --classColumn ${params.classifed_column_name} \
         --cpu_jobs 16 \
         --mim_class_label_threshold ${params.minimum_label_count} \
-        --letterhead "${params.letterhead}" \
+        --letterhead "${letterhead}" \
         --model_performance_table ${model_performance_table} \
         --trainingDataframe ${trainingDataframe} \
         --select_features_csv ${select_features_csv}
@@ -102,23 +103,24 @@ process HOLDOUT_XGB_EVALUATION {
         pattern: "*.pdf",
         mode: "copy"
     )
-    
-    input:
-    path(holdoutDataframe)
-    path(select_features_csv)
-    path(model_pickle)
-    path(leEncoderFile)
-    
-    output:
-    path("holdout_*.csv"), emit: eval
-    path("Holdout_on_*.pdf")
-    
-    script:
+	
+	input:
+	path(holdoutDataframe)
+	path(select_features_csv)
+	path(model_pickle)
+	path(leEncoderFile)
+	path(letterhead)
+	
+	output:
+	path("holdout_*.csv"), emit: eval
+	path("Holdout_on_*.pdf")
+	
+	script:
     """
     get_holdout_evaluation.py \
         --classColumn ${params.classifed_column_name} \
         --leEncoderFile ${leEncoderFile} \
-        --letterhead "${params.letterhead}" \
+        --letterhead "${letterhead}" \
         --model_pickle ${model_pickle} \
         --holdoutDataframe ${holdoutDataframe} \
         --select_features_csv ${select_features_csv}
@@ -167,6 +169,7 @@ workflow modelling_wf {
     trainingPickleTable
     holdoutPickleTable
     featuresCSV
+    letterhead
 
     main:
     xgbconfig = CREATE_XGB_PARAMS()
@@ -175,7 +178,7 @@ workflow modelling_wf {
     xgbHyper = XGBOOSTING_MODEL(trainingPickleTable, featuresCSV, params_channel)
     paramSearch = MERGE_XGB_CSV(xgbHyper.behavior.collect())
     
-    xgbModels = XGBOOSTING_FINAL_MODEL(trainingPickleTable, featuresCSV, paramSearch.table)
+    xgbModels = XGBOOSTING_FINAL_MODEL(trainingPickleTable, featuresCSV, paramSearch.table, letterhead)
     
     allModelsTrained = xgbModels.m1.concat(xgbModels.m2).flatten()
     allModelsTrained.subscribe { println "Model: $it" }
@@ -184,7 +187,8 @@ workflow modelling_wf {
         holdoutPickleTable, 
         featuresCSV, 
         allModelsTrained, 
-        xgbModels.classes
+        xgbModels.classes,
+        letterhead
     )
     
     holdoutEval = MERGE_HOLDOUT_CSV(allHoldoutResults.eval.collect())
