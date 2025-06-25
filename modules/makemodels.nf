@@ -76,7 +76,7 @@ process XGBOOSTING_FINAL_MODEL {
 	path("XGBoost_Model_First.pkl"), emit: m1
 	path("XGBoost_Model_Second.pkl"), emit: m2
 	path("classes.npy"), emit: classes
-    tuple path("xgbWinners_*.png"), path("xgbWinners_parameter_summary.csv"), path("xgbWinners_results.json"), emit: xgboost_output
+    tuple path("xgbWinners_*.png"), path("xgbWinners_*.csv"), path("xgbWinners_results.json"), emit: xgboost_output
 	
 	script:
     """

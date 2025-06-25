@@ -67,8 +67,6 @@ def make_a_new_model(toTrainDF, classColumn, cpu_jobs, mim_class_label_threshold
 
     results = {
         'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'class_column': classColumn,
-        'cpu_jobs': cpu_jobs,
         'min_class_threshold': mim_class_label_threshold
     }
 
@@ -77,24 +75,23 @@ def make_a_new_model(toTrainDF, classColumn, cpu_jobs, mim_class_label_threshold
     print(f"Original class counts: {dict(class_counts)}")
 
     classes_to_keep = class_counts[class_counts > mim_class_label_threshold].index
-    original_shape = toTrainDF.shape
     toTrainDF = toTrainDF[toTrainDF[classColumn].isin(classes_to_keep)]
-    filtered_shape = toTrainDF.shape
 
-    print(f"Data shape: {original_shape} -> {filtered_shape} (filtered by threshold)")
+    label_counts = pd.DataFrame({
+    'Cell Type': class_counts.index,
+    'Number of annotations': class_counts.values,
+    'Included in training': class_counts.index.isin(classes_to_keep)
+    })
 
-    # Store class filtering info
-    results['original_data_shape'] = list(original_shape)
-    results['filtered_data_shape'] = list(filtered_shape)
-    results['classes_removed'] = {k: int(v) for k, v in class_counts[class_counts <= mim_class_label_threshold].to_dict().items()}
-    results['classes_kept'] = {k: int(v) for k, v in class_counts[class_counts > mim_class_label_threshold].to_dict().items()}
+    classes_summary_path = "xgbWinners_classes_summary.csv"
+    label_counts.to_csv(classes_summary_path, index=False)
+    print(f"Classes summary table saved: {classes_summary_path}")
+    results['classes_summary_path'] = classes_summary_path
+
 
     # Prepare features
     X = toTrainDF.select_dtypes(include=[np.number])
     X = X.loc[:, ~X.columns.duplicated()]
-
-    results['feature_count'] = X.shape[1]
-    results['feature_names'] = X.columns.tolist()
 
     le = preprocessing.LabelEncoder()
     y_Encode = le.fit_transform(toTrainDF[classColumn])
@@ -103,19 +100,14 @@ def make_a_new_model(toTrainDF, classColumn, cpu_jobs, mim_class_label_threshold
     encoder_path = "classes.npy"
     np.save(encoder_path, le.classes_)
     print(f"Label encoder saved: {encoder_path}")
-    results['label_encoder_path'] = encoder_path
-    results['class_mapping'] = {int(k): str(v) for k, v in zip(unique.tolist(), le.classes_.tolist())}
 
     # Create class distribution plot
     class_dist_path = "xgbWinners_class_distribution.png"
     plot_class_distribution(unique, counts, class_dist_path)
     results['class_distribution_plot_path'] = class_dist_path
-    results['final_class_counts'] = {int(k): int(v) for k, v in zip(unique.tolist(), counts.tolist())}
     
     num_round = 200
-
     xgboostParams = pd.read_csv(model_performance_table)
-    results['parameter_search_data'] = xgboostParams.to_dict('records')
 
     param_plot_path = "xgbWinners_parameter_search.png"
     plot_parameter_search(xgboostParams, param_plot_path)
@@ -148,12 +140,7 @@ def make_a_new_model(toTrainDF, classColumn, cpu_jobs, mim_class_label_threshold
     top_models = summary_table.sort_values('Test_mean', ascending=False).drop_duplicates(subset=['max_depth', 'eta']).head(2)
     print("Top Models:", top_models)
 
-    model_info = []
-    model_paths = []
-
-    #for fname, (_, row) in zip(["XGBoost_Model_First.pkl", "XGBoost_Model_Second.pkl"], top_models.iterrows()):
-    for i, (fname, (_, row)) in enumerate(zip(["XGBoost_Model_First.pkl", "XGBoost_Model_Second.pkl"], 
-                                             top_models.iterrows())):
+    for fname, (_, row) in zip(["XGBoost_Model_First.pkl", "XGBoost_Model_Second.pkl"], top_models.iterrows()):
         param = {
             'max_depth': int(row['max_depth']),
             'eta': row['eta'],
@@ -167,35 +154,7 @@ def make_a_new_model(toTrainDF, classColumn, cpu_jobs, mim_class_label_threshold
         pickle.dump(bst, open(fname, "wb"))
         print(f"Model saved: {fname}")
 
-        # Store model info
-        model_info.append({
-            'rank': i + 1,
-            'filename': fname,
-            'max_depth': int(row['max_depth']),
-            'eta': float(row['eta']),
-            'test_mean': float(row['Test_mean']),
-            'test_std': float(row['Test_std']),
-            'training_mean': float(row['Training_mean']),
-            'training_std': float(row['Training_std']),
-            'cv_folds': int(row['cv']),
-            'num_rounds': num_round,
-            'parameters': param
-        })
-        model_paths.append(fname)
-
-    results['best_model'] = model_info[0] if model_info else None
-    results['second_best_model'] = model_info[1] if len(model_info) > 1 else None
-
-        # Training summary
-    results['training_summary'] = {
-        'total_samples': filtered_shape[0],
-        'total_features': X.shape[1],
-        'num_classes': len(unique),
-        'training_rounds': num_round,
-        'models_trained': len(model_info),
-        'best_test_accuracy': float(top_models.iloc[0]['Test_mean']) if not top_models.empty else None
-    }
-
+    return results
 
 def main():
     parser = argparse.ArgumentParser(description="Train and select XGBoost models based on parameter search results.")
