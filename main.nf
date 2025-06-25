@@ -129,7 +129,6 @@ process GENERATE_TRAINING_N_HOLDOUT{
     
 	input:
 	path(norms_pkl_collected)
-	path(letterhead)
 
 	output:
     path("holdout_dataframe.pkl"), emit: holdout
@@ -145,7 +144,7 @@ process GENERATE_TRAINING_N_HOLDOUT{
         --cellTypeNegative "${params.filter_out_junk_celltype_labels}" \
         --minimunHoldoutThreshold ${params.minimum_label_count} \
         --pickle_files "${norms_pkl_collected}" \
-        --letterhead "${letterhead}"
+        --letterhead "${params.letterhead}"
     """
 
 }

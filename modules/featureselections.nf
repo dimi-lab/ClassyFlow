@@ -125,7 +125,6 @@ process EXAMINE_CLASS_LABEL{
     
 	input:
 	tuple val(celltype), path(trainingDataframe), val(best_alpha), path(rfe_scores), path(alpha_scores)
-	path(letterhead)
 	
 	output:
 	path("top_rank_features_*.csv"), emit: feature_list
@@ -147,7 +146,7 @@ process EXAMINE_CLASS_LABEL{
         --max_workers 8 \
         --mim_class_label_threshold 20 \
         --n_alphas_to_search 8 \
-        --letterhead "${letterhead}"
+        --letterhead "${params.letterhead}"
     """
 }
 
@@ -171,7 +170,6 @@ workflow featureselection_wf {
 	take: 
 	trainingPickleTable
 	celltypeCsv
-	letterhead
 	
 	main:
 	// Step1. Split the list into individual elements
@@ -235,9 +233,9 @@ workflow featureselection_wf {
     //labelWithEverything.view()    
     labelWithEverything.dump(tag: 'feat_sec_everything', pretty: true)
 	
-	fts = examineClassLabel(labelWithEverything, letterhead)
+	fts = EXAMINE_CLASS_LABEL(labelWithEverything)
 		
-	mas = mergeAndSortCsv(fts.feature_list.collect())
+	mas = MERGE_AND_SORT_CSV(fts.feature_list.collect())
 	
 	emit:
 	mas

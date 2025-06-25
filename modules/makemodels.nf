@@ -76,7 +76,6 @@ process XGBOOSTING_FINAL_MODEL {
 	path(trainingDataframe)
 	path(select_features_csv)
 	path(model_performance_table)
-	path(letterhead)
 	
 	output:
 	path("XGBoost_Model_First.pkl"), emit: m1
@@ -90,7 +89,7 @@ process XGBOOSTING_FINAL_MODEL {
         --classColumn ${params.classifed_column_name} \
         --cpu_jobs 16 \
         --mim_class_label_threshold ${params.minimum_label_count} \
-        --letterhead "${letterhead}" \
+        --letterhead "${params.letterhead}" \
         --model_performance_table ${model_performance_table} \
         --trainingDataframe ${trainingDataframe} \
         --select_features_csv ${select_features_csv}
@@ -109,7 +108,6 @@ process HOLDOUT_XGB_EVALUATION {
 	path(select_features_csv)
 	path(model_pickle)
 	path(leEncoderFile)
-	path(letterhead)
 	
 	output:
 	path("holdout_*.csv"), emit: eval
@@ -120,7 +118,7 @@ process HOLDOUT_XGB_EVALUATION {
     get_holdout_evaluation.py \
         --classColumn ${params.classifed_column_name} \
         --leEncoderFile ${leEncoderFile} \
-        --letterhead "${letterhead}" \
+        --letterhead "${params.letterhead}" \
         --model_pickle ${model_pickle} \
         --holdoutDataframe ${holdoutDataframe} \
         --select_features_csv ${select_features_csv}
@@ -169,7 +167,6 @@ workflow modelling_wf {
     trainingPickleTable
     holdoutPickleTable
     featuresCSV
-    letterhead
 
     main:
     xgbconfig = CREATE_XGB_PARAMS()
@@ -178,7 +175,7 @@ workflow modelling_wf {
     xgbHyper = XGBOOSTING_MODEL(trainingPickleTable, featuresCSV, params_channel)
     paramSearch = MERGE_XGB_CSV(xgbHyper.behavior.collect())
     
-    xgbModels = XGBOOSTING_FINAL_MODEL(trainingPickleTable, featuresCSV, paramSearch.table, letterhead)
+    xgbModels = XGBOOSTING_FINAL_MODEL(trainingPickleTable, featuresCSV, paramSearch.table)
     
     allModelsTrained = xgbModels.m1.concat(xgbModels.m2).flatten()
     allModelsTrained.subscribe { println "Model: $it" }
@@ -187,8 +184,7 @@ workflow modelling_wf {
         holdoutPickleTable, 
         featuresCSV, 
         allModelsTrained, 
-        xgbModels.classes,
-        letterhead
+        xgbModels.classes
     )
     
     holdoutEval = MERGE_HOLDOUT_CSV(allHoldoutResults.eval.collect())
