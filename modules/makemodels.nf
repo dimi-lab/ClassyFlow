@@ -55,11 +55,6 @@ process MERGE_XGB_CSV {
 
 process XGBOOSTING_FINAL_MODEL {
     publishDir(
-        path: "${params.output_dir}/model_reports",
-        pattern: "*.pdf",
-        mode: "copy"
-    )
-    publishDir(
         path: "${params.output_dir}/models",
         pattern: "*_Model_*.pkl",
         overwrite: true,
@@ -80,8 +75,8 @@ process XGBOOSTING_FINAL_MODEL {
 	output:
 	path("XGBoost_Model_First.pkl"), emit: m1
 	path("XGBoost_Model_Second.pkl"), emit: m2
-	path("Model_Development_Xgboost.pdf")
 	path("classes.npy"), emit: classes
+    tuple path("xgbWinners_*.png"), path("xgbWinners_parameter_summary.csv"), path("xgbWinners_results.json"), emit: xgboost_output
 	
 	script:
     """
@@ -89,7 +84,6 @@ process XGBOOSTING_FINAL_MODEL {
         --classColumn ${params.classifed_column_name} \
         --cpu_jobs 16 \
         --mim_class_label_threshold ${params.minimum_label_count} \
-        --letterhead "${params.letterhead}" \
         --model_performance_table ${model_performance_table} \
         --trainingDataframe ${trainingDataframe} \
         --select_features_csv ${select_features_csv}
