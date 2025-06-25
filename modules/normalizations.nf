@@ -10,7 +10,6 @@ process BOXCOX {
 	
 	input:
 	tuple val(batchID), path(pickleTable)
-	path(letterhead)
 	
 	output:
 	tuple val(batchID), path("boxcox_transformed_${batchID}.tsv"), emit: norm_df
@@ -24,7 +23,7 @@ process BOXCOX {
 		--quantType ${params.qupath_object_type} \
 		--nucMark ${params.nucleus_marker} \
 		--plotFraction ${params.plot_fraction} \
-		--letterhead ${letterhead}
+		--letterhead ${params.letterhead}
 	"""
 }
     
@@ -169,7 +168,6 @@ process GMM_GATING {
 workflow normalization_wf {
     take:
     batchPickleTable
-    letterhead
 
     main:
 	def best_ch
