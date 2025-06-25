@@ -13,7 +13,7 @@ params.input_dirs = [
 params.output_dir = "${workflow.projectDir}/output"
 
 //Static Assests for beautification
-params.letterhead = "${workflow.projectDir}/images/ClassyFlow_Letterhead.PNG"
+params.letterhead = "${projectDir}/images/ClassyFlow_Letterhead.PNG"
 
 // Build Input List of Batches
 Channel.fromList(params.input_dirs)
@@ -129,6 +129,7 @@ process GENERATE_TRAINING_N_HOLDOUT{
     
 	input:
 	path(norms_pkl_collected)
+	path(letterhead)
 
 	output:
     path("holdout_dataframe.pkl"), emit: holdout
@@ -144,7 +145,7 @@ process GENERATE_TRAINING_N_HOLDOUT{
         --cellTypeNegative "${params.filter_out_junk_celltype_labels}" \
         --minimunHoldoutThreshold ${params.minimum_label_count} \
         --pickle_files "${norms_pkl_collected}" \
-        --letterhead "${params.letterhead}"
+        --letterhead "${letterhead}"
     """
 
 }
@@ -223,7 +224,7 @@ process QC_DENSITY {
 workflow {
     // Show help message if the user specifies the --help flag at runtime
     // or if any required params are not provided
-    if ( params.help || params.input_dir == false ){
+    if ( params.help || params.input_dirs == false ){
         // Invoke the function above which prints the help message
         helpMessage()
         // Exit out and do not run anything else
