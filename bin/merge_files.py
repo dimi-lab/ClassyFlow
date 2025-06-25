@@ -3,20 +3,46 @@
 import sys, os
 import argparse
 import pandas as pd
+import re
 
 def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_slide, input_extension, input_delimiter, batchID):
     # List all files in the directory
     files = [f for f in os.listdir(directory_path) if f.endswith(input_extension)]
 
-    # Read and concatenate all tab-delimited files into a single DataFrame
+    def load_selected_columns(file_path, chunk_size=40000, excld_regex=None):
+        selected_columns = []
+        all_chunks = []
+        # Read the first chunk to identify columns to exclude
+        for first_chunk in pd.read_csv(file_path, chunksize=1, low_memory=False, sep=input_delimiter):
+            columns = first_chunk.columns
+            if excld_regex:
+                exclude_regex = re.compile(excld_regex, re.IGNORECASE)
+                selected_columns = [col for col in columns if not exclude_regex.search(col)]
+            else:
+                selected_columns = list(columns)
+            break
+        # Process chunks efficiently
+        with pd.read_csv(file_path, usecols=selected_columns, chunksize=chunk_size, low_memory=True, sep=input_delimiter) as reader:
+            for chunk in reader:
+                all_chunks.append(chunk)
+        allLnData = pd.concat(all_chunks, axis=0, ignore_index=True)
+        return allLnData
+
+    def get_chunk_size(file_path):
+        size_bytes = os.path.getsize(file_path)
+        if size_bytes < 10 * 1024 * 1024:  # less than 10MB
+            return 5000
+        elif size_bytes < 1024 * 1024 * 1024:  # less than 1GB
+            return 40000
+        else:
+            return 100000
+
     dataframes = []
     for file in files:
         file_path = os.path.join(directory_path, file)
-        df = pd.read_csv(file_path, sep=input_delimiter, low_memory=False)
-        #print(file_path) - Used to debug, misformatted files.
-        #print(df.columns.tolist())
-        if excld != '':
-            df = df[df.columns.drop(list(df.filter(regex='('+excld+')')))]
+        excld_regex = excld if excld != '' else None
+        chunk_size = get_chunk_size(file_path)
+        df = load_selected_columns(file_path, chunk_size=chunk_size, excld_regex=excld_regex)
         if slide_by_prefix:
             df['Slide'] = [e.split('_')[0] for e in df['Image'].tolist() ]
         elif folder_is_slide:
@@ -30,7 +56,6 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
 
     # Concatenate all DataFrames
     merged_df = pd.concat(dataframes, ignore_index=True)
-    # merged_df = merged_df.sample(n=5000)  # remove this after testing
     merged_df = merged_df.reset_index()
 
     ## Throw Error if Quant Files are empty.
