@@ -2,6 +2,7 @@
 
 // Using DSL-2
 nextflow.enable.dsl=2
+println "Active profile: ${workflow.profile}"
 
 // All of the default parameters are being set in `nextflow.config`
 params.input_dirs = [
@@ -47,7 +48,7 @@ def helpMessage() {
 }
 
 // Define a process to merge tab-delimited files and save as pickle
-process mergeTabDelimitedFiles {
+process MERGE_TAB_DELIMITED_FILES {
 	input:
     path subdir
     
@@ -75,7 +76,7 @@ process mergeTabDelimitedFiles {
  * are present in each batch or panel. This matrix is saved as 'panel_design.csv' for downstream
  * comparison of panel designs across
  */
-process checkPanelDesign {
+process CHECK_PANEL_DESIGN {
 	input:
 	path(tables_pkl_collected)
 
@@ -94,7 +95,7 @@ process checkPanelDesign {
  * (using sklearn's make_blobs) to fill in the missing features, ensuring all batches have a consistent set of markers.
  * The modified table is saved for downstream normalization and modeling.
  */
- process addEmptyMarkerNoise {
+process ADD_EMPTY_MARKER_NOISE {
 	input:
 	tuple val(batchID), path(pickleTable)
 	path designTable
@@ -119,7 +120,7 @@ process checkPanelDesign {
  * It also generates a summary table and a PDF report showing the distribution of cell types in each set,
  * ensuring balanced and reproducible training/validation splits for downstream modeling.
  */
-process generateTrainingNHoldout{
+process GENERATE_TRAINING_N_HOLDOUT{
 	publishDir(
         path: "${params.output_dir}/celltype_reports",
         pattern: "*.pdf",
@@ -150,7 +151,7 @@ process generateTrainingNHoldout{
 }
 
 // Run model on everything make results
-process predictAllCells_xgb{
+process PREDICT_ALL_CELLS_XGB{
 	publishDir(
         path: "${params.output_dir}/celltypes",
         pattern: "*_PRED.tsv",
@@ -162,7 +163,7 @@ process predictAllCells_xgb{
 	tuple val(batchID), path(pickleTable)
 	
 	output:
-	path("*.tsv")
+	path("*.tsv"), emit: predictions
 	
 	script:
     """
@@ -174,6 +175,46 @@ process predictAllCells_xgb{
         --modelfile ${model_path} \
         --columnsToExport "${params.predict_columns_to_export}" \
         --cpu_jobs ${params.predict_cpu_jobs}
+    """
+}
+
+process CLASSIFIED_REPORT_PER_SLIDE {
+    publishDir(
+        path: "${params.output_dir}/celltype_reports",
+        pattern: "*.html",
+        mode: "copy"
+    )
+
+    input:
+    path(prediction_tsv)
+
+    output:
+    path("*.html"), emit: slide_reports
+
+    script:
+    """
+    generate_classified_report.py \
+        --input_tsv ${prediction_tsv} \
+        --output_html \$(basename ${prediction_tsv} .tsv)_report.html
+    """
+}
+
+process QC_DENSITY {
+    tag { prediction_tsv.baseName }
+    publishDir "${params.output_dir}/celltypes", pattern: "*_PRED.tsv", mode: "copy", overwrite: true
+
+    input:
+    path(prediction_tsv)
+
+    output:
+    path("*.tsv"), emit: qc_predictions
+
+    script:
+    """
+    calculate_bin_density.py --input_tsv ${prediction_tsv} \
+        --output_tsv ${prediction_tsv} \
+        --bin_size 120 \
+        --density_cutoff 3
     """
 }
 // -------------------------------------- //
@@ -190,34 +231,45 @@ workflow {
         exit 1
     } else {
 
-		// Pull channel object `batchDirs` from nextflow env - see top of file.
-    	mergeTabDelimitedFiles(batchDirs)
+        // Pull channel object `batchDirs` from nextflow env - see top of file.
+        MERGE_TAB_DELIMITED_FILES(batchDirs)
     
-    	checkPanelDesign(mergeTabDelimitedFiles.output.batchtables.collect())  
-    	
-    	//modify the pickle files to account for missing features...
-    	addEmptyMarkerNoise(mergeTabDelimitedFiles.output.namedBatchtables, checkPanelDesign.output.paneldesignfile)
-    	   
-    	/*
-    	 * - Subworkflow to handle all Normalization/Standardization Tasks - 
-    	 */ 
-    	normalizedDataFrames = normalization_wf(addEmptyMarkerNoise.output.modbatchtables, params.letterhead)
-    	
-    	labledDataFrames = generateTrainingNHoldout(normalizedDataFrames.map{ it[1] }.collect(), params.letterhead)
-    	
-		/*
-    	 * - Subworkflow to examine Cell Type Specific interpetability & Feature Selections - 
-    	 */ 
-		selectFeatures = featureselection_wf(labledDataFrames.training, labledDataFrames.lableFile, params.letterhead)
-    	
-    	/*
-    	 * - Subworkflow to generate models and then check them against the holdout - 
-    	 */ 
-		bestModel = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures, params.letterhead)
-		
-		
-    	// Run the best model on the full input batches/files 
-    	predictAllCells_xgb(bestModel, normalizedDataFrames)
+        CHECK_PANEL_DESIGN(MERGE_TAB_DELIMITED_FILES.output.batchtables.collect())  
+        
+        //modify the pickle files to account for missing features...
+        ADD_EMPTY_MARKER_NOISE(MERGE_TAB_DELIMITED_FILES.output.namedBatchtables, CHECK_PANEL_DESIGN.output.paneldesignfile)
+           
+        /*
+         * - Subworkflow to handle all Normalization/Standardization Tasks - 
+         */ 
+        normalizedDataFrames = normalization_wf(ADD_EMPTY_MARKER_NOISE.output.modbatchtables)
+        
+        labledDataFrames = GENERATE_TRAINING_N_HOLDOUT(normalizedDataFrames.map{ it[1] }.collect())
+        
+        /*
+         * - Subworkflow to examine Cell Type Specific interpetability & Feature Selections - 
+         */ 
+        selectFeatures = featureselection_wf(labledDataFrames.training, labledDataFrames.lableFile)
+        
+        /*
+         * - Subworkflow to generate models and then check them against the holdout - 
+         */ 
+        bestModel = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures)
+        
+        // Run the best model on the full input batches/files 
+        PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
+
+        // Optionally run QC_DENSITY if enabled in config
+        if (params.qc_density) {
+            QC_DENSITY(PREDICT_ALL_CELLS_XGB.output.predictions)
+            // Overwrite predictions with QC-augmented files for downstream steps
+            predictions_for_report = QC_DENSITY.output.qc_predictions
+        } else {
+            predictions_for_report = PREDICT_ALL_CELLS_XGB.output.predictions
+        }
+
+        // Generate a comprehensive HTML report for each prediction file
+        CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
     	
     }
     
