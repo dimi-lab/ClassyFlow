@@ -122,7 +122,7 @@ process EXAMINE_CLASS_LABEL{
 	
 	output:
 	path("feature_selection_*_top_features.csv"), emit: feature_list
-	tuple path("feature_selection_*_binary_counts.csv"), path("feature_selection_*_rfe_summary.csv"), path("feature_selection_*_rfe_analysis.png"), path("feature_selection_*_feature_ranking.png"), path("feature_selection_*_feature_importance.csv"), emit: feature_selection_results
+	tuple path("feature_selection_*_results.json"), path("feature_selection_*.csv"), path("feature_selection_*.png"), emit: feature_selection_results
     
     script:
     """

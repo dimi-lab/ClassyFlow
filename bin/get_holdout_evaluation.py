@@ -8,10 +8,11 @@ import seaborn as sns
 import json
 from pprint import pprint
 from sklearn.metrics import roc_curve, auc
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, f1_score
 from sklearn.metrics import confusion_matrix
 from sklearn import preprocessing
 from sklearn.preprocessing import label_binarize
+from datetime import datetime
 
 import pickle
 import xgboost as xgb
@@ -132,7 +133,9 @@ def detect_class_imbalance(counts, threshold=0.1):
 def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
     """Evaluate model on holdout data and save outputs as separate files"""
 
-    results = {}
+    results = {
+        'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
 
     X_holdout = toCheckDF[list(toCheckDF.select_dtypes(include=[np.number]).columns.values)]
     X_holdout = X_holdout[xgbM.feature_names]
@@ -155,6 +158,8 @@ def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
 
     accuracy = accuracy_score(y_holdout, y_pred_proba)
     results['accuracy'] = float(accuracy)
+    f1 = f1_score(y_holdout, y_pred_proba, average='weighted')
+    results['f1_score'] = float(f1)
     results['class_imbalance_detected'] = bool(detect_class_imbalance(counts))
     
     # Create class distribution plot
@@ -229,8 +234,7 @@ def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
         'class_names': uniqNames.tolist(),
         'class_counts': counts.tolist(),
         'auc_scores': [{'class_index': int(idx), 'class_name': lableHash[idx], 'auc': float(score)} 
-                      for idx, score in sorted_auc_scores],
-        'confusion_matrix': cm.tolist()
+                      for idx, score in sorted_auc_scores]
     })
     
     return results
@@ -262,7 +266,7 @@ if __name__ == "__main__":
     with open(args.model_pickle, 'rb') as file:
         xgbMdl = pickle.load(file)
 
-    prefix = os.path.splitext(os.path.basename(args.model_pickle))[0]
+    prefix = f"holdout_eval_{os.path.splitext(os.path.basename(args.model_pickle))[0]}"
 
     # Generate evaluation data and plots
     results = check_holdout(focusData, xgbMdl, classColumn, leEncoderFile, prefix)
@@ -272,9 +276,7 @@ if __name__ == "__main__":
         'model_file': args.model_pickle,
         'encoder_file': args.leEncoderFile,
         'features_file': args.select_features_csv,
-        'feature_count': len(featureList) - 1,  # Exclude class column
-        'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
-        'script': 'get_holdout_evaluation.py'
+        'feature_count': len(featureList) - 1
     }
     
     # Save results as JSON
