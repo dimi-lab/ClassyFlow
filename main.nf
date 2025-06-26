@@ -14,6 +14,7 @@ params.output_dir = "${workflow.projectDir}/output"
 
 //Static Assests for beautification
 params.letterhead = "${projectDir}/assets/images/ClassyFlow_Letterhead.PNG"
+params.html_template = "${projectDir}/assets/html_templates"
 
 // Build Input List of Batches
 Channel.fromList(params.input_dirs)
@@ -216,6 +217,17 @@ process QC_DENSITY {
     touch ${prediction_tsv}
     """
 }
+
+process GENERATE_FINAL_REPORT {
+    publishDir "${params.outdir}/reports", mode: 'copy'
+    
+    input:
+    path(norm_files, stageAs: "norm/*")
+    path(fs_files, stageAs: "feature_selection/*") 
+    path(xgb_winners, stageAs: "modeling/winners/*")
+    path(holdout_files, stageAs: "modeling/holdout/*")
+
+}
 // -------------------------------------- //
 
 
@@ -264,6 +276,33 @@ workflow {
     
         // Generate a comprehensive HTML report for each prediction file
         CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
+
+        // Generate final HTML report for the whole run
+        // Collect normalization outputs (optional processes)
+        norm_outputs = Channel.empty()
+            .mix(
+                normalization_wf.out.boxcox_results.ifEmpty([]),
+                normalization_wf.out.quantile_results.ifEmpty([]),
+                normalization_wf.out.minmax_results.ifEmpty([]),
+                normalization_wf.out.log_results.ifEmpty([])
+            )
+            .collect()
+
+        // Collect feature selection outputs (multiple cell classes)
+        fs_outputs = featureselection_wf.out.feature_selection_results.collect()
+
+        // Collect modeling outputs
+        xgb_winners = modelling_wf.out.xgboost_results
+        holdout_evals = modelling_wf.out.holdoutEval_results.collect()
+
+        // Pass all to reporting
+        GENERATE_FINAL_REPORT(
+            norm_outputs,
+            fs_outputs, 
+            xgb_winners,
+            holdout_evals
+        )
+
     	
     }
     
