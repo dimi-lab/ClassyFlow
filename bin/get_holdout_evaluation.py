@@ -291,6 +291,6 @@ if __name__ == "__main__":
         "Min AUC": results['min_auc']['auc']
     }, index=[0])
     
-    csv_path = f"holdout_{prefix}.csv"
+    csv_path = f"holdout_{os.path.splitext(os.path.basename(args.model_pickle))[0]}.csv"
     performanceDF.to_csv(csv_path, index=False)
     print(f"Performance CSV saved: {csv_path}")
