@@ -236,16 +236,16 @@ def collect_and_transform(df, batchName, quantType, nucMark, plotFraction):
     }
     
     # 1. Slide boxplots
-    create_slide_boxplots(df, bcDf, batchName, plotFraction)
+    create_slide_boxplots(df, bcDf, results["slide_boxplots"], plotFraction)
     
     # 2. CV heatmap
-    create_cv_heatmap(cv_df, batchName, plot_type='improvement')
+    create_cv_heatmap(cv_df, results["cv_heatmap"], plot_type='improvement')
     
     # 3. Transformation examples
-    create_transformation_examples(df, bcDf, batchName, nucMark)
+    create_transformation_examples(df, bcDf, results["transformation_examples"], nucMark)
     
     # 4. Distribution comparison
-    create_distribution_comparison(df, bcDf, worst_markers, batchName)
+    create_distribution_comparison(df, bcDf, worst_markers, results["distribution_comparison"])
     
     # Save transformation results
     bcDf.to_csv(f"boxcox_transformed_{batchName}.tsv", sep="\t", index=False)
