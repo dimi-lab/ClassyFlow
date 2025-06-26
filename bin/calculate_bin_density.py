@@ -7,7 +7,6 @@ import numpy as np
 def main():
     parser = argparse.ArgumentParser(description="Calculate bin density for cell predictions.")
     parser.add_argument('--input_tsv', required=True, help='Input TSV file with cell predictions')
-    parser.add_argument('--output_tsv', required=True, help='Output TSV file with bin density columns')
     parser.add_argument('--bin_size', type=float, default=120, help='Bin size for density calculation (default: 120)')
     parser.add_argument('--density_cutoff', type=int, default=3, help='Density cutoff for low density (default: 3)')
     args = parser.parse_args()
@@ -33,7 +32,8 @@ def main():
     print(f"Low density cells: {n_lowdensity} ({pct_lowdensity:.1%})")
 
     # Write output
-    df.to_csv(args.output_tsv, sep='\t', index=False)
+    output_tsv = args.input_tsv.replace('_PRED.tsv', '_qPRED.tsv')
+    df.to_csv(output_tsv, sep='\t', index=False)
 
 if __name__ == "__main__":
     main()
