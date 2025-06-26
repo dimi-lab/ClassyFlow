@@ -98,7 +98,7 @@ process HOLDOUT_XGB_EVALUATION {
 	path(leEncoderFile)
 
 	output:
-	tuple path("XGBoost_Model_*.png"), path("XGBoost_Model_*_auc_rankings.csv"), path("XGBoost_Model_*_results.json"), emit: holdoutEval_output
+	tuple path("holdout_eval_XGBoost_Model_*.png"), path("holdout_eval_XGBoost_Model_*_auc_rankings.csv"), path("holdout_eval_XGBoost_Model_*_results.json"), emit: holdoutEval_output
     path("holdout_*.csv"), emit: eval
 
 	

@@ -130,18 +130,6 @@ def plot_recursive_elimination(rfeTbl, summary_df, output_path):
     
     return featureCutoff
 
-def save_top_features(dfF, featureCutoff, celltype, output_path):
-    """Save top ranked features to CSV"""
-    top_features = dfF['Name'].tolist()[:featureCutoff]
-    
-    with open(output_path, 'w', newline='') as csvfile:
-        f_writer = csv.writer(csvfile)
-        f_writer.writerow(["Features"])
-        for feature in top_features:
-            f_writer.writerow([feature])
-    
-    print(f"Top {featureCutoff} features saved: {output_path}")
-    return top_features
 ############################ PLOT AND TABLE GENERATION ############################
 
 def get_lasso_classification_features(
@@ -152,14 +140,7 @@ def get_lasso_classification_features(
     
     results = {
         'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'celltype': celltype,
-        'output_prefix': output_prefix,
-        'best_alpha': float(a),
-        'variance_threshold': float(varThreshold),
-        'n_folds': n_folds,
-        'n_features_to_RFE': n_features_to_RFE,
-        'min_class_threshold': mim_class_label_threshold,
-        'class_column': classColumn
+        'celltype': celltype
     }
     
     print(f"\n=== FEATURE SELECTION FOR {celltype} ===")
@@ -169,21 +150,11 @@ def get_lasso_classification_features(
     binary_table_path = f"{output_prefix}_binary_counts.csv"
     binary_table = create_binary_count_table(df, binary_table_path)
     results['binary_count_table_path'] = binary_table_path
-    results['binary_counts'] = binary_table.to_dict('records')
 
     # Process alpha optimization results
-    print(f"Best Alpha: {results['best_alpha']}")
     scores = aTbl["mean_test_score"].values
     scores_std = aTbl["std_test_score"].values
     alphas = list(aTbl["input_a"].str.split('-').str[0].astype(float))
-    
-    results['alpha_optimization'] = {
-        'alphas_tested': alphas,
-        'cv_scores': scores.tolist(),
-        'cv_scores_std': scores_std.tolist(),
-        'best_alpha': float(a),
-        'best_score': float(max(scores))
-    }
     
     # Create alpha plot
     alpha_plot_path = f"{output_prefix}_alpha_optimization.png"
@@ -191,7 +162,6 @@ def get_lasso_classification_features(
     results['alpha_plot_path'] = alpha_plot_path
 
     # Prepare feature data
-    print("\n=== PROCESSING FEATURES ===")
     XAll = df[list(df.select_dtypes(include=[np.number]).columns.values)]
     XAll = XAll[XAll.columns.drop(list(XAll.filter(regex='(Centroid|Binary|cnt|Name)')))].fillna(0)
     yAll = df['Lasso_Binary']
@@ -201,13 +171,6 @@ def get_lasso_classification_features(
     sel.fit(XAll)
     nonVarFeatures = [x for x in XAll.columns if x not in XAll.columns[sel.get_support()]]
     print(f"Non-variant Features: {', '.join(nonVarFeatures)}")
-    
-    results['variance_filtering'] = {
-        'non_variant_features': nonVarFeatures,
-        'features_removed': len(nonVarFeatures),
-        'features_remaining': len(XAll.columns[sel.get_support()]),
-        'original_feature_count': len(XAll.columns)
-    }
 
     # Feature importance from Lasso
     clf = Lasso(alpha=a)
@@ -226,19 +189,12 @@ def get_lasso_classification_features(
     # Create feature importance dataframe
     dfF = pd.DataFrame(list(zip(features, importance)), columns=['Name', 'Feature_Importance'])
     dfF = dfF.sort_values(by=['Feature_Importance'], ascending=False)
-    
-    # Save feature importance table
-    feature_importance_path = f"{output_prefix}_feature_importance.csv"
-    dfF.to_csv(feature_importance_path, index=False)
-    print(f"✓ Feature importance table saved: {feature_importance_path}")
-    results['feature_importance_csv_path'] = feature_importance_path
 
     # Process RFE results
     print("\n=== PROCESSING RFE RESULTS ===")
     rfe_summary_path = f"{output_prefix}_rfe_summary.csv"
     summary_df = create_rfe_summary_table(rfeTbl, rfe_summary_path)
     results['rfe_summary_csv_path'] = rfe_summary_path
-    results['rfe_summary_data'] = summary_df.to_dict('records')
 
     # Create RFE plot and determine optimal features
     rfe_plot_path = f"{output_prefix}_rfe_analysis.png"
@@ -246,28 +202,12 @@ def get_lasso_classification_features(
     results['rfe_plot_path'] = rfe_plot_path
     results['optimal_n_features'] = int(featureCutoff)
 
-    # Save top features
-    top_features_path = f"{output_prefix}_top_features.csv"
-    top_features = save_top_features(dfF, featureCutoff, celltype, top_features_path)
-    results['top_features_csv_path'] = top_features_path
-    results['selected_features'] = top_features
-    results['selected_features_count'] = len(top_features)
-
     # Feature selection summary
     results['feature_selection_summary'] = {
         'original_features': len(features),
         'non_variant_removed': len(nonVarFeatures),
         'features_after_variance_filter': len(XAll.columns[sel.get_support()]),
-        'optimal_features_selected': len(top_features),
-        'selection_ratio': round(len(top_features) / len(features), 3),
-        'best_rfe_score': float(summary_df[summary_df['n_features'] == featureCutoff]['median_score'].iloc[0])
     }
-
-    print(f"\n=== FEATURE SELECTION COMPLETE ===")
-    print(f"Original features: {len(features)}")
-    print(f"Non-variant features removed: {len(nonVarFeatures)}")
-    print(f"Optimal features selected: {len(top_features)}")
-    print(f"Selection ratio: {len(top_features) / len(features):.3f}")
 
     return results
 
@@ -299,26 +239,6 @@ if __name__ == "__main__":
     safe_celltype = myLabel.replace(' ', '_').replace('|', '_').replace('/', '')
     output_prefix = f"feature_selection_{safe_celltype}"
 
-    # Store input information
-    input_info = {
-        'celltype_original': args.celltype,
-        'celltype_safe': safe_celltype,
-        'training_dataframe': args.trainingDataframe,
-        'rfe_scores_file': args.rfe_scores,
-        'alpha_scores_file': args.alpha_scores,
-        'input_data_shape': list(myData.shape),
-        'analysis_parameters': {
-            'variance_threshold': args.varThreshold,
-            'n_features_to_RFE': args.n_features_to_RFE,
-            'n_folds': args.n_folds,
-            'subset_data': args.ifSubsetData,
-            'max_workers': args.max_workers,
-            'min_class_threshold': args.mim_class_label_threshold,
-            'n_alphas_searched': args.n_alphas_to_search
-        }
-    }
-
-
     # Run feature selection analysis
     feature_results = get_lasso_classification_features(
         myData,
@@ -336,28 +256,11 @@ if __name__ == "__main__":
         output_prefix
     )
 
-    # Combine input info with results
-    complete_results = {**input_info, **feature_results}
-
     # Save comprehensive results as JSON
     json_path = f"{output_prefix}_results.json"
     with open(json_path, 'w') as f:
-        json.dump(complete_results, f, indent=2)
-    print(f"✓ Results JSON saved: {json_path}")
+        json.dump(feature_results, f, indent=2)
+    print(f"Results JSON saved: {json_path}")
 
-    print(f"\n=== FEATURE SELECTION PIPELINE COMPLETE ===")
     print(f"Cell type: {myLabel}")
-    print(f"Input data: {myData.shape[0]} samples, {myData.shape[1]} features")
-    print(f"Best alpha: {best_alpha}")
-    print(f"Optimal features selected: {complete_results['optimal_n_features']}")
-    print(f"Feature selection ratio: {complete_results['feature_selection_summary']['selection_ratio']}")
-
-    print(f"\n=== OUTPUT FILES GENERATED ===")
     print(f"• Feature selection results JSON: {json_path}")
-    print(f"• Binary counts table: {complete_results['binary_count_table_path']}")
-    print(f"• Alpha optimization plot: {complete_results['alpha_plot_path']}")
-    print(f"• Feature ranking plot: {complete_results['feature_ranking_plot_path']}")
-    print(f"• Feature importance CSV: {complete_results['feature_importance_csv_path']}")
-    print(f"• RFE summary CSV: {complete_results['rfe_summary_csv_path']}")
-    print(f"• RFE analysis plot: {complete_results['rfe_plot_path']}")
-    print(f"• Selected features CSV: {complete_results['top_features_csv_path']}")
