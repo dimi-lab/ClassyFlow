@@ -77,7 +77,7 @@ def get_worst_performing_markers(cv_df, n_markers=5):
     worst_markers = marker_performance.nsmallest(n_markers, 'cv_improvement')['marker'].tolist()
     return worst_markers
 
-def create_slide_boxplots(df, df_transformed, filename):
+def create_slide_boxplots(df, df_transformed, filename, plotFraction):
     """Create before/after boxplots by slide"""
     
     # Sample data for plotting (preserve original logic)
