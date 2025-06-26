@@ -2,7 +2,7 @@
 
 **ClassyFlow** is a robust, modular Nextflow pipeline designed to streamline and automate the process of building, evaluating, and deploying machine learning models for multiplex immunofluorescence (MxIF) single-cell image data. 
 
-<img src="https://github.com/dimi-lab/ClassyFlow/blob/main/images/classyFlow_banner.PNG" width="1000"/>
+<img src="https://github.com/dimi-lab/ClassyFlow/blob/main/assets/images/classyFlow_banner.PNG" width="1000"/>
 
 ## What Does This Pipeline Do?
 
