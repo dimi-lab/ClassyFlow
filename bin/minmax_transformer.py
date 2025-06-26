@@ -40,18 +40,16 @@ def calculate_cv_metrics(df, df_transformed, batchName):
     cv_df = pd.DataFrame(cv_data)
     return cv_df
 
-def create_cv_heatmap(cv_df, batchName, plot_type='improvement'):
+def create_cv_heatmap(cv_df, filename, plot_type='improvement'):
     """Create CV heatmap showing improvement or transformed values"""
     
     if plot_type == 'improvement':
         pivot_data = cv_df.pivot(index='marker', columns='slide', values='cv_improvement')
         title = 'CV Improvement by Marker and Slide (Original - Transformed)'
-        filename = f'cv_improvement_heatmap_{batchName}.png'
         cmap = 'RdYlGn'  # Red = worse, Green = better
     else:
         pivot_data = cv_df.pivot(index='marker', columns='slide', values='cv_transformed')
         title = 'Coefficient of Variation After Transformation'
-        filename = f'cv_transformed_heatmap_{batchName}.png'
         cmap = 'YlOrRd_r'  # Lower CV = better
     
     plt.figure(figsize=(12, 8))
