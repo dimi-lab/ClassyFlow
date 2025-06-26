@@ -13,7 +13,7 @@ params.input_dirs = [
 params.output_dir = "${workflow.projectDir}/output"
 
 //Static Assests for beautification
-params.letterhead = "${projectDir}/images/ClassyFlow_Letterhead.PNG"
+params.letterhead = "${projectDir}/assets/images/ClassyFlow_Letterhead.PNG"
 
 // Build Input List of Batches
 Channel.fromList(params.input_dirs)
