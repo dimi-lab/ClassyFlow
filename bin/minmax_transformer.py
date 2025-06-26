@@ -277,5 +277,5 @@ if __name__ == "__main__":
     metrics = collect_and_transform(myData, myFileIdx, quantType, nucMark, plotFraction)
     
     # Save metrics to JSON
-    with open(f'minmax_results_{args.batchName}.json', 'w') as f:
+    with open(f'minmax_results_{args.batchID}.json', 'w') as f:
         json.dump(metrics, f, indent=2, default=str)
