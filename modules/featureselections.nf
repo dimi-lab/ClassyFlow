@@ -120,7 +120,7 @@ process EXAMINE_CLASS_LABEL{
 	tuple val(celltype), path(trainingDataframe), val(best_alpha), path(rfe_scores), path(alpha_scores)
     	
 	output:
-	path("feature_selection_*_top_features.csv"), emit: feature_list
+	path("top_rank_features_*.csv"), emit: feature_list
 	tuple path("feature_selection_*_results.json"), path("feature_selection_*.csv"), path("feature_selection_*.png"), emit: feature_selection_results
     
     script:
