@@ -266,7 +266,7 @@ if __name__ == "__main__":
     with open(args.model_pickle, 'rb') as file:
         xgbMdl = pickle.load(file)
 
-    prefix = f"holdout_eval_{os.path.splitext(os.path.basename(args.model_pickle))[0]}"
+    prefix = f"holdoutEval_{os.path.splitext(os.path.basename(args.model_pickle))[0]}"
 
     # Generate evaluation data and plots
     results = check_holdout(focusData, xgbMdl, classColumn, leEncoderFile, prefix)

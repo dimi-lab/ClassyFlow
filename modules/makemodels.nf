@@ -76,7 +76,7 @@ process XGBOOSTING_FINAL_MODEL {
 	path("XGBoost_Model_First.pkl"), emit: m1
 	path("XGBoost_Model_Second.pkl"), emit: m2
 	path("classes.npy"), emit: classes
-    tuple path("xgbWinners_*.png"), path("xgbWinners_*.csv"), path("xgbWinners_results.json"), emit: xgboost_output
+    tuple path("xgbWinners_*.png"), path("xgbWinners_*.csv"), path("xgbWinners_results.json"), emit: xgboost_results
 	
 	script:
     """
@@ -98,7 +98,7 @@ process HOLDOUT_XGB_EVALUATION {
 	path(leEncoderFile)
 
 	output:
-	tuple path("holdout_eval_XGBoost_Model_*.png"), path("holdout_eval_XGBoost_Model_*_auc_rankings.csv"), path("holdout_eval_XGBoost_Model_*_results.json"), emit: holdoutEval_output
+	tuple path("holdoutEval_XGBoost_Model_*.png"), path("holdoutEval_XGBoost_Model_*_auc_rankings.csv"), path("holdoutEval_XGBoost_Model_*_results.json"), emit: holdoutEval_results
     path("holdout_*.csv"), emit: eval
 
 	
