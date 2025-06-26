@@ -287,8 +287,6 @@ if __name__ == "__main__":
     parser.add_argument('--quantType', required=True, help='QuPath object type (e.g., CellObject)')
     parser.add_argument('--nucMark', required=True, help='Nucleus marker name (e.g., DAPI)')
     parser.add_argument('--plotFraction', type=float, default=0.25, help='Fraction of data to plot for QC (default: 0.25)')
-    parser.add_argument('--letterhead', required=True, help='Path to letterhead image for PDF report')
-
     args = parser.parse_args()
     myData = pd.read_pickle(args.pickleTable)
     myFileIdx = args.batchID
@@ -298,5 +296,5 @@ if __name__ == "__main__":
 
     metrics = collect_and_transform(myData, myFileIdx, quantType, nucMark, plotFraction)
     # Save metrics to JSON
-    with open(f'boxcox_transformation_metrics_{args.batchName}.json', 'w') as f:
+    with open(f'boxcox_results_{args.batchName}.json', 'w') as f:
         json.dump(metrics, f, indent=2, default=str)

@@ -251,7 +251,6 @@ if __name__ == "__main__":
     parser.add_argument('--nucMark', required=True, help='Nucleus marker name (e.g., DAPI)')
     parser.add_argument('--plotFraction', type=float, default=0.25, help='Fraction of data to plot for QC (default: 0.25)')
     parser.add_argument('--quantileSplit', type=int, required=True, help='Number of quantiles for QuantileTransformer')
-    parser.add_argument('--letterhead', required=True, help='Path to letterhead image for PDF report')
 
     args = parser.parse_args()
 

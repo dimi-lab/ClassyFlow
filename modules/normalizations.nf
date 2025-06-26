@@ -1,19 +1,13 @@
 // Produce Batch based normalization - boxcox
 process BOXCOX {
 	tag { batchID }
-
-	publishDir(
-        path: "${params.output_dir}/normalization",
-        pattern: "*.pdf",
-        mode: "copy"
-    )
 	
 	input:
 	tuple val(batchID), path(pickleTable)
 	
 	output:
 	tuple val(batchID), path("boxcox_transformed_${batchID}.tsv"), emit: norm_df
-	path("boxcox_report_${batchID}.pdf")
+	tuple val(batchID), path ("boxcox_results_${batchID}.json"), path("boxcox_*.png"), emit: boxcox_results
 	
 	script:
 	"""
@@ -22,8 +16,7 @@ process BOXCOX {
 		--batchID ${batchID} \
 		--quantType ${params.qupath_object_type} \
 		--nucMark ${params.nucleus_marker} \
-		--plotFraction ${params.plot_fraction} \
-		--letterhead ${params.letterhead}
+		--plotFraction ${params.plot_fraction}
 	"""
 }
     
@@ -32,18 +25,12 @@ process BOXCOX {
 process QUANTILE {
 	tag { batchID }
 
-    publishDir(
-        path: "${params.output_dir}/normalization",
-        pattern: "*.pdf",
-        mode: "copy"
-    )
-
     input:
     tuple val(batchID), path(pickleTable)
 
     output:
     tuple val(batchID), path("quantile_transformed_${batchID}.tsv"), emit: norm_df
-    path("quantile_report_${batchID}.pdf")
+    tuple val(batchID), path ("quantile_results_${batchID}.json"), path("quantile_*.png"), emit: quantile_results
 
     script:
     """
@@ -53,50 +40,52 @@ process QUANTILE {
         --quantType ${params.qupath_object_type} \
         --nucMark ${params.nucleus_marker} \
         --plotFraction ${params.plot_fraction} \
-        --quantileSplit ${params.quantile_split} \
-        --letterhead ${params.letterhead}
+        --quantileSplit ${params.quantile_split}
     """
 }
 
 // Produce Batch based normalization - min/max scaling
 process MINMAX {
 	tag { batchID }
-	publishDir(
-        path: "${params.output_dir}/normalization",
-        pattern: "*.pdf",
-        mode: "copy"
-    )
 	
 	input:
 	tuple val(batchID), path(pickleTable)
 	
 	output:
 	tuple val(batchID), path("minmax_transformed_${batchID}.tsv"), emit: norm_df
-	path("minmax_report_${batchID}.pdf")
+	tuple val(batchID), path ("minmax_results_${batchID}.json"), path("minmax_*.png"), emit: minmax_results
 	
 	script:
-	template 'minmax_transformer.py'
+	"""
+    minmax_transformer.py \
+        --pickleTable ${pickleTable} \
+        --batchID ${batchID} \
+        --quantType ${params.qupath_object_type} \
+        --nucMark ${params.nucleus_marker} \
+        --plotFraction ${params.plot_fraction}
+    """
 
 }
 
 process LOGSCALE {
 	tag { batchID }
-	publishDir(
-        path: "${params.output_dir}/normalization",
-        pattern: "*.pdf",
-        mode: "copy"
-    )
 	
 	input:
 	tuple val(batchID), path(pickleTable)
 	
 	output:
 	tuple val(batchID), path("log_transformed_${batchID}.tsv"), emit: norm_df
-	path("log_report_${batchID}.pdf")
+	tuple val(batchID), path ("log_results_${batchID}.json"), path("log_*.png"), emit: log_results
 	
 	script:
-	template 'log_transformer.py'
-
+	"""
+    log_transformer.py \
+        --pickleTable ${pickleTable} \
+        --batchID ${batchID} \
+        --quantType ${params.qupath_object_type} \
+        --nucMark ${params.nucleus_marker} \
+        --plotFraction ${params.plot_fraction}
+    """
 }
 
 
@@ -196,8 +185,8 @@ workflow normalization_wf {
         def mxchannels = batchPickleTable.mix(bc, qt, mm, lg).groupTuple()
         mxchannels.dump(tag: 'debug_normalization_channels', pretty: true)
 
-        def best = IDENTIFY_BEST(mxchannels)
-        best_ch = best.norm_df
+        //def best = IDENTIFY_BEST(mxchannels)
+        best_ch = boxcox.norm_df
     }
 
     // Insert GMM gating after normalization
