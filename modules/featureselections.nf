@@ -118,8 +118,7 @@ process MERGE_RFE_SCORE_CSV_FILES {
 process EXAMINE_CLASS_LABEL{
 	input:
 	tuple val(celltype), path(trainingDataframe), val(best_alpha), path(rfe_scores), path(alpha_scores)
-	path(letterhead)
-	
+    	
 	output:
 	path("feature_selection_*_top_features.csv"), emit: feature_list
 	tuple path("feature_selection_*_results.json"), path("feature_selection_*.csv"), path("feature_selection_*.png"), emit: feature_selection_results

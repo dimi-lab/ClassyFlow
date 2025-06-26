@@ -44,6 +44,7 @@ process QUANTILE {
     """
 }
 
+
 // Produce Batch based normalization - min/max scaling
 process MINMAX {
 	tag { batchID }
@@ -186,7 +187,7 @@ workflow normalization_wf {
         mxchannels.dump(tag: 'debug_normalization_channels', pretty: true)
 
         //def best = IDENTIFY_BEST(mxchannels)
-        best_ch = boxcox.norm_df
+        best_ch = bc
     }
 
     // Insert GMM gating after normalization
