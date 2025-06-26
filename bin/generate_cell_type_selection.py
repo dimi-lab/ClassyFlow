@@ -209,6 +209,13 @@ def get_lasso_classification_features(
         'features_after_variance_filter': len(XAll.columns[sel.get_support()]),
     }
 
+    ctl = dfF['Name'].tolist()[:featureCutoff]  
+    with open("top_rank_features_{}.csv".format(celltype.replace(' ','_').replace('|','_').replace('/','')), 'w', newline='') as csvfile:
+        f_writer = csv.writer(csvfile)
+        f_writer.writerow(["Features"])
+        for ln in ctl:
+            f_writer.writerow([ln])
+
     return results
 
 if __name__ == "__main__":
