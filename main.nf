@@ -151,11 +151,11 @@ process GENERATE_TRAINING_N_HOLDOUT{
 
 // Run model on everything make results
 process PREDICT_ALL_CELLS_XGB{
-	publishDir(
-        path: "${params.output_dir}/celltypes",
-        pattern: "*_PRED.tsv",
-        mode: "copy"
-    )
+	//publishDir(
+    //    path: "${params.output_dir}/celltypes",
+    //    pattern: "*_PRED.tsv",
+    //    mode: "copy"
+    //)
     
 	input:
 	tuple val(model_name), path(model_path), path(leEncoderFile)
@@ -200,7 +200,7 @@ process CLASSIFIED_REPORT_PER_SLIDE {
 
 process QC_DENSITY {
     tag { prediction_tsv.baseName }
-    publishDir "${params.output_dir}/celltypes", pattern: "*_PRED.tsv", mode: "copy", overwrite: true
+    publishDir "${params.output_dir}/celltypes", pattern: "*_qPRED.tsv", mode: "copy", overwrite: true
 
     input:
     path(prediction_tsv)
@@ -211,9 +211,9 @@ process QC_DENSITY {
     script:
     """
     calculate_bin_density.py --input_tsv ${prediction_tsv} \
-        --output_tsv ${prediction_tsv} \
         --bin_size 120 \
         --density_cutoff 3
+    touch ${prediction_tsv}
     """
 }
 // -------------------------------------- //
@@ -258,15 +258,10 @@ workflow {
         // Run the best model on the full input batches/files 
         PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
 
-        // Optionally run QC_DENSITY if enabled in config
-        if (params.qc_density) {
-            QC_DENSITY(PREDICT_ALL_CELLS_XGB.output.predictions)
-            // Overwrite predictions with QC-augmented files for downstream steps
-            predictions_for_report = QC_DENSITY.output.qc_predictions
-        } else {
-            predictions_for_report = PREDICT_ALL_CELLS_XGB.output.predictions
-        }
-
+        QC_DENSITY(PREDICT_ALL_CELLS_XGB.output.predictions.flatten())
+        // Overwrite predictions with QC-augmented files for downstream steps
+        predictions_for_report = QC_DENSITY.output.qc_predictions.flatten()
+    
         // Generate a comprehensive HTML report for each prediction file
         CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
     	
