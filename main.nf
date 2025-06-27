@@ -224,8 +224,8 @@ process GENERATE_FINAL_REPORT {
     input:
     path(norm_files, stageAs: "norm/*")
     path(fs_files, stageAs: "feature_selection/*") 
-    path(xgb_winners, stageAs: "modeling/winners/*")
-    path(holdout_files, stageAs: "modeling/holdout/*")
+    path(xgb_winners, stageAs: "modeling/*")
+    path(holdout_files, stageAs: "modeling/*")
 
 }
 // -------------------------------------- //
