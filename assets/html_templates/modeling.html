@@ -1,4 +1,4 @@
-<div class="tab-content" id="training">
+<div class="tab-content" id="modeling">
 
 <section class="page-section">
     <h2>Model Training and Evaluation</h2>
@@ -11,11 +11,11 @@
 
     <!-- Overall Model Performance Summary -->
     <div class="header-with-tooltip">
-        <h3>Model Performance Summary</h3>
+        <h3>Final Model Performance Summary</h3>
         <div class="tooltip-container">
             <div class="tooltip-icon">i</div>
             <div class="tooltip-popup">
-                Summary of the best performing model's results across all evaluation metrics.
+                Summary of the final model's results. This is the model that is used to predict all the cell types
             </div>
         </div>
     </div>
@@ -23,9 +23,8 @@
     <div class="metrics-grid">
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ (modeling_data.best_accuracy * 100) | round(1) if modeling_data.best_accuracy else "N/A" }}%</div>
+                <div class="metric-value">{{ (holdout_accuracy* 100) | round(1) if holdout_accuracy else "N/A" }}%</div>
                 <div class="metric-label">Best Accuracy</div>
-                <div class="metric-description">Highest accuracy achieved</div>
                 <span class="tooltiptext">
                     Best overall classification accuracy achieved across all model evaluations.
                 </span>
@@ -34,9 +33,8 @@
 
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ (modeling_data.best_f1_score * 100) | round(1) if modeling_data.best_f1_score else "N/A" }}%</div>
+                <div class="metric-value">{{ (f1_score * 100) | round(1) if f1_score else "N/A" }}%</div>
                 <div class="metric-label">Best F1 Score</div>
-                <div class="metric-description">Highest F1 score achieved</div>
                 <span class="tooltiptext">
                     Best weighted F1 score achieved, balancing precision and recall across all classes.
                 </span>
@@ -45,8 +43,8 @@
 
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ modeling_data.total_classes | default("N/A") }}</div>
-                <div class="metric-label">Total Classes</div>
+                <div class="metric-value">{{ training_classes | default("N/A") }}</div>
+                <div class="metric-label">Total Training Classes</div>
                 <div class="metric-description">Cell types in model</div>
                 <span class="tooltiptext">
                     Total number of cell type classes included in the final model.
@@ -56,16 +54,75 @@
 
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ modeling_data.holdout_evaluations | length | default("N/A") }}</div>
-                <div class="metric-label">Models Evaluated</div>
-                <div class="metric-description">Number of model evaluations</div>
+                <div class="metric-value">{{ modeling_data.best_class | default("N/A") }}</div>
+                <div class="metric-label">Best Performing Class</div>
                 <span class="tooltiptext">
-                    Number of different models or model versions that were evaluated during training.
+                    The cell type with the best prediction performance based on the holdout dataset.
                 </span>
             </div>
         </div>
+
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ modeling_data.worst_class | default("N/A") }}</div>
+                <div class="metric-label">Worst Performing Class</div>
+                <span class="tooltiptext">
+                    The cell type with the worst prediction performance based on the holdout dataset.
+                </span>
+            </div>
+        </div>
+
     </div>
 </section>
+
+<!-- Model Comparison Summary -->
+{% if modeling_data.model_comparisons %}
+    <section class="page-section">
+        <div class="header-with-tooltip">
+            <h3>Model Comparison and Selection</h3>
+            <div class="tooltip-container">
+                <div class="tooltip-icon">i</div>
+                <div class="tooltip-popup">
+                    Results from model comparison and selection processes used to identify the best performing model.
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Visualizations -->
+        <div class="header-with-tooltip">
+            <h5>Model Comparison Visualizations</h5>
+            <div class="tooltip-container">
+                <div class="tooltip-icon">i</div>
+                <div class="tooltip-popup">
+                    Visual comparisons of different models and their parameter optimization results.
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 2rem;">
+            {% if modeling_data.model_comparisons.class_distribution_plot_path %}
+            <div class="plot-container">
+                <div class="plot-title">Class Distribution Analysis</div>
+                <img src="{{ modeling_data.model_comparisons.class_distribution_plot_path }}" alt="Class Distribution Analysis" class="embedded-image" />
+                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
+                    Analysis of class distributions used in model comparison.
+                </p>
+            </div>
+            {% endif %}
+
+            {% if modeling_data.model_comparisons.parameter_search_plot_path %}
+            <div class="plot-container">
+                <div class="plot-title">Parameter Search Results</div>
+                <img src="{{ modeling_data.model_comparisons.parameter_search_plot_path }}" alt="Parameter Search" class="embedded-image" />
+                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
+                    Hyperparameter optimization results across different model configurations.
+                </p>
+            </div>
+            {% endif %}
+        </div>
+        
+    </section>
+    {% endif %}
 
 {% if modeling_data.holdout_evaluations %}
 <!-- Model Evaluation Tabs -->
@@ -180,10 +237,13 @@
         {% for model_eval in modeling_data.holdout_evaluations %}
         <div class="model-tab {% if loop.first %}active{% endif %}" 
              onclick="showModel('model-{{ loop.index0 }}')">
-            {{ model_eval.model_name.replace('holdoutEval_', '').replace('_results', '') }}
-            <small style="display: block; font-size: 0.8em; color: #6c757d;">
-                Acc: {{ (model_eval.accuracy * 100) | round(1) }}%
-            </small>
+            {% if 'First' in model_eval.model_name %}
+                First Model
+            {% elif 'Second' in model_eval.model_name %}
+                Second Model
+            {% else %}
+                "N/A"
+            {% endif %}
         </div>
         {% endfor %}
     </div>
@@ -194,7 +254,7 @@
         
         <!-- Model Overview -->
         <div class="header-with-tooltip">
-            <h4>{{ model_eval.model_name.replace('holdoutEval_', '').replace('_results', '') }} Performance</h4>
+            <h4>{{ model_eval.data.model_name }} Performance</h4>
             <div class="tooltip-container">
                 <div class="tooltip-icon">i</div>
                 <div class="tooltip-popup">
@@ -206,9 +266,8 @@
         <div class="metrics-grid">
             <div class="metric-card">
                 <div class="tooltip">
-                    <div class="metric-value">{{ (model_eval.accuracy * 100) | round(2) }}%</div>
+                    <div class="metric-value">{{ (model_eval.data.accuracy * 100) | round(2) }}%</div>
                     <div class="metric-label">Overall Accuracy</div>
-                    <div class="metric-description">Classification accuracy</div>
                     <span class="tooltiptext">
                         Percentage of correctly classified cells in the holdout test set.
                     </span>
@@ -217,9 +276,8 @@
 
             <div class="metric-card">
                 <div class="tooltip">
-                    <div class="metric-value">{{ (model_eval.f1_score * 100) | round(2) }}%</div>
+                    <div class="metric-value">{{ (model_eval.data.f1_score * 100) | round(2) }}%</div>
                     <div class="metric-label">F1 Score</div>
-                    <div class="metric-description">Weighted F1 score</div>
                     <span class="tooltiptext">
                         Weighted F1 score balancing precision and recall across all classes.
                     </span>
@@ -229,21 +287,9 @@
             <div class="metric-card">
                 <div class="tooltip">
                     <div class="metric-value">{{ model_eval.data.total_samples | number_format }}</div>
-                    <div class="metric-label">Test Samples</div>
-                    <div class="metric-description">Holdout set size</div>
+                    <div class="metric-label">Test sample size</div>
                     <span class="tooltiptext">
-                        Number of samples in the holdout test set used for evaluation.
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ model_eval.data.metadata.feature_count if model_eval.data.metadata and model_eval.data.metadata.feature_count else "N/A" }}</div>
-                    <div class="metric-label">Features Used</div>
-                    <div class="metric-description">Number of features</div>
-                    <span class="tooltiptext">
-                        Number of features used by this model for classification.
+                        Number of cells in the holdout test set used for evaluation.
                     </span>
                 </div>
             </div>
@@ -257,14 +303,14 @@
         </div>
         {% endif %}
 
-        <!-- Class Distribution Table -->
-        {% if model_eval.class_names and model_eval.class_counts %}
+        <!-- Combined Class Performance Table -->
+        {% if model_eval.data.class_names and model_eval.data.class_counts and model_eval.data.auc_scores %}
         <div class="header-with-tooltip">
-            <h5>Class Distribution in Test Set</h5>
+            <h5>Class Performance Summary</h5>
             <div class="tooltip-container">
                 <div class="tooltip-icon">i</div>
                 <div class="tooltip-popup">
-                    Distribution of cell types in the holdout test set used for model evaluation.
+                    Combined view of class distribution in the test set and AUC performance for each cell type.
                 </div>
             </div>
         </div>
@@ -277,27 +323,86 @@
                         <th>Test Samples</th>
                         <th>Percentage</th>
                         <th>Class Balance</th>
+                        <th>AUC Score</th>
+                        <th>Performance Level</th>
+                        <th>AUC Rank</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% set total_samples = model_eval.class_counts | sum %}
-                    {% for i in range(model_eval.class_names | length) %}
-                    {% set class_name = model_eval.class_names[i] %}
-                    {% set count = model_eval.class_counts[i] %}
+                    {% set total_samples = model_eval.data.class_counts | sum %}
+                    {% for i in range(model_eval.data.class_names | length) %}
+                    {% set class_name = model_eval.data.class_names[i] %}
+                    {% set count = model_eval.data.class_counts[i] %}
                     {% set percentage = (count / total_samples * 100) if total_samples > 0 else 0 %}
+                    
+                    <!-- Find matching AUC score for this class -->
+                    {% set auc_score = namespace(value=0, found=false) %}
+                    {% for auc_result in model_eval.data.auc_scores %}
+                        {% if auc_result.class_name == class_name %}
+                            {% set auc_score.value = auc_result.auc %}
+                            {% set auc_score.found = true %}
+                        {% endif %}
+                    {% endfor %}
+                    
                     <tr>
                         <td><strong>{{ class_name }}</strong></td>
                         <td>{{ count | number_format }}</td>
                         <td>{{ "%.1f" | format(percentage) }}%</td>
                         <td>
-                            {% if percentage < 5 %}
-                                <span style="color: #dc3545;">Severely Underrepresented</span>
-                            {% elif percentage < 10 %}
-                                <span style="color: #ffc107;">Underrepresented</span>
-                            {% elif percentage > 40 %}
-                                <span style="color: #17a2b8;">Dominant</span>
+                            <span class="badge" style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8em; font-weight: 600;
+                                {% if percentage < 5 %}background-color: #f5c6cb; color: #721c24;
+                                {% elif percentage < 10 %}background-color: #fff3cd; color: #856404;
+                                {% elif percentage > 40 %}background-color: #d1ecf1; color: #0c5460;
+                                {% else %}background-color: #d4edda; color: #155724;{% endif %}">
+                                {% if percentage < 5 %}Severely Under.
+                                {% elif percentage < 10 %}Underrepresented
+                                {% elif percentage > 40 %}Dominant
+                                {% else %}Balanced{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            {% if auc_score.found %}
+                            <span style="font-weight: 700; font-size: 1.1em; 
+                                {% if auc_score.value >= 0.9 %}color: #28a745;
+                                {% elif auc_score.value >= 0.8 %}color: #17a2b8;
+                                {% elif auc_score.value >= 0.7 %}color: #ffc107;
+                                {% else %}color: #dc3545;{% endif %}">
+                                {{ "%.3f" | format(auc_score.value) }}
+                            </span>
                             {% else %}
-                                <span style="color: #28a745;">Balanced</span>
+                            <span style="color: #6c757d;">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if auc_score.found %}
+                            <span class="badge" style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8em; font-weight: 600; 
+                                {% if auc_score.value >= 0.9 %}background-color: #d4edda; color: #155724;
+                                {% elif auc_score.value >= 0.8 %}background-color: #d1ecf1; color: #0c5460;
+                                {% elif auc_score.value >= 0.7 %}background-color: #fff3cd; color: #856404;
+                                {% elif auc_score.value >= 0.6 %}background-color: #f8d7da; color: #721c24;
+                                {% else %}background-color: #f5c6cb; color: #721c24;{% endif %}">
+                                {% if auc_score.value >= 0.9 %}Excellent
+                                {% elif auc_score.value >= 0.8 %}Good
+                                {% elif auc_score.value >= 0.7 %}Moderate
+                                {% elif auc_score.value >= 0.6 %}Poor
+                                {% else %}Very Poor{% endif %}
+                            </span>
+                            {% else %}
+                            <span style="color: #6c757d;">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if auc_score.found %}
+                            <!-- Calculate rank by counting how many have higher AUC -->
+                            {% set rank = namespace(value=1) %}
+                            {% for other_auc in model_eval.data.auc_scores %}
+                                {% if other_auc.auc > auc_score.value %}
+                                    {% set rank.value = rank.value + 1 %}
+                                {% endif %}
+                            {% endfor %}
+                            {{ rank.value }}
+                            {% else %}
+                            <span style="color: #6c757d;">N/A</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -305,70 +410,8 @@
                 </tbody>
             </table>
         </div>
-        {% endif %}
 
-        <!-- AUC Performance by Class -->
-        {% if model_eval.data.auc_scores %}
-        <div class="header-with-tooltip">
-            <h5>Per-Class AUC Performance</h5>
-            <div class="tooltip-container">
-                <div class="tooltip-icon">i</div>
-                <div class="tooltip-popup">
-                    Area Under the Curve (AUC) scores for each cell type, indicating classification performance.
-                </div>
-            </div>
-        </div>
 
-        <div class="class-performance-grid">
-            {% for auc_result in model_eval.data.auc_scores %}
-            {% set auc_value = auc_result.auc %}
-            <div class="class-performance-card 
-                {% if auc_value < 0.6 %}poor{% elif auc_value < 0.8 %}moderate{% else %}good{% endif %}">
-                <div class="auc-value 
-                    {% if auc_value >= 0.9 %}excellent
-                    {% elif auc_value >= 0.8 %}good
-                    {% elif auc_value >= 0.7 %}moderate
-                    {% else %}poor{% endif %}">
-                    {{ "%.3f" | format(auc_value) }}
-                </div>
-                <div style="font-weight: 600; margin-bottom: 0.25rem;">{{ auc_result.class_name }}</div>
-                <div style="font-size: 0.8em; color: #6c757d;">
-                    {% if auc_value >= 0.9 %}Excellent
-                    {% elif auc_value >= 0.8 %}Good
-                    {% elif auc_value >= 0.7 %}Moderate
-                    {% elif auc_value >= 0.6 %}Poor
-                    {% else %}Very Poor{% endif %}
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-
-        <!-- Best and Worst Performing Classes -->
-        {% if model_eval.data.max_auc and model_eval.data.min_auc %}
-        <div class="metrics-grid">
-            <div class="metric-card" style="border-left-color: #28a745;">
-                <div class="tooltip">
-                    <div class="metric-value" style="color: #28a745;">{{ "%.3f" | format(model_eval.data.max_auc.auc) }}</div>
-                    <div class="metric-label">Best AUC</div>
-                    <div class="metric-description">{{ model_eval.data.max_auc.class_name }}</div>
-                    <span class="tooltiptext">
-                        Highest AUC score achieved by {{ model_eval.data.max_auc.class_name }} classification.
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card" style="border-left-color: #dc3545;">
-                <div class="tooltip">
-                    <div class="metric-value" style="color: #dc3545;">{{ "%.3f" | format(model_eval.data.min_auc.auc) }}</div>
-                    <div class="metric-label">Worst AUC</div>
-                    <div class="metric-description">{{ model_eval.data.min_auc.class_name }}</div>
-                    <span class="tooltiptext">
-                        Lowest AUC score, indicating the most challenging cell type to classify.
-                    </span>
-                </div>
-            </div>
-        </div>
-        {% endif %}
         {% endif %}
 
         <!-- Visualization Plots -->
@@ -382,212 +425,40 @@
             </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
-            {% if model_eval.data.confusion_matrix_csv_path and embedded_images[model_eval.data.confusion_matrix_csv_path] %}
+        <div style="display: flex; flex-direction: column; gap: 2rem;">
+            {% if model_eval.data.confusion_matrix_csv_path %}
             <div class="plot-container">
                 <div class="plot-title">Confusion Matrix</div>
-                <img src="{{ embedded_images[model_eval.data.confusion_matrix_csv_path] }}" alt="Confusion Matrix" class="embedded-image" />
+                <img src="{{ model_eval.data.confusion_matrix_csv_path }}" alt="Confusion Matrix" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
                     Matrix showing predicted vs. actual classifications for each cell type.
                 </p>
             </div>
             {% endif %}
 
-            {% if model_eval.data.roc_curves_plot_path and embedded_images[model_eval.data.roc_curves_plot_path] %}
+            {% if model_eval.data.roc_curves_plot_path %}
             <div class="plot-container">
                 <div class="plot-title">ROC Curves</div>
-                <img src="{{ embedded_images[model_eval.data.roc_curves_plot_path] }}" alt="ROC Curves" class="embedded-image" />
+                <img src="{{ model_eval.data.roc_curves_plot_path }}" alt="ROC Curves" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
                     Receiver Operating Characteristic curves for each cell type classification.
                 </p>
             </div>
             {% endif %}
 
-            {% if model_eval.data.class_distribution_plot_path and embedded_images[model_eval.data.class_distribution_plot_path] %}
+            {% if model_eval.data.class_distribution_plot_path %}
             <div class="plot-container">
                 <div class="plot-title">Class Distribution</div>
-                <img src="{{ embedded_images[model_eval.data.class_distribution_plot_path] }}" alt="Class Distribution" class="embedded-image" />
+                <img src="{{ model_eval.data.class_distribution_plot_path }}" alt="Class Distribution" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
                     Distribution of cell types in the test dataset highlighting class imbalance.
                 </p>
             </div>
             {% endif %}
         </div>
-
-        <!-- Model Metadata -->
-        {% if model_eval.data.metadata %}
-        <div class="header-with-tooltip">
-            <h5>Model Configuration</h5>
-            <div class="tooltip-container">
-                <div class="tooltip-icon">i</div>
-                <div class="tooltip-popup">
-                    Technical details about the model configuration and files used.
-                </div>
-            </div>
-        </div>
-
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Parameter</th>
-                        <th>Value</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if model_eval.data.metadata.model_file %}
-                    <tr>
-                        <td><strong>Model File</strong></td>
-                        <td><code>{{ model_eval.data.metadata.model_file }}</code></td>
-                        <td>Trained model file used for predictions</td>
-                    </tr>
-                    {% endif %}
-                    {% if model_eval.data.metadata.encoder_file %}
-                    <tr>
-                        <td><strong>Label Encoder</strong></td>
-                        <td><code>{{ model_eval.data.metadata.encoder_file }}</code></td>
-                        <td>Class label encoder for model predictions</td>
-                    </tr>
-                    {% endif %}
-                    {% if model_eval.data.metadata.features_file %}
-                    <tr>
-                        <td><strong>Features File</strong></td>
-                        <td><code>{{ model_eval.data.metadata.features_file }}</code></td>
-                        <td>Selected features used by the model</td>
-                    </tr>
-                    {% endif %}
-                    {% if model_eval.data.metadata.feature_count %}
-                    <tr>
-                        <td><strong>Feature Count</strong></td>
-                        <td>{{ model_eval.data.metadata.feature_count }}</td>
-                        <td>Number of features used for classification</td>
-                    </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
-
-        <!-- AUC Rankings Table -->
-        {% if model_eval.data.auc_rankings_csv_path %}
-        <div class="header-with-tooltip">
-            <h5>Detailed AUC Rankings</h5>
-            <div class="tooltip-container">
-                <div class="tooltip-icon">i</div>
-                <div class="tooltip-popup">
-                    Complete ranking of all cell types by their AUC performance scores.
-                </div>
-            </div>
-        </div>
-
-        <div class="alert alert-info">
-            <strong>AUC Rankings Data:</strong> Detailed AUC rankings and statistics are available in: 
-            <code>{{ model_eval.data.auc_rankings_csv_path }}</code>
-        </div>
-        {% endif %}
     </div>
     {% endfor %}
 </section>
-
-<!-- Model Comparison Summary -->
-{% if modeling_data.model_comparisons %}
-<section class="page-section">
-    <div class="header-with-tooltip">
-        <h3>Model Comparison and Selection</h3>
-        <div class="tooltip-container">
-            <div class="tooltip-icon">i</div>
-            <div class="tooltip-popup">
-                Results from model comparison and selection processes used to identify the best performing model.
-            </div>
-        </div>
-    </div>
-
-    {% for comparison in modeling_data.model_comparisons %}
-    <div class="header-with-tooltip">
-        <h4>{{ comparison.comparison_name.replace('_', ' ').title() }}</h4>
-        <div class="tooltip-container">
-            <div class="tooltip-icon">i</div>
-            <div class="tooltip-popup">
-                Model comparison analysis: {{ comparison.comparison_name }}
-            </div>
-        </div>
-    </div>
-
-    <div class="metrics-grid">
-        {% if comparison.data.min_class_threshold %}
-        <div class="metric-card">
-            <div class="tooltip">
-                <div class="metric-value">{{ comparison.data.min_class_threshold }}</div>
-                <div class="metric-label">Min Class Threshold</div>
-                <div class="metric-description">Minimum samples per class</div>
-                <span class="tooltiptext">
-                    Minimum number of samples required per class for model training inclusion.
-                </span>
-            </div>
-        </div>
-        {% endif %}
-
-        {% if comparison.data.generation_time %}
-        <div class="metric-card">
-            <div class="tooltip">
-                <div class="metric-value">{{ comparison.data.generation_time.split(' ')[0] }}</div>
-                <div class="metric-label">Analysis Date</div>
-                <div class="metric-description">Model comparison date</div>
-                <span class="tooltiptext">
-                    Date when the model comparison analysis was performed.
-                </span>
-            </div>
-        </div>
-        {% endif %}
-    </div>
-
-    <!-- Comparison Visualizations -->
-    <div class="header-with-tooltip">
-        <h5>Model Comparison Visualizations</h5>
-        <div class="tooltip-container">
-            <div class="tooltip-icon">i</div>
-            <div class="tooltip-popup">
-                Visual comparisons of different models and their parameter optimization results.
-            </div>
-        </div>
-    </div>
-
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
-        {% if comparison.data.class_distribution_plot_path and embedded_images[comparison.data.class_distribution_plot_path] %}
-        <div class="plot-container">
-            <div class="plot-title">Class Distribution Analysis</div>
-            <img src="{{ embedded_images[comparison.data.class_distribution_plot_path] }}" alt="Class Distribution Analysis" class="embedded-image" />
-            <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
-                Analysis of class distributions used in model comparison.
-            </p>
-        </div>
-        {% endif %}
-
-        {% if comparison.data.parameter_search_plot_path and embedded_images[comparison.data.parameter_search_plot_path] %}
-        <div class="plot-container">
-            <div class="plot-title">Parameter Search Results</div>
-            <img src="{{ embedded_images[comparison.data.parameter_search_plot_path] }}" alt="Parameter Search" class="embedded-image" />
-            <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
-                Hyperparameter optimization results across different model configurations.
-            </p>
-        </div>
-        {% endif %}
-    </div>
-
-    <!-- Additional Data Files -->
-    <div class="alert alert-info">
-        <strong>Additional Analysis Files:</strong>
-        {% if comparison.data.classes_summary_path %}
-        <br>• Class summary: <code>{{ comparison.data.classes_summary_path }}</code>
-        {% endif %}
-        {% if comparison.data.parameter_summary_csv_path %}
-        <br>• Parameter summary: <code>{{ comparison.data.parameter_summary_csv_path }}</code>
-        {% endif %}
-    </div>
-    {% endfor %}
-</section>
-{% endif %}
 
 <script>
 function showModel(modelId) {

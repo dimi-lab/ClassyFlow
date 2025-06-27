@@ -9,64 +9,6 @@
         distinguishing each cell type, improving model performance and interpretability.
     </div>
 
-    <!-- Overall Feature Selection Summary -->
-    <div class="header-with-tooltip">
-        <h3>Feature Selection Summary</h3>
-        <div class="tooltip-container">
-            <div class="tooltip-icon">i</div>
-            <div class="tooltip-popup">
-                Overview of feature selection results across all cell types processed in the analysis.
-            </div>
-        </div>
-    </div>
-
-    <div class="metrics-grid">
-        <div class="metric-card">
-            <div class="tooltip">
-                <div class="metric-value">{{ feature_selection_data.total_original_features | default("N/A") }}</div>
-                <div class="metric-label">Original Features</div>
-                <div class="metric-description">Total markers available</div>
-                <span class="tooltiptext">
-                    Total number of protein markers available in the dataset before feature selection.
-                </span>
-            </div>
-        </div>
-
-        <div class="metric-card">
-            <div class="tooltip">
-                <div class="metric-value">{{ feature_selection_data.cell_types_processed | length | default("N/A") }}</div>
-                <div class="metric-label">Cell Types Processed</div>
-                <div class="metric-description">Number of cell types analyzed</div>
-                <span class="tooltiptext">
-                    Number of distinct cell types for which feature selection was performed.
-                </span>
-            </div>
-        </div>
-
-        <div class="metric-card">
-            <div class="tooltip">
-                <div class="metric-value">{{ "%.1f" | format(feature_selection_data.average_optimal_features) if feature_selection_data.average_optimal_features else "N/A" }}</div>
-                <div class="metric-label">Average Optimal Features</div>
-                <div class="metric-description">Mean features selected per cell type</div>
-                <span class="tooltiptext">
-                    Average number of features selected as optimal across all cell types analyzed.
-                </span>
-            </div>
-        </div>
-
-        <div class="metric-card">
-            <div class="tooltip">
-                <div class="metric-value">{{ feature_selection_data.cell_types_processed | join(", ") if feature_selection_data.cell_types_processed else "N/A" }}</div>
-                <div class="metric-label">Cell Types</div>
-                <div class="metric-description">Types analyzed</div>
-                <span class="tooltiptext">
-                    List of cell types that underwent feature selection analysis.
-                </span>
-            </div>
-        </div>
-    </div>
-</section>
-
 {% if feature_selection_data.feature_selection_results %}
 <!-- Cell Type Tabs Navigation -->
 <section class="page-section">
@@ -143,9 +85,6 @@
         <div class="celltype-tab {% if loop.first %}active{% endif %}" 
              onclick="showCellType('celltype-{{ loop.index0 }}')">
             {{ celltype_result.celltype }}
-            <small style="display: block; font-size: 0.8em; color: #6c757d;">
-                {{ celltype_result.optimal_features }} features
-            </small>
         </div>
         {% endfor %}
     </div>
@@ -168,7 +107,7 @@
         <div class="metrics-grid">
             <div class="metric-card">
                 <div class="tooltip">
-                    <div class="metric-value">{{ celltype_result.original_features }}</div>
+                    <div class="metric-value">{{ celltype_result.data.feature_selection_summary.original_features }}</div>
                     <div class="metric-label">Original Features</div>
                     <div class="metric-description">Starting feature count</div>
                     <span class="tooltiptext">
@@ -179,7 +118,7 @@
 
             <div class="metric-card">
                 <div class="tooltip">
-                    <div class="metric-value">{{ celltype_result.optimal_features }}</div>
+                    <div class="metric-value">{{ celltype_result.data.optimal_features }}</div>
                     <div class="metric-label">Optimal Features</div>
                     <div class="metric-description">Selected feature count</div>
                     <span class="tooltiptext">
@@ -190,22 +129,11 @@
 
             <div class="metric-card">
                 <div class="tooltip">
-                    <div class="metric-value">{{ "%.1f" | format((celltype_result.optimal_features / celltype_result.original_features * 100)) if celltype_result.original_features > 0 else "N/A" }}%</div>
+                    <div class="metric-value">{{ "%.1f" | format((celltype_result.data.optimal_n_features / celltype_result.data.feature_selection_summary.original_features * 100)) if celltype_result.data.feature_selection_summary.original_features > 0 else "N/A" }}%</div>
                     <div class="metric-label">Reduction Rate</div>
                     <div class="metric-description">Features retained</div>
                     <span class="tooltiptext">
                         Percentage of original features retained after selection process.
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ celltype_result.data.generation_time.split(' ')[0] if celltype_result.data.generation_time else "N/A" }}</div>
-                    <div class="metric-label">Analysis Date</div>
-                    <div class="metric-description">When analysis was run</div>
-                    <span class="tooltiptext">
-                        Date when feature selection was performed for this cell type.
                     </span>
                 </div>
             </div>
@@ -281,73 +209,37 @@
             </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
-            {% if celltype_result.data.alpha_plot_path and embedded_images[celltype_result.data.alpha_plot_path] %}
+        <div style="display: flex; flex-direction: column; gap: 2rem;">
+            {% if celltype_result.data.alpha_plot_path %}
             <div class="plot-container">
                 <div class="plot-title">Alpha Optimization</div>
-                <img src="{{ embedded_images[celltype_result.data.alpha_plot_path] }}" alt="Alpha Optimization Plot" class="embedded-image" />
+                <img src="{{ celltype_result.data.alpha_plot_path }}" alt="Alpha Optimization Plot" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
                     Optimization of regularization parameter (alpha) for feature selection.
                 </p>
             </div>
             {% endif %}
 
-            {% if celltype_result.data.feature_ranking_plot_path and embedded_images[celltype_result.data.feature_ranking_plot_path] %}
+            {% if celltype_result.data.feature_ranking_plot_path %}
             <div class="plot-container">
                 <div class="plot-title">Feature Ranking</div>
-                <img src="{{ embedded_images[celltype_result.data.feature_ranking_plot_path] }}" alt="Feature Ranking Plot" class="embedded-image" />
+                <img src="{{ celltype_result.data.feature_ranking_plot_path }}" alt="Feature Ranking Plot" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
                     Ranking of features by importance for {{ celltype_result.celltype }} classification.
                 </p>
             </div>
             {% endif %}
 
-            {% if celltype_result.data.rfe_plot_path and embedded_images[celltype_result.data.rfe_plot_path] %}
+            {% if celltype_result.data.rfe_plot_path and celltype_result.data.rfe_plot_path %}
             <div class="plot-container">
                 <div class="plot-title">RFE Analysis</div>
-                <img src="{{ embedded_images[celltype_result.data.rfe_plot_path] }}" alt="RFE Analysis Plot" class="embedded-image" />
+                <img src="{{ celltype_result.data.rfe_plot_path }}" alt="RFE Analysis Plot" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
                     Recursive Feature Elimination analysis showing performance vs. number of features.
                 </p>
             </div>
             {% endif %}
         </div>
-
-        <!-- Binary Counts Table (if available) -->
-        {% if celltype_result.data.binary_count_table_path %}
-        <div class="header-with-tooltip">
-            <h5>Binary Classification Counts</h5>
-            <div class="tooltip-container">
-                <div class="tooltip-icon">i</div>
-                <div class="tooltip-popup">
-                    Sample counts for binary classification ({{ celltype_result.celltype }} vs. all other cell types).
-                </div>
-            </div>
-        </div>
-
-        <div class="alert alert-info">
-            <strong>Binary Counts Data:</strong> Detailed binary classification counts are available in: 
-            <code>{{ celltype_result.data.binary_count_table_path }}</code>
-        </div>
-        {% endif %}
-
-        <!-- RFE Summary (if available) -->
-        {% if celltype_result.data.rfe_summary_csv_path %}
-        <div class="header-with-tooltip">
-            <h5>RFE Summary</h5>
-            <div class="tooltip-container">
-                <div class="tooltip-icon">i</div>
-                <div class="tooltip-popup">
-                    Summary of Recursive Feature Elimination results for {{ celltype_result.celltype }}.
-                </div>
-            </div>
-        </div>
-
-        <div class="alert alert-info">
-            <strong>RFE Summary Data:</strong> Detailed RFE analysis results are available in: 
-            <code>{{ celltype_result.data.rfe_summary_csv_path }}</code>
-        </div>
-        {% endif %}
     </div>
     {% endfor %}
 </section>
