@@ -1,0 +1,434 @@
+<div class="tab-content" id="normalization">
+
+<section class="page-section">
+    <h2>Data Normalization Results</h2>
+    
+    <div class="alert alert-info">
+        <strong>Normalization Overview:</strong> This section presents the results of data normalization applied to 
+        standardize feature distributions across batches and improve model performance. The normalization process 
+        ensures that features with different scales and distributions are appropriately adjusted for machine learning.
+    </div>
+
+    <!-- Overall Normalization Summary -->
+    <div class="header-with-tooltip">
+        <h3>Normalization Summary</h3>
+        <div class="tooltip-container">
+            <div class="tooltip-icon">i</div>
+            <div class="tooltip-popup">
+                Overview of the normalization methods applied and their effectiveness across all batches in the dataset.
+            </div>
+        </div>
+    </div>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ normalization_data.total_batches | default("N/A") }}</div>
+                <div class="metric-label">Total Batches</div>
+                <div class="metric-description">Number of data batches processed</div>
+                <span class="tooltiptext">
+                    Total number of separate data batches that underwent normalization. Each batch typically 
+                    represents a different slide or experimental condition.
+                </span>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ normalization_data.total_cells_normalized | default("N/A") | number_format }}</div>
+                <div class="metric-label">Cells Normalized</div>
+                <div class="metric-description">Total cells processed</div>
+                <span class="tooltiptext">
+                    Total number of cells across all batches that underwent normalization processing.
+                </span>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ normalization_data.total_markers | default("N/A") }}</div>
+                <div class="metric-label">Markers Analyzed</div>
+                <div class="metric-description">Number of protein markers</div>
+                <span class="tooltiptext">
+                    Total number of protein markers (features) that were included in the normalization process.
+                </span>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ normalization_data.primary_method | default("N/A") }}</div>
+                <div class="metric-label">Primary Method</div>
+                <div class="metric-description">Normalization technique used</div>
+                <span class="tooltiptext">
+                    The primary normalization method applied to the dataset. Common methods include Box-Cox, 
+                    quantile normalization, log transformation, or min-max scaling.
+                </span>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% if normalization_data.normalization_results %}
+<!-- Batch Tabs Navigation -->
+<section class="page-section">
+    <div class="header-with-tooltip">
+        <h3>Batch-Specific Results</h3>
+        <div class="tooltip-container">
+            <div class="tooltip-icon">i</div>
+            <div class="tooltip-popup">
+                Detailed normalization results for each batch. Click on the tabs below to view results for individual batches.
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .batch-tabs {
+            display: flex;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 2rem;
+            overflow-x: auto;
+        }
+
+        .batch-tab {
+            padding: 0.75rem 1.5rem;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-bottom: none;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.3s ease;
+            margin-right: 2px;
+            border-radius: 6px 6px 0 0;
+        }
+
+        .batch-tab:hover {
+            background-color: #e9ecef;
+        }
+
+        .batch-tab.active {
+            background-color: white;
+            border-bottom: 2px solid white;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .batch-content {
+            display: none;
+        }
+
+        .batch-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .batch-tabs {
+                flex-direction: column;
+            }
+            
+            .batch-tab {
+                margin-right: 0;
+                margin-bottom: 2px;
+                border-radius: 6px;
+            }
+        }
+    </style>
+
+    <!-- Batch Tabs -->
+    <div class="batch-tabs">
+        {% for batch_result in normalization_data.normalization_results %}
+        <div class="batch-tab {% if loop.first %}active{% endif %}" 
+             onclick="showBatch('batch-{{ loop.index0 }}')">
+            {{ batch_result.batch_name }}
+            <small style="display: block; font-size: 0.8em; color: #6c757d;">
+                {{ batch_result.data.transformation_type | title }}
+            </small>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Batch Content Panels -->
+    {% for batch_result in normalization_data.normalization_results %}
+    <div id="batch-{{ loop.index0 }}" class="batch-content {% if loop.first %}active{% endif %}">
+        
+        <!-- Batch Overview -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ batch_result.total_cells | number_format }}</div>
+                    <div class="metric-label">Cells in Batch</div>
+                    <div class="metric-description">{{ batch_result.batch_name }}</div>
+                    <span class="tooltiptext">
+                        Number of cells in this specific batch that underwent normalization.
+                    </span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ batch_result.data.total_slides | default("N/A") }}</div>
+                    <div class="metric-label">Slides</div>
+                    <div class="metric-description">Number of slides in batch</div>
+                    <span class="tooltiptext">
+                        Number of tissue slides included in this batch.
+                    </span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ batch_result.data.transformation_type | title }}</div>
+                    <div class="metric-label">Method Used</div>
+                    <div class="metric-description">Normalization technique</div>
+                    <span class="tooltiptext">
+                        The specific normalization method applied to this batch.
+                    </span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ batch_result.data.timestamp.split(' ')[0] if batch_result.data.timestamp else "N/A" }}</div>
+                    <div class="metric-label">Processing Date</div>
+                    <div class="metric-description">When normalization was run</div>
+                    <span class="tooltiptext">
+                        Date when the normalization was processed for this batch.
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Method-Specific Metrics -->
+        {% if batch_result.data.transformation_type == "boxcox" and batch_result.data.boxcox_metrics %}
+        <div class="header-with-tooltip">
+            <h4>Box-Cox Transformation Metrics</h4>
+            <div class="tooltip-container">
+                <div class="tooltip-icon">i</div>
+                <div class="tooltip-popup">
+                    Box-Cox transformation parameters and success rates for this batch.
+                </div>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ batch_result.data.boxcox_metrics.successful_transforms }}</div>
+                    <div class="metric-label">Successful Transforms</div>
+                    <div class="metric-description">Out of {{ batch_result.data.boxcox_metrics.total_features }} features</div>
+                    <span class="tooltiptext">
+                        Number of features that were successfully transformed using Box-Cox normalization.
+                    </span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ batch_result.data.boxcox_metrics.failed_transforms }}</div>
+                    <div class="metric-label">Failed Transforms</div>
+                    <div class="metric-description">Features that could not be transformed</div>
+                    <span class="tooltiptext">
+                        Number of features where Box-Cox transformation failed, typically due to negative values or other data issues.
+                    </span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.mean_lambda) if batch_result.data.boxcox_metrics.lambda_stats.mean_lambda else "N/A" }}</div>
+                    <div class="metric-label">Mean Lambda</div>
+                    <div class="metric-description">Average transformation parameter</div>
+                    <span class="tooltiptext">
+                        Average lambda parameter used in the Box-Cox transformation across all features.
+                    </span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.median_lambda) if batch_result.data.boxcox_metrics.lambda_stats.median_lambda else "N/A" }}</div>
+                    <div class="metric-label">Median Lambda</div>
+                    <div class="metric-description">Median transformation parameter</div>
+                    <span class="tooltiptext">
+                        Median lambda parameter, providing a robust measure of the typical transformation applied.
+                    </span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Coefficient of Variation Improvement -->
+        {% if batch_result.data.cv_metrics %}
+        <div class="header-with-tooltip">
+            <h4>Coefficient of Variation Improvement</h4>
+            <div class="tooltip-container">
+                <div class="tooltip-icon">i</div>
+                <div class="tooltip-popup">
+                    Analysis of how normalization improved the coefficient of variation (CV) across markers.
+                </div>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ "%.3f" | format(batch_result.data.cv_metrics.mean_cv_improvement) if batch_result.data.cv_metrics.mean_cv_improvement else "N/A" }}</div>
+                    <div class="metric-label">Mean CV Improvement</div>
+                    <div class="metric-description">Average improvement in CV</div>
+                    <span class="tooltiptext">
+                        Average improvement in coefficient of variation after normalization. Positive values indicate reduced variability.
+                    </span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ "%.3f" | format(batch_result.data.cv_metrics.median_cv_improvement) if batch_result.data.cv_metrics.median_cv_improvement else "N/A" }}</div>
+                    <div class="metric-label">Median CV Improvement</div>
+                    <div class="metric-description">Median improvement in CV</div>
+                    <span class="tooltiptext">
+                        Median improvement in coefficient of variation, providing a robust measure of normalization effectiveness.
+                    </span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ batch_result.data.cv_metrics.markers_improved }}</div>
+                    <div class="metric-label">Markers Improved</div>
+                    <div class="metric-description">Number with reduced CV</div>
+                    <span class="tooltiptext">
+                        Number of markers that showed improvement (reduced coefficient of variation) after normalization.
+                    </span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ batch_result.data.cv_metrics.markers_worsened }}</div>
+                    <div class="metric-label">Markers Worsened</div>
+                    <div class="metric-description">Number with increased CV</div>
+                    <span class="tooltiptext">
+                        Number of markers that showed worsening (increased coefficient of variation) after normalization.
+                    </span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Worst Performing Markers -->
+        {% if batch_result.data.worst_performing_markers %}
+        <div class="header-with-tooltip">
+            <h4>Worst Performing Markers</h4>
+            <div class="tooltip-container">
+                <div class="tooltip-icon">i</div>
+                <div class="tooltip-popup">
+                    Markers that showed the poorest normalization results and may require special attention.
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Marker Name</th>
+                        <th>Performance Issue</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for marker in batch_result.data.worst_performing_markers %}
+                    <tr>
+                        <td>{{ marker }}</td>
+                        <td>
+                            <div class="tooltip">
+                                Poor normalization response
+                                <span class="tooltiptext">
+                                    This marker showed suboptimal response to normalization, potentially due to 
+                                    extreme values, poor signal-to-noise ratio, or distribution characteristics.
+                                </span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Visualization Plots -->
+        <div class="header-with-tooltip">
+            <h4>Normalization Visualizations</h4>
+            <div class="tooltip-container">
+                <div class="tooltip-icon">i</div>
+                <div class="tooltip-popup">
+                    Visual representations of the normalization results for this batch.
+                </div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
+            {% if batch_result.data.slide_boxplots and embedded_images[batch_result.data.slide_boxplots] %}
+            <div class="plot-container">
+                <div class="plot-title">Slide Boxplots</div>
+                <img src="{{ embedded_images[batch_result.data.slide_boxplots] }}" alt="Slide Boxplots" class="embedded-image" />
+            </div>
+            {% endif %}
+
+            {% if batch_result.data.cv_heatmap and embedded_images[batch_result.data.cv_heatmap] %}
+            <div class="plot-container">
+                <div class="plot-title">CV Improvement Heatmap</div>
+                <img src="{{ embedded_images[batch_result.data.cv_heatmap] }}" alt="CV Improvement Heatmap" class="embedded-image" />
+            </div>
+            {% endif %}
+
+            {% if batch_result.data.transformation_examples and embedded_images[batch_result.data.transformation_examples] %}
+            <div class="plot-container">
+                <div class="plot-title">Transformation Examples</div>
+                <img src="{{ embedded_images[batch_result.data.transformation_examples] }}" alt="Transformation Examples" class="embedded-image" />
+            </div>
+            {% endif %}
+
+            {% if batch_result.data.distribution_comparison and embedded_images[batch_result.data.distribution_comparison] %}
+            <div class="plot-container">
+                <div class="plot-title">Distribution Comparison</div>
+                <img src="{{ embedded_images[batch_result.data.distribution_comparison] }}" alt="Distribution Comparison" class="embedded-image" />
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</section>
+
+<script>
+function showBatch(batchId) {
+    // Hide all batch content
+    var contents = document.getElementsByClassName('batch-content');
+    for (var i = 0; i < contents.length; i++) {
+        contents[i].classList.remove('active');
+    }
+    
+    // Remove active class from all tabs
+    var tabs = document.getElementsByClassName('batch-tab');
+    for (var i = 0; i < tabs.length; i++) {
+        tabs[i].classList.remove('active');
+    }
+    
+    // Show selected batch content
+    document.getElementById(batchId).classList.add('active');
+    
+    // Add active class to clicked tab
+    event.target.classList.add('active');
+}
+</script>
+
+{% else %}
+<section class="page-section">
+    <div class="alert alert-warning">
+        <strong>No Normalization Data Available:</strong> No normalization results were found. This may indicate 
+        that normalization was not performed or the results files are missing.
+    </div>
+</section>
+{% endif %}
+
+</div>

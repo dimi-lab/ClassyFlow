@@ -68,7 +68,6 @@
             max-height: 100%;
             max-width: 100%;
             object-fit: contain;
-            filter: brightness(0) invert(1);
             opacity: 0.9;
         }
 
@@ -253,6 +252,19 @@
             border-bottom: none;
         }
 
+        .table-responsive {
+    margin: 20px 0;
+        }
+
+        .table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: rgba(0,123,255,.075);
+        }
+
         /* Images and plots */
         .plot-container {
             text-align: center;
@@ -264,6 +276,12 @@
         }
 
         .plot-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        .embedded-image {
             max-width: 100%;
             height: auto;
             border-radius: 4px;
@@ -318,6 +336,76 @@
             visibility: visible;
             opacity: 1;
         }
+
+        .header-with-tooltip {
+    display: flex;
+    align-items: center;
+    }
+
+    .header-with-tooltip h3 {
+        margin: 0;
+        margin-right: 8px;
+    }
+
+    .tooltip-container {
+        position: relative;
+        display: inline-block;
+    }
+
+    .tooltip-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background-color: #007acc;
+        color: white;
+        font-size: 12px;
+        font-weight: bold;
+        cursor: help;
+        transition: background-color 0.2s ease;
+    }
+
+    .tooltip-icon:hover {
+        background-color: #0056b3;
+    }
+
+    .tooltip-popup {
+        visibility: hidden;
+        width: 280px;
+        background-color: #333;
+        color: #fff;
+        text-align: left;
+        border-radius: 8px;
+        padding: 12px;
+        position: absolute;
+        z-index: 1000;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -140px;
+        opacity: 0;
+        transition: opacity 0.3s, visibility 0.3s;
+        font-size: 13px;
+        line-height: 1.4;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .tooltip-popup::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #333 transparent transparent transparent;
+    }
+
+    .tooltip-container:hover .tooltip-popup {
+        visibility: visible;
+        opacity: 1;
+    }
 
         /* Alerts and callouts */
         .alert {
@@ -437,6 +525,15 @@
                 -webkit-print-color-adjust: exact;
             }
         }
+    .tab-content {
+        display: none;
+        padding: 20px;
+    }
+
+    .nav a.active {
+        background-color: #007acc;
+        color: white;
+    }
     </style>
 </head>
 <body>
@@ -446,12 +543,12 @@
         {% endif %}
         <div class="header-content">
             <div class="header-text">
-                <h1>{% block header_title %}Cell Type Classification Report{% endblock %}</h1>
-                <p>{% block header_subtitle %}Automated analysis and classification results{% endblock %}</p>
+                <h1>{{ header_title if header_title else "Cell Type Classification Report" }}</h1>
+                <p>{{ header_subtitle if header_subtitle else "Automated analysis and classification results" }}</p>
             </div>
-            {% if header_logo %}
+            {% if header_logo_embedded %}
             <div class="header-logo">
-                <img src="{{ header_logo }}" alt="Organization Logo" />
+                <img src="{{ header_logo_embedded }}" alt="Organization Logo" />
             </div>
             {% endif %}
         </div>
@@ -460,20 +557,33 @@
     <nav class="nav">
         <div class="nav-content">
             <ul>
-                <li><a href="#summary" class="{% if page == 'summary' %}active{% endif %}">Summary</a></li>
-                <li><a href="#normalization" class="{% if page == 'normalization' %}active{% endif %}">Normalization</a></li>
-                <li><a href="#feature-selection" class="{% if page == 'feature-selection' %}active{% endif %}">Feature Selection</a></li>
-                <li><a href="#training" class="{% if page == 'training' %}active{% endif %}">Model Training</a></li>
+                <li><a href="#summary" onclick="showTab('summary')">Summary</a></li>
+                <li><a href="#normalization" onclick="showTab('normalization')">Normalization</a></li>
+                <li><a href="#feature-selection" onclick="showTab('feature-selection')">Feature Selection</a></li>
+                <li><a href="#training" onclick="showTab('training')">Model Training</a></li>
             </ul>
         </div>
     </nav>
 
-    <main class="container">
-        {% block content %}{% endblock %}
-    </main>
+    <!-- Include all tab content -->
+    {% include 'summary.html' %}
+    {% include 'normalization.html' %}
+    {% include 'feature-selection.html' %}
+    {% include 'training.html' %}
+    
 
     <footer class="footer">
         <p>Generated on {{ generation_date }} | Pipeline Version {{ pipeline_version if pipeline_version else 'Unknown' }}</p>
     </footer>
+
+    <script>
+    function showTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.nav a').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabName).style.display = 'block';
+        document.querySelector(`a[href="#${tabName}"]`).classList.add('active');
+    }
+    document.addEventListener('DOMContentLoaded', () => showTab('summary'));
+    </script>
 </body>
 </html>
