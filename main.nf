@@ -227,6 +227,13 @@ process GENERATE_FINAL_REPORT {
     path(xgb_winners, stageAs: "modeling/*")
     path(holdout_files, stageAs: "modeling/*")
 
+    script:
+    """
+    generate_final_report.py --template-dir ${params.html_template} \
+                            --report-name classyflow_report.html \
+                            --letterhead ${params.letterhead}
+    """
+
 }
 // -------------------------------------- //
 

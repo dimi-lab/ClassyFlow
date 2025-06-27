@@ -17,9 +17,21 @@
             line-height: 1.6;
             color: #333;
             background-color: #f8f9fa;
+            max-width: 1000px;
+            margin: 0 auto;
         }
 
         /* Header */
+        .header-with-description {
+            margin-bottom: 1.5rem;
+        }
+
+        .header-description {
+            margin: 0.5rem 0 0 0;
+            color: #6c757d;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -47,9 +59,73 @@
             padding: 0 2rem;
             position: relative;
             z-index: 2;
-            display: flex;
-            align-items: center;
+            display: block; /* Changed from flex */
+            text-align: center;
             min-height: 120px;
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+
+        .letterhead {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .letterhead img {
+            max-width: 100%;
+            height: auto;
+            max-height: 120px;
+            object-fit: contain;
+        }
+
+        .letterhead-banner {
+            width: 100%;
+            background: white;
+            padding: 0;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .letterhead-banner img {
+            width: 100%;
+            height: auto;
+            display: block;
+            object-fit: contain;
+        }
+
+        .header-text-center {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .report-info {
+            text-align: center;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            padding-top: 1.5rem;
+        }
+
+        .report-subtitle {
+            font-size: 1.4rem;
+            font-weight: 400;
+            margin-bottom: 0.75rem;
+            color: white;
+            opacity: 0.95;
+        }
+
+        .report-details {
+            font-size: 0.95rem;
+            opacity: 0.85;
+            color: white;
+        }
+
+        .report-separator {
+            margin: 0 0.75rem;
+            opacity: 0.7;
+        }
+
+        .report-date, .report-version {
+            font-weight: 500;
         }
 
         .header-text {
@@ -298,7 +374,6 @@
         .tooltip {
             position: relative;
             cursor: help;
-            border-bottom: 1px dotted #667eea;
         }
 
         .tooltip .tooltiptext {
@@ -537,20 +612,32 @@
     </style>
 </head>
 <body>
+
+    {% if letterhead %}
+    <div class="letterhead-banner">
+        <img src="{{ letterhead }}" alt="Organization Letterhead" />
+    </div>
+    {% endif %}
+
     <header class="header">
-        {% if header_background_image %}
-        <div class="header-image" style="background-image: url('{{ header_background_image }}');"></div>
-        {% endif %}
+
         <div class="header-content">
-            <div class="header-text">
+            {% if not letterhead %}
+            <!-- Fallback title if no letterhead -->
+            <div class="header-text-center">
                 <h1>{{ header_title if header_title else "Cell Type Classification Report" }}</h1>
-                <p>{{ header_subtitle if header_subtitle else "Automated analysis and classification results" }}</p>
-            </div>
-            {% if header_logo_embedded %}
-            <div class="header-logo">
-                <img src="{{ header_logo_embedded }}" alt="Organization Logo" />
             </div>
             {% endif %}
+            
+            <!-- Subtitle and report info below letterhead -->
+            <div class="report-info">
+                <h2 class="report-subtitle">{{ header_subtitle if header_subtitle else "Automated Cell Type Classification Analysis" }}</h2>
+                <div class="report-details">
+                    <span class="report-date">Generated on {{ generation_date | strftime('%B %d, %Y') if generation_date else 'Unknown Date' }}</span>
+                    <span class="report-separator">•</span>
+                    <span class="report-version">Pipeline Version {{ pipeline_version if pipeline_version else 'Unknown' }}</span>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -560,7 +647,7 @@
                 <li><a href="#summary" onclick="showTab('summary')">Summary</a></li>
                 <li><a href="#normalization" onclick="showTab('normalization')">Normalization</a></li>
                 <li><a href="#feature-selection" onclick="showTab('feature-selection')">Feature Selection</a></li>
-                <li><a href="#training" onclick="showTab('training')">Model Training</a></li>
+                <li><a href="#modeling" onclick="showTab('modeling')">Model Training</a></li>
             </ul>
         </div>
     </nav>
@@ -569,8 +656,8 @@
     {% include 'summary.html' %}
     {% include 'normalization.html' %}
     {% include 'feature-selection.html' %}
-    {% include 'training.html' %}
-    
+    {% include 'modeling.html' %}
+
 
     <footer class="footer">
         <p>Generated on {{ generation_date }} | Pipeline Version {{ pipeline_version if pipeline_version else 'Unknown' }}</p>
