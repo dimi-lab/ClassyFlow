@@ -117,7 +117,7 @@ def setup_jinja_environment(template_dir: str):
 
 def read_normalization_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     """Read normalization results from norm directory."""
-    norm_dir = pipeline_output_dir / "norm"
+    norm_dir = Path(pipeline_output_dir, "norm")
     norm_template = {
         'normalization_results': []
     }
@@ -175,7 +175,7 @@ def read_normalization_data(pipeline_output_dir: Path) -> Dict[str, Any]:
 def read_feature_selection_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     """Read feature selection results from feature_selection directory."""
     
-    fs_dir = pipeline_output_dir / "feature_selection"
+    fs_dir = Path(pipeline_output_dir, "feature_selection")
     fs_data = {
         'cell_types_processed': [],
         'feature_selection_results': [],
@@ -219,7 +219,7 @@ def read_feature_selection_data(pipeline_output_dir: Path) -> Dict[str, Any]:
 
 def read_modeling_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     """Read modeling results from modeling directory."""
-    modeling_dir = pipeline_output_dir / "modeling"
+    modeling_dir = Path(pipeline_output_dir, "modeling")
     modeling_data = {
         'holdout_evaluations': [],
         'model_comparisons': [],
@@ -388,7 +388,7 @@ def main():
     )
     parser.add_argument(
         '--input-dir',
-        default="./"
+        default="./",
         help='Directory containing pipeline outputs (default: ./)'
     )
     parser.add_argument(
