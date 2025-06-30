@@ -19,7 +19,6 @@
             <div class="tooltip">
                 <div class="metric-value">{{ normalization_data.total_batches | default("N/A") }}</div>
                 <div class="metric-label">Number of Batches</div>
-                <div class="metric-description">The number of batches processed in this analysis</div>
             </div>
         </div>
         <div class="metric-card">
@@ -27,7 +26,6 @@
             <div class="metric-value">{{ normalization_data.primary_method | default("N/A") }}</div>
             {% if normalization_data.primary_method and normalization_data.primary_method != "N/A" %}
                 <div class="metric-label">Normalization Method</div>
-                <div class="metric-description">Normalization technique used</div>
                 <span class="tooltiptext">
                     The primary normalization method applied to the dataset. Common methods include Box-Cox, 
                     quantile normalization, log transformation, or min-max scaling.
@@ -120,162 +118,219 @@
     <!-- Batch Content Panels -->
     {% for batch_result in normalization_data.normalization_results %}
     <div id="batch-{{ loop.index0 }}" class="batch-content {% if loop.first %}active{% endif %}">
-        
-        <!-- Batch Overview -->
-        <div class="metrics-grid">
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ batch_result.data.total_cells | number_format }}</div>
-                    <div class="metric-label">Cells in Batch</div>
-                </div>
-            </div>
+        <!-- Three Tables Side by Side -->
 
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ batch_result.data.total_markers | default("N/A") }}</div>
-                    <div class="metric-label">Number of markers</div>
-                    <span class="tooltiptext">
-                        Number of markers used in this batch
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ batch_result.data.transformation_type | title }}</div>
-                    <div class="metric-label">Normalization Method</div>
-                </div>
-            </div>
+        <!-- Table 1: Batch Overview -->
+        <div class="table-container inline-third">
+            <table>
+                <thead>
+                    <tr>
+                        <th colspan="2">Batch Overview</th>
+                    </tr>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Cells in Batch</td>
+                        <td>{{ batch_result.data.total_cells | number_format }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                Number of Markers
+                                <span class="tooltiptext">Number of markers used in this batch</span>
+                            </div>
+                        </td>
+                        <td>{{ batch_result.data.total_markers | default("N/A") }}</td>
+                    </tr>
+                    <tr>
+                        <td>Normalization Method</td>
+                        <td>{{ batch_result.data.transformation_type | title }}</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
-        <!-- Method-Specific Metrics -->
+        <!-- Table 2: Box-Cox Transformation Metrics -->
         {% if batch_result.data.transformation_type == "boxcox" and batch_result.data.boxcox_metrics %}
-        <div class="header-with-tooltip">
-            <h4>Box-Cox Transformation Metrics</h4>
-            <div class="tooltip-container">
-                <div class="tooltip-icon">i</div>
-                <div class="tooltip-popup">
-                    Box-Cox transformation parameters and success rates for this batch.
-                </div>
-            </div>
+        <div class="table-container inline-third">
+            <table>
+                <thead>
+                    <tr>
+                        <th colspan="2">
+                            Box-Cox Metrics
+                        </th>
+                    </tr>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                Successful Transforms
+                                <span class="tooltiptext">Number of features that were successfully transformed using Box-Cox normalization.</span>
+                            </div>
+                        </td>
+                        <td>{{ batch_result.data.boxcox_metrics.successful_transforms }}/{{ batch_result.data.boxcox_metrics.total_features }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                Failed Transforms
+                                <span class="tooltiptext">Number of features where Box-Cox transformation failed, typically due to negative values or other data issues.</span>
+                            </div>
+                        </td>
+                        <td>{{ batch_result.data.boxcox_metrics.failed_transforms }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                Mean Lambda
+                                <span class="tooltiptext">Average lambda parameter used in the Box-Cox transformation across all features.</span>
+                            </div>
+                        </td>
+                        <td>{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.mean_lambda) if batch_result.data.boxcox_metrics.lambda_stats.mean_lambda else "N/A" }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                Median Lambda
+                                <span class="tooltiptext">Median lambda parameter, providing a robust measure of the typical transformation applied.</span>
+                            </div>
+                        </td>
+                        <td>{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.median_lambda) if batch_result.data.boxcox_metrics.lambda_stats.median_lambda else "N/A" }}</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
-
-        <div class="metrics-grid">
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ batch_result.data.boxcox_metrics.successful_transforms }}</div>
-                    <div class="metric-label">Successful Transforms</div>
-                    <div class="metric-description">Out of {{ batch_result.data.boxcox_metrics.total_features }} features</div>
-                    <span class="tooltiptext">
-                        Number of features that were successfully transformed using Box-Cox normalization.
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ batch_result.data.boxcox_metrics.failed_transforms }}</div>
-                    <div class="metric-label">Failed Transforms</div>
-                    <div class="metric-description">Features that could not be transformed</div>
-                    <span class="tooltiptext">
-                        Number of features where Box-Cox transformation failed, typically due to negative values or other data issues.
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.mean_lambda) if batch_result.data.boxcox_metrics.lambda_stats.mean_lambda else "N/A" }}</div>
-                    <div class="metric-label">Mean Lambda</div>
-                    <div class="metric-description">Average transformation parameter</div>
-                    <span class="tooltiptext">
-                        Average lambda parameter used in the Box-Cox transformation across all features.
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.median_lambda) if batch_result.data.boxcox_metrics.lambda_stats.median_lambda else "N/A" }}</div>
-                    <div class="metric-label">Median Lambda</div>
-                    <div class="metric-description">Median transformation parameter</div>
-                    <span class="tooltiptext">
-                        Median lambda parameter, providing a robust measure of the typical transformation applied.
-                    </span>
-                </div>
-            </div>
+        {% else %}
+        <!-- Placeholder table when Box-Cox metrics aren't available -->
+        <div class="table-container inline-third">
+            <table>
+                <thead>
+                    <tr>
+                        <th colspan="2">Transformation Details</th>
+                    </tr>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Method</td>
+                        <td>{{ batch_result.data.transformation_type | title }}</td>
+                    </tr>
+                    <tr>
+                        <td>Status</td>
+                        <td>Applied</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="text-align: center; font-style: italic; color: #6c757d;">
+                            Detailed metrics not available for this transformation method
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
         {% endif %}
 
-        <!-- Coefficient of Variation Improvement -->
+        <!-- Table 3: Coefficient of Variation Improvement -->
         {% if batch_result.data.cv_metrics %}
-        <div class="header-with-tooltip">
-            <h4>Coefficient of Variation Improvement</h4>
-            <div class="tooltip-container">
-                <div class="tooltip-icon">i</div>
-                <div class="tooltip-popup">
-                    Analysis of how normalization improved the coefficient of variation (CV) across markers.
-                </div>
-            </div>
+        <div class="table-container inline-third">
+            <table>
+                <thead>
+                    <tr>
+                        <th colspan="2">
+                            CV Improvement
+                        </th>
+                    </tr>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                Mean CV Improvement
+                                <span class="tooltiptext">Average improvement in coefficient of variation after normalization. Positive values indicate reduced variability.</span>
+                            </div>
+                        </td>
+                        <td>{{ "%.3f" | format(batch_result.data.cv_metrics.mean_cv_improvement) if batch_result.data.cv_metrics.mean_cv_improvement else "N/A" }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                Median CV Improvement
+                                <span class="tooltiptext">Median improvement in coefficient of variation, providing a robust measure of normalization effectiveness.</span>
+                            </div>
+                        </td>
+                        <td>{{ "%.3f" | format(batch_result.data.cv_metrics.median_cv_improvement) if batch_result.data.cv_metrics.median_cv_improvement else "N/A" }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                Markers Improved
+                                <span class="tooltiptext">Number of markers that showed improvement (reduced coefficient of variation) after normalization.</span>
+                            </div>
+                        </td>
+                        <td>{{ batch_result.data.cv_metrics.markers_improved }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                Markers Worsened
+                                <span class="tooltiptext">Number of markers that showed worsening (increased coefficient of variation) after normalization.</span>
+                            </div>
+                        </td>
+                        <td>{{ batch_result.data.cv_metrics.markers_worsened }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                Worst Performers
+                                <span class="tooltiptext">Markers that showed the poorest normalization results and may require special attention.</span>
+                            </div>
+                        </td>
+                        <td style="font-size: 0.85em;">{{ batch_result.worst_performing_markers }}</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
-
-        <div class="metrics-grid">
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ "%.3f" | format(batch_result.data.cv_metrics.mean_cv_improvement) if batch_result.data.cv_metrics.mean_cv_improvement else "N/A" }}</div>
-                    <div class="metric-label">Mean CV Improvement</div>
-                    <div class="metric-description">Average improvement in CV</div>
-                    <span class="tooltiptext">
-                        Average improvement in coefficient of variation after normalization. Positive values indicate reduced variability.
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ "%.3f" | format(batch_result.data.cv_metrics.median_cv_improvement) if batch_result.data.cv_metrics.median_cv_improvement else "N/A" }}</div>
-                    <div class="metric-label">Median CV Improvement</div>
-                    <div class="metric-description">Median improvement in CV</div>
-                    <span class="tooltiptext">
-                        Median improvement in coefficient of variation, providing a robust measure of normalization effectiveness.
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ batch_result.data.cv_metrics.markers_improved }}</div>
-                    <div class="metric-label">Markers Improved</div>
-                    <div class="metric-description">Number with reduced CV</div>
-                    <span class="tooltiptext">
-                        Number of markers that showed improvement (reduced coefficient of variation) after normalization.
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ batch_result.data.cv_metrics.markers_worsened }}</div>
-                    <div class="metric-label">Markers Worsened</div>
-                    <div class="metric-description">Number with increased CV</div>
-                    <span class="tooltiptext">
-                        Number of markers that showed worsening (increased coefficient of variation) after normalization.
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ batch_result.worst_performing_markers }}</div>
-                    <div class="metric-label">Worst Performing Markers</div>
-                    <div class="metric-description">The 5 worst performing markers</div>
-                    <span class="tooltiptext">
-                        Markers that showed the poorest normalization results and may require special attention.
-                    </span>
-                </div>
-            </div>
+        {% else %}
+        <!-- Placeholder table when CV metrics aren't available -->
+        <div class="table-container inline-third">
+            <table>
+                <thead>
+                    <tr>
+                        <th colspan="2">CV Analysis</th>
+                    </tr>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="2" style="text-align: center; font-style: italic; color: #6c757d;">
+                            CV improvement metrics not available for this batch
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
         {% endif %}
+
+        
+        
 
         <!-- Visualization Plots -->
         <div class="header-with-tooltip">
@@ -289,19 +344,6 @@
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 2rem;">
-        {% if batch_result.data.slide_boxplots %}
-        <div class="plot-container">
-            <div class="plot-title">Slide Boxplots</div>
-            <img src="{{ batch_result.data.slide_boxplots }}" alt="Slide Boxplots" class="embedded-image" />
-        </div>
-        {% endif %}
-
-        {% if batch_result.data.cv_heatmap %}
-        <div class="plot-container">
-            <div class="plot-title">CV Improvement Heatmap</div>
-            <img src="{{ batch_result.data.cv_heatmap }}" alt="CV Improvement Heatmap" class="embedded-image" />
-        </div>
-        {% endif %}
 
         {% if batch_result.data.transformation_examples %}
         <div class="plot-container">
@@ -311,7 +353,7 @@
         {% endif %}
 
         {% if batch_result.data.distribution_comparison %}
-        <div class="plot-container">
+        <div class="plot-containerlarge">
             <div class="plot-title">Distribution Comparison</div>
             <img src="{{ batch_result.data.distribution_comparison }}" alt="Distribution Comparison" class="embedded-image" />
         </div>

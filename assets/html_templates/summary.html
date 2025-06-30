@@ -26,9 +26,8 @@
             <div class="tooltip">
                 <div class="metric-value">{{ total_cells | default("N/A") | number_format }}</div>
                 <div class="metric-label">Total Cells</div>
-                <div class="metric-description">Cells analyzed in the dataset</div>
                 <span class="tooltiptext">
-                    Total number of cells identified and segmented from the MxIF data. This includes both 
+                    Total number of cells. This includes both 
                     labeled and unlabeled cells across all batches used in this analysis.
                 </span>
             </div>
@@ -36,12 +35,11 @@
 
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ labeled_classes | default("N/A") }}</div>
-                <div class="metric-label">Labeled Classes</div>
-                <div class="metric-description">Distinct cell types with labels</div>
+                <div class="metric-value">{{ total_labels | default("N/A") | number_format }}</div>
+                <div class="metric-label">Total Labelled Cells</div>
                 <span class="tooltiptext">
-                    Number of distinct cell type categories that had manual annotations or labels 
-                    available in the original dataset for model training.
+                    Total number of labeled cells. These cells will be used for training
+                    anf evaluating the model
                 </span>
             </div>
         </div>
@@ -50,7 +48,6 @@
             <div class="tooltip">
                 <div class="metric-value">{{ training_classes | default("N/A") }}</div>
                 <div class="metric-label">Training Classes</div>
-                <div class="metric-description">Classes used for model training</div>
                 <span class="tooltiptext">
                     Number of cell type classes that met the minimum requirements for model training 
                     (sufficient sample size) and were included in the final model.
@@ -62,7 +59,6 @@
     <div class="tooltip">
         <div class="metric-value">{{ normalization_method | default("N/A") }}</div>
         <div class="metric-label">Normalization Method</div>
-        <div class="metric-description">Data preprocessing approach</div>
         <span class="tooltiptext">
             {% if normalization_method == "N/A" or normalization_method is none %}
                 No normalization method was set in the pipeline's configuration.
@@ -92,7 +88,6 @@
             <div class="tooltip">
                 <div class="metric-value">{{ (holdout_accuracy * 100) | round(1) if holdout_accuracy else "N/A" }}%</div>
                 <div class="metric-label">Holdout Accuracy</div>
-                <div class="metric-description">Classification accuracy on test set</div>
                 <span class="tooltiptext">
                     Percentage of correctly classified cells in the holdout test set. This metric indicates 
                     the overall performance of the model on unseen data and represents the expected accuracy 
@@ -105,7 +100,6 @@
             <div class="tooltip">
                 <div class="metric-value">{{ (f1_score * 100) | round(1) if f1_score else "N/A" }}%</div>
                 <div class="metric-label">F1 Score</div>
-                <div class="metric-description">Weighted average F1 score</div>
                 <span class="tooltiptext">
                     The weighted F1 score balances precision and recall across all classes. This metric 
                     is particularly useful for datasets with imbalanced classes, providing a more 
@@ -120,8 +114,7 @@
         <div class="tooltip-container">
             <div class="tooltip-icon">i</div>
             <div class="tooltip-popup">
-                his visualization shows the relative abundance of each predicted cell type in the dataset. 
-                The plot helps identify dominant cell populations and rare cell types.
+                This visualization shows the relative abundance of each predicted cell type in the dataset. 
             </div>
         </div>
     </div>
@@ -162,6 +155,7 @@
         <li><strong>Normalization Results:</strong> Details about data preprocessing and quality control measures</li>
         <li><strong>Feature Selection:</strong> Information about which features were most important for classification</li>
         <li><strong>Model Training:</strong> Comprehensive evaluation of model performance and validation results</li>
+        <li><strong>Prediction:</strong> Summary of the final predicted cell types</li>
     </ul>
 
     <div style="margin-top: 2rem; padding: 1rem; background-color: #f8f9fa; border-radius: 6px;">

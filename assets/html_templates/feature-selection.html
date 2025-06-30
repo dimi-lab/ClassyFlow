@@ -12,16 +12,6 @@
 {% if feature_selection_data.feature_selection_results %}
 <!-- Cell Type Tabs Navigation -->
 <section class="page-section">
-    <div class="header-with-tooltip">
-        <h3>Cell Type-Specific Results</h3>
-        <div class="tooltip-container">
-            <div class="tooltip-icon">i</div>
-            <div class="tooltip-popup">
-                Detailed feature selection results for each cell type. Click on the tabs below to view results for individual cell types.
-            </div>
-        </div>
-    </div>
-
     <style>
         .celltype-tabs {
             display: flex;
@@ -94,22 +84,13 @@
     <div id="celltype-{{ loop.index0 }}" class="celltype-content {% if loop.first %}active{% endif %}">
         
         <!-- Cell Type Overview -->
-        <div class="header-with-tooltip">
-            <h4>{{ celltype_result.celltype }} Feature Selection</h4>
-            <div class="tooltip-container">
-                <div class="tooltip-icon">i</div>
-                <div class="tooltip-popup">
-                    Feature selection results specifically for {{ celltype_result.celltype }} cells.
-                </div>
-            </div>
-        </div>
+        <h3>{{ celltype_result.celltype }} Feature Selection</h3>
 
         <div class="metrics-grid">
             <div class="metric-card">
                 <div class="tooltip">
                     <div class="metric-value">{{ celltype_result.data.feature_selection_summary.original_features }}</div>
                     <div class="metric-label">Original Features</div>
-                    <div class="metric-description">Starting feature count</div>
                     <span class="tooltiptext">
                         Number of features available before feature selection for this cell type.
                     </span>
@@ -118,56 +99,8 @@
 
             <div class="metric-card">
                 <div class="tooltip">
-                    <div class="metric-value">{{ celltype_result.data.optimal_features }}</div>
-                    <div class="metric-label">Optimal Features</div>
-                    <div class="metric-description">Selected feature count</div>
-                    <span class="tooltiptext">
-                        Number of features selected as optimal for classifying this cell type.
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ "%.1f" | format((celltype_result.data.optimal_n_features / celltype_result.data.feature_selection_summary.original_features * 100)) if celltype_result.data.feature_selection_summary.original_features > 0 else "N/A" }}%</div>
-                    <div class="metric-label">Reduction Rate</div>
-                    <div class="metric-description">Features retained</div>
-                    <span class="tooltiptext">
-                        Percentage of original features retained after selection process.
-                    </span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Feature Selection Process Details -->
-        {% if celltype_result.data.feature_selection_summary %}
-        <div class="header-with-tooltip">
-            <h5>Feature Selection Process</h5>
-            <div class="tooltip-container">
-                <div class="tooltip-icon">i</div>
-                <div class="tooltip-popup">
-                    Details about the feature selection process and filtering steps applied.
-                </div>
-            </div>
-        </div>
-
-        <div class="metrics-grid">
-            <div class="metric-card">
-                <div class="tooltip">
-                    <div class="metric-value">{{ celltype_result.data.feature_selection_summary.original_features }}</div>
-                    <div class="metric-label">Initial Features</div>
-                    <div class="metric-description">Before any filtering</div>
-                    <span class="tooltiptext">
-                        Total features before any preprocessing or filtering steps.
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="tooltip">
                     <div class="metric-value">{{ celltype_result.data.feature_selection_summary.non_variant_removed | default("N/A") }}</div>
                     <div class="metric-label">Non-Variant Removed</div>
-                    <div class="metric-description">Low-variance features</div>
                     <span class="tooltiptext">
                         Number of features removed due to low or zero variance across samples.
                     </span>
@@ -176,11 +109,10 @@
 
             <div class="metric-card">
                 <div class="tooltip">
-                    <div class="metric-value">{{ celltype_result.data.feature_selection_summary.features_after_variance_filter | default("N/A") }}</div>
-                    <div class="metric-label">After Variance Filter</div>
-                    <div class="metric-description">Remaining features</div>
+                    <div class="metric-value">{{ "%.1f" | format((celltype_result.data.optimal_n_features / celltype_result.data.feature_selection_summary.original_features * 100)) if celltype_result.data.feature_selection_summary.original_features > 0 else "N/A" }}%</div>
+                    <div class="metric-label">Reduction Rate</div>
                     <span class="tooltiptext">
-                        Number of features remaining after variance filtering step.
+                        Percentage of original features reduced after selection process.
                     </span>
                 </div>
             </div>
@@ -189,18 +121,16 @@
                 <div class="tooltip">
                     <div class="metric-value">{{ celltype_result.data.optimal_n_features }}</div>
                     <div class="metric-label">Final Selection</div>
-                    <div class="metric-description">Optimal feature count</div>
                     <span class="tooltiptext">
                         Final number of features selected as optimal for this cell type classification.
                     </span>
                 </div>
             </div>
         </div>
-        {% endif %}
 
         <!-- Visualization Plots -->
         <div class="header-with-tooltip">
-            <h5>Feature Selection Visualizations</h5>
+            <h4>Feature Selection Visualizations</h4>
             <div class="tooltip-container">
                 <div class="tooltip-icon">i</div>
                 <div class="tooltip-popup">
@@ -210,18 +140,8 @@
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 2rem;">
-            {% if celltype_result.data.alpha_plot_path %}
-            <div class="plot-container">
-                <div class="plot-title">Alpha Optimization</div>
-                <img src="{{ celltype_result.data.alpha_plot_path }}" alt="Alpha Optimization Plot" class="embedded-image" />
-                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
-                    Optimization of regularization parameter (alpha) for feature selection.
-                </p>
-            </div>
-            {% endif %}
-
             {% if celltype_result.data.feature_ranking_plot_path %}
-            <div class="plot-container">
+            <div class="plot-container large">
                 <div class="plot-title">Feature Ranking</div>
                 <img src="{{ celltype_result.data.feature_ranking_plot_path }}" alt="Feature Ranking Plot" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
@@ -230,8 +150,18 @@
             </div>
             {% endif %}
 
+            {% if celltype_result.data.alpha_plot_path %}
+            <div class="plot-container small">
+                <div class="plot-title">Alpha Optimization</div>
+                <img src="{{ celltype_result.data.alpha_plot_path }}" alt="Alpha Optimization Plot" class="embedded-image" />
+                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
+                    Optimization of regularization parameter (alpha) for feature selection.
+                </p>
+            </div>
+            {% endif %}
+
             {% if celltype_result.data.rfe_plot_path and celltype_result.data.rfe_plot_path %}
-            <div class="plot-container">
+            <div class="plot-container small">
                 <div class="plot-title">RFE Analysis</div>
                 <img src="{{ celltype_result.data.rfe_plot_path }}" alt="RFE Analysis Plot" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
