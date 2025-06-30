@@ -161,33 +161,38 @@ workflow normalization_wf {
 
     main:
 	def best_ch
+    def bc
+    def lg
+    def qt
+    def mm
+    def mxchannels
+
     if (params.override_normalization == "boxcox") {
-        def bc = BOXCOX(batchPickleTable)
+        bc = BOXCOX(batchPickleTable)
         best_ch = bc.norm_df
     }
     else if (params.override_normalization == "quantile") {
-        def qt = QUANTILE(batchPickleTable)
+        qt = QUANTILE(batchPickleTable)
         best_ch = qt.norm_df
     }
     else if (params.override_normalization == "minmax") {
-        def mm = MINMAX(batchPickleTable)
+        mm = MINMAX(batchPickleTable)
         best_ch = mm.norm_df
     }
     else if (params.override_normalization == "logscale") {
-        def lg = LOGSCALE(batchPickleTable)
+        lg = LOGSCALE(batchPickleTable)
         best_ch = lg.norm_df
     }
     else {
-        def bc = BOXCOX(batchPickleTable).norm_df
-        def qt = QUANTILE(batchPickleTable).norm_df
-        def mm = MINMAX(batchPickleTable).norm_df
-        def lg = LOGSCALE(batchPickleTable).norm_df
+        bc = BOXCOX(batchPickleTable).norm_df
+        qt = QUANTILE(batchPickleTable).norm_df
+        mm = MINMAX(batchPickleTable).norm_df
+        lg = LOGSCALE(batchPickleTable).norm_df
 
-        def mxchannels = batchPickleTable.mix(bc, qt, mm, lg).groupTuple()
+        mxchannels = batchPickleTable.mix(bc, qt, mm, lg).groupTuple()
         mxchannels.dump(tag: 'debug_normalization_channels', pretty: true)
 
-        //def best = IDENTIFY_BEST(mxchannels)
-        best_ch = bc
+        def best = IDENTIFY_BEST(mxchannels)
     }
 
     // Insert GMM gating after normalization
@@ -205,5 +210,9 @@ workflow normalization_wf {
 
     emit:
     normalized = best_ch
+    boxcox_results = bc ? bc.boxcox_results : Channel.empty()
+    quantile_results = qt ? qt.quantile_results : Channel.empty()
+    minmax_results = mm ? mm.minmax_results : Channel.empty()
+    log_results = lg ? lg.log_results : Channel.empty()
 }
 

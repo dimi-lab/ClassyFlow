@@ -4,6 +4,8 @@ import os, sys, math
 import pandas as pd
 from sklearn.datasets import make_blobs
 import argparse
+import json
+
 
 staticColHead = 'Unnamed: 0'
 
@@ -23,6 +25,7 @@ def findMissingFeatures(df, nom, designFile, objtype):
     panelDesign = pd.read_csv(designFile)
     pdf2 = panelDesign.loc[panelDesign[nom] == 0]
     print(pdf2)
+    synthetic_features = 0
     if pdf2.shape[0] == 0:
         print("Skip this batch, no missing fields.")
         df.to_pickle('merged_dataframe_{}_mod.pkl'.format(nom))
@@ -41,6 +44,7 @@ def findMissingFeatures(df, nom, designFile, objtype):
             standard_dev = math.ceil((mx-mn)/6)
 
             theseMissingFields = [f+st for f in missingMarks]
+            synthetic_features += len(theseMissingFields)
             if len(theseMissingFields) == 0:
                 sys.exit('Missing Fields Empty! ( {} )'.format(st))
             vals, lbs = make_blobs(n_samples=len(df), n_features=len(theseMissingFields), center_box=center_box, cluster_std=standard_dev)
@@ -49,6 +53,18 @@ def findMissingFeatures(df, nom, designFile, objtype):
             prt1DataT = pd.concat([prt1DataT,dfTmp],axis=1)
 
         prt1DataT.to_pickle('merged_dataframe_{}_mod.pkl'.format(nom))
+
+        summary_report = {
+            "batch_id": nom,
+            "original_features": df.shape[1],
+            "missing_markers": pdf2[staticColHead].tolist() if pdf2.shape[0] > 0 else [],
+            "synthetic_features_added": synthetic_features if pdf2.shape[0] > 0 else 0,
+            "final_features": prt1DataT.shape[1],
+            "percent_synthetic": (synthetic_features/prt1DataT.shape[1]*100) if pdf2.shape[0] > 0 else 0
+        }
+
+        with open(f'missing_data_fill_report_{nom}.json', 'w') as f:
+            json.dump(summary_report, f, indent=2)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Add noise columns for missing markers in quantification tables.")
