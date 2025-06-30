@@ -15,6 +15,7 @@ params.output_dir = "${workflow.projectDir}/output"
 //Static Assests for beautification
 params.letterhead = "${projectDir}/assets/images/ClassyFlow_Letterhead.PNG"
 params.html_template = "${projectDir}/assets/html_templates"
+params.pipeline_version = "1.0"
 
 // Build Input List of Batches
 Channel.fromList(params.input_dirs)
@@ -103,7 +104,7 @@ process ADD_EMPTY_MARKER_NOISE {
 
     output:
     tuple val(batchID), path("merged_dataframe_${batchID}_mod.pkl"), emit: modbatchtables
-    tuple val(batchID), path("missing_data_fill_report_${batchID}.json"), emit: empty_marker_results
+    path("missing_data_fill_report_${batchID}.json"), emit: empty_marker_results
 
     script:
     """
@@ -137,7 +138,7 @@ process GENERATE_TRAINING_N_HOLDOUT{
     path("training_dataframe.pkl"), emit: training
 	path("celltypes.csv"), emit: lableFile
 	path("annotation_report.html")
-    path("training_split_report.json"), emit: training_holdout_results
+    tuple path("training_split_report.json"), path("cell_count_table.csv"), emit: training_holdout_results
 
     script:
     """
@@ -220,14 +221,31 @@ process QC_DENSITY {
     """
 }
 
+process SUMMARIZE_PREDICTIONS {
+    input:
+    path(prediction_files)
+
+    output:
+    tuple path("abundance_metrics.json"), path("*.png"), emit: abundance_results
+
+    script:
+    """
+    generate_predictions_summary.py --input_dir ./
+
+    """
+}
+
 process GENERATE_FINAL_REPORT {
     publishDir "${params.output_dir}/final_reports", pattern: "classyflow_report.html", mode: 'copy', overwrite: true
     
     input:
+    path(missing_files, stageAs: "general/*")
+    path(split_files, stageAs: "general/*")
     path(norm_files, stageAs: "norm/*")
     path(fs_files, stageAs: "feature_selection/*") 
     path(xgb_winners, stageAs: "modeling/*")
     path(holdout_files, stageAs: "modeling/*")
+    path(abundance_results, stageAs: "general/*")
 
     output:
     path("classyflow_report.html")
@@ -237,6 +255,7 @@ process GENERATE_FINAL_REPORT {
     generate_final_report.py --template-dir ${params.html_template} \
                             --report-name classyflow_report.html \
                             --letterhead ${params.letterhead}
+                            --version ${params.pipeline_version}
     """
 
 }
@@ -292,7 +311,13 @@ workflow {
         // Generate a comprehensive HTML report for each prediction file
         CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
 
+        // Generate summary statistics and plots for all predictions
+        SUMMARIZE_PREDICTIONS(predictions_for_report.collect())
+
         // Generate final HTML report for the whole run
+        missing_outputs = ADD_EMPTY_MARKER_NOISE.output.empty_marker_results.flatten().collect()
+        split_outputs = labledDataFrames.training_holdout_results.flatten().collect()
+
         norm_outputs = Channel.empty().mix(
         normalized_output.boxcox_results.map { it -> it[1..-1] }.ifEmpty([]),  // Skip batchID, take files
         normalized_output.quantile_results.map { it -> it[1..-1] }.ifEmpty([]), // Skip batchID, take files  
@@ -312,12 +337,18 @@ workflow {
         .flatten()
         .collect()
 
+    prediction_results = SUMMARIZE_PREDICTIONS.output.abundance_results
+        .flatten()
+
         // Pass all to reporting
         GENERATE_FINAL_REPORT(
+            missing_outputs,
+            split_outputs,
             norm_outputs,
             fs_outputs, 
             xgb_winners,
-            holdout_evals
+            holdout_evals,
+            prediction_results
         )
 
     	

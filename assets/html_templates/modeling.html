@@ -45,7 +45,6 @@
             <div class="tooltip">
                 <div class="metric-value">{{ training_classes | default("N/A") }}</div>
                 <div class="metric-label">Total Training Classes</div>
-                <div class="metric-description">Cell types in model</div>
                 <span class="tooltiptext">
                     Total number of cell type classes included in the final model.
                 </span>
@@ -303,19 +302,18 @@
         </div>
         {% endif %}
 
-        <!-- Combined Class Performance Table -->
         {% if model_eval.data.class_names and model_eval.data.class_counts and model_eval.data.auc_scores %}
         <div class="header-with-tooltip">
             <h5>Class Performance Summary</h5>
             <div class="tooltip-container">
                 <div class="tooltip-icon">i</div>
                 <div class="tooltip-popup">
-                    Combined view of class distribution in the test set and AUC performance for each cell type.
+                    Combined view of class distribution in the test set and AUC performance for each cell type. Sorted by AUC score (highest to lowest).
                 </div>
             </div>
         </div>
 
-        <div class="table-container">
+        <div class="table-container medium">
             <table>
                 <thead>
                     <tr>
@@ -323,84 +321,91 @@
                         <th>Test Samples</th>
                         <th>Percentage</th>
                         <th>Class Balance</th>
-                        <th>AUC Score</th>
+                        <th>AUC Score ↓</th>
                         <th>Performance Level</th>
-                        <th>AUC Rank</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% set total_samples = model_eval.data.class_counts | sum %}
-                    {% for i in range(model_eval.data.class_names | length) %}
-                    {% set class_name = model_eval.data.class_names[i] %}
-                    {% set count = model_eval.data.class_counts[i] %}
-                    {% set percentage = (count / total_samples * 100) if total_samples > 0 else 0 %}
                     
-                    <!-- Find matching AUC score for this class -->
-                    {% set auc_score = namespace(value=0, found=false) %}
-                    {% for auc_result in model_eval.data.auc_scores %}
-                        {% if auc_result.class_name == class_name %}
-                            {% set auc_score.value = auc_result.auc %}
-                            {% set auc_score.found = true %}
-                        {% endif %}
+                    {# Create a list to store all class data with AUC scores #}
+                    {% set class_data = [] %}
+                    
+                    {# Build the data structure with all class information #}
+                    {% for i in range(model_eval.data.class_names | length) %}
+                        {% set class_name = model_eval.data.class_names[i] %}
+                        {% set count = model_eval.data.class_counts[i] %}
+                        {% set percentage = (count / total_samples * 100) if total_samples > 0 else 0 %}
+                        
+                        {# Find matching AUC score for this class #}
+                        {% set auc_score = namespace(value=0, found=false) %}
+                        {% for auc_result in model_eval.data.auc_scores %}
+                            {% if auc_result.class_name == class_name %}
+                                {% set auc_score.value = auc_result.auc %}
+                                {% set auc_score.found = true %}
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {# Add to class_data list - use -1 for missing AUC to sort them last #}
+                        {% set sort_value = auc_score.value if auc_score.found else -1 %}
+                        {% set _ = class_data.append({
+                            'name': class_name,
+                            'count': count,
+                            'percentage': percentage,
+                            'auc_value': auc_score.value,
+                            'auc_found': auc_score.found,
+                            'sort_value': sort_value
+                        }) %}
                     {% endfor %}
                     
+                    {# Sort by AUC score descending (highest first) #}
+                    {% set sorted_classes = class_data | sort(attribute='sort_value', reverse=true) %}
+                    
+                    {# Display sorted results #}
+                    {% for class_info in sorted_classes %}
                     <tr>
-                        <td><strong>{{ class_name }}</strong></td>
-                        <td>{{ count | number_format }}</td>
-                        <td>{{ "%.1f" | format(percentage) }}%</td>
+                        <td><strong>{{ class_info.name }}</strong></td>
+                        <td>{{ class_info.count | number_format }}</td>
+                        <td>{{ "%.1f" | format(class_info.percentage) }}%</td>
                         <td>
                             <span class="badge" style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8em; font-weight: 600;
-                                {% if percentage < 5 %}background-color: #f5c6cb; color: #721c24;
-                                {% elif percentage < 10 %}background-color: #fff3cd; color: #856404;
-                                {% elif percentage > 40 %}background-color: #d1ecf1; color: #0c5460;
+                                {% if class_info.percentage < 5 %}background-color: #f5c6cb; color: #721c24;
+                                {% elif class_info.percentage < 10 %}background-color: #fff3cd; color: #856404;
+                                {% elif class_info.percentage > 40 %}background-color: #d1ecf1; color: #0c5460;
                                 {% else %}background-color: #d4edda; color: #155724;{% endif %}">
-                                {% if percentage < 5 %}Severely Under.
-                                {% elif percentage < 10 %}Underrepresented
-                                {% elif percentage > 40 %}Dominant
+                                {% if class_info.percentage < 5 %}Severely Under.
+                                {% elif class_info.percentage < 10 %}Underrepresented
+                                {% elif class_info.percentage > 40 %}Dominant
                                 {% else %}Balanced{% endif %}
                             </span>
                         </td>
                         <td>
-                            {% if auc_score.found %}
+                            {% if class_info.auc_found %}
                             <span style="font-weight: 700; font-size: 1.1em; 
-                                {% if auc_score.value >= 0.9 %}color: #28a745;
-                                {% elif auc_score.value >= 0.8 %}color: #17a2b8;
-                                {% elif auc_score.value >= 0.7 %}color: #ffc107;
+                                {% if class_info.auc_value >= 0.9 %}color: #28a745;
+                                {% elif class_info.auc_value >= 0.8 %}color: #17a2b8;
+                                {% elif class_info.auc_value >= 0.7 %}color: #ffc107;
                                 {% else %}color: #dc3545;{% endif %}">
-                                {{ "%.3f" | format(auc_score.value) }}
+                                {{ "%.3f" | format(class_info.auc_value) }}
                             </span>
                             {% else %}
                             <span style="color: #6c757d;">N/A</span>
                             {% endif %}
                         </td>
                         <td>
-                            {% if auc_score.found %}
+                            {% if class_info.auc_found %}
                             <span class="badge" style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8em; font-weight: 600; 
-                                {% if auc_score.value >= 0.9 %}background-color: #d4edda; color: #155724;
-                                {% elif auc_score.value >= 0.8 %}background-color: #d1ecf1; color: #0c5460;
-                                {% elif auc_score.value >= 0.7 %}background-color: #fff3cd; color: #856404;
-                                {% elif auc_score.value >= 0.6 %}background-color: #f8d7da; color: #721c24;
+                                {% if class_info.auc_value >= 0.9 %}background-color: #d4edda; color: #155724;
+                                {% elif class_info.auc_value >= 0.8 %}background-color: #d1ecf1; color: #0c5460;
+                                {% elif class_info.auc_value >= 0.7 %}background-color: #fff3cd; color: #856404;
+                                {% elif class_info.auc_value >= 0.6 %}background-color: #f8d7da; color: #721c24;
                                 {% else %}background-color: #f5c6cb; color: #721c24;{% endif %}">
-                                {% if auc_score.value >= 0.9 %}Excellent
-                                {% elif auc_score.value >= 0.8 %}Good
-                                {% elif auc_score.value >= 0.7 %}Moderate
-                                {% elif auc_score.value >= 0.6 %}Poor
+                                {% if class_info.auc_value >= 0.9 %}Excellent
+                                {% elif class_info.auc_value >= 0.8 %}Good
+                                {% elif class_info.auc_value >= 0.7 %}Moderate
+                                {% elif class_info.auc_value >= 0.6 %}Poor
                                 {% else %}Very Poor{% endif %}
                             </span>
-                            {% else %}
-                            <span style="color: #6c757d;">N/A</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if auc_score.found %}
-                            <!-- Calculate rank by counting how many have higher AUC -->
-                            {% set rank = namespace(value=1) %}
-                            {% for other_auc in model_eval.data.auc_scores %}
-                                {% if other_auc.auc > auc_score.value %}
-                                    {% set rank.value = rank.value + 1 %}
-                                {% endif %}
-                            {% endfor %}
-                            {{ rank.value }}
                             {% else %}
                             <span style="color: #6c757d;">N/A</span>
                             {% endif %}
@@ -410,7 +415,6 @@
                 </tbody>
             </table>
         </div>
-
 
         {% endif %}
 

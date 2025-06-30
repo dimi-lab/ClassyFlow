@@ -292,9 +292,39 @@ def read_modeling_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     
     return replace_png_with_base64(modeling_data, "./modeling")
 
+def read_general_data(pipeline_output_dir: Path) -> Dict[str, Any]:
+    general_dir = Path(pipeline_output_dir, "general")
+    results = {}
+
+    if not general_dir.exists():
+        logger.error(f"General Metrics directory not found: {general_dir}")
+
+    
+    json_files = glob.glob(str(general_dir / "*.json"))
+
+    for file_path in json_files:
+        try:
+            with open(file_path, 'r') as f:
+                json_results = json.load(f)
+            
+            conflicting_keys = set(results.keys()) & set(json_results.keys())
+            if conflicting_keys:
+                logger.error(f"Overwriting existing keys from {file_path}: {conflicting_keys}")
+
+            results.update(json_results)
+            
+            logger.info(f"Loaded metrics from {file_path}")
+            
+        except Exception as e:
+            logger.error(f"Error reading metrics file {file_path}: {e}")
+
+    return replace_png_with_base64(results, "./general")
 
 def collect_all_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     """Collect all data from pipeline outputs."""
+    logger.info("Collecting general metrics...")
+    general_data = read_general_data(pipeline_output_dir)
+
     logger.info("Collecting normalization data...")
     norm_data = read_normalization_data(pipeline_output_dir)
     
@@ -304,11 +334,17 @@ def collect_all_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     logger.info("Collecting modeling data...")
     modeling_data = read_modeling_data(pipeline_output_dir)
     
-    return {
-        'normalization': norm_data,
-        'feature_selection': fs_data,
-        'modeling': modeling_data
+    all_jsons = {
+        'general': general_data,
+        'normalization_data': norm_data,
+        'feature_selection_data': fs_data,
+        'modeling_data': modeling_data
         }
+
+    with open(f'all_jsons.json', 'w') as f:
+            json.dump(all_jsons, f, indent=2)
+
+    return all_jsons
 
 def csv_to_dict(csv_file_path, max_rows=None):
     """Convert CSV to dictionary for Jinja2 templates."""
@@ -330,7 +366,8 @@ def generate_report(all_data: Dict[str, Any],
                    output_file: str, 
                    jinja_env, 
                    template_name: str = "base.html",
-                   letterhead: Optional[str] = None):
+                   letterhead: Optional[str] = None,
+                   pipeline_version: Optional[str] = None):
     """
     Generate the HTML report with embedded images.
     
@@ -347,22 +384,20 @@ def generate_report(all_data: Dict[str, Any],
         # Embed all images
         logger.info("Embedding images into report...")
 
-        norm = all_data['normalization']
-        
         template_data = {
-            'total_cells': "123", #coming soon
-            'total_batches': norm['total_batches'],
-            'labeled_classes': "123", #coming soon
-            'training_classes': all_data['modeling']["training_classes"],
-            'normalization_method': norm["primary_method"],
-            'holdout_accuracy': all_data['modeling']["holdout_accuracy"],
-            'f1_score': all_data['modeling']["f1_score"],
-            'normalization_data': norm,
-            'feature_selection_data': all_data['feature_selection'],
-            'modeling_data': all_data['modeling'],
+            'pipeline_version': pipeline_version,
+            'generation_date': datetime.now().strftime("%B %d, %Y"),
+            'total_cells': all_data['general']['total_cells'], 
+            'total_batches': all_data['normalization_data']['total_batches'],
+            'total_labels': all_data['general']["total_annotated_cells"],
+            'training_classes': all_data['modeling_data']["training_classes"],
+            'normalization_method': all_data['normalization_data']["primary_method"],
+            'holdout_accuracy': all_data['modeling_data']["holdout_accuracy"],
+            'f1_score': all_data['modeling_data']["f1_score"],
             'letterhead': encode_image_to_base64(letterhead)
-
         }
+
+        template_data.update(all_data)
 
         # Render the template
         html_content = template.render(**template_data)
@@ -411,6 +446,11 @@ def main():
         help='Path to header logo image (will be embedded in report)'
     )
     parser.add_argument(
+        '--version',
+        help='Pipeline version to be displayed in final report',
+        default="N/A"
+    )
+    parser.add_argument(
         '--debug',
         action='store_true',
         help='Enable debug logging'
@@ -430,10 +470,11 @@ def main():
     # Generate report
     output_file = Path(args.report_dir) / args.report_name
     generate_report(
-        all_data, 
-        output_file, 
-        jinja_env, 
-        letterhead=args.letterhead,
+        all_data = all_data, 
+        output_file = output_file, 
+        jinja_env = jinja_env, 
+        letterhead = args.letterhead,
+        pipeline_version = args.version
     )
     
     print(f"Report generated: {output_file}")

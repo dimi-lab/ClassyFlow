@@ -7,6 +7,8 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
+from matplotlib.patches import Rectangle
+import matplotlib.patches as mpatches
 rcParams.update({'figure.autolayout': True})
 from matplotlib import pyplot
 from numpy import mean
@@ -58,77 +60,118 @@ def plot_best_alpha(scores, scores_std, alphas, best_alpha, n_folds, output_path
     plt.close()
     print(f"Best alpha plot saved: {output_path}")
 
-def plot_feature_ranking(featureRankDF, output_path):
-    """Create feature ranking plot and save to file"""
-    fig, ax = plt.subplots(figsize=(8, 12))
-    top_features = featureRankDF.nlargest(35, columns="score").sort_values(by="score", ascending=True)
-    bars = ax.barh(range(len(top_features)), top_features['score'], color='steelblue', alpha=0.7)
-    ax.set_yticks(range(len(top_features)))
-    ax.set_yticklabels(top_features.index)
-    ax.set_xlabel('Feature Importance (|Coefficient|)')
-    ax.set_title('Top 35 Feature Rankings from Lasso')
-    ax.grid(True, alpha=0.3, axis='x')
+
+def plot_feature_ranking(featureRankDF, output_path, top_n=35, model_name="XGBoost"):
+    """
+    Advanced version with color-coded importance levels and enhanced styling
+    """
     
-    # Add value labels
-    for i, bar in enumerate(bars):
-        width = bar.get_width()
-        ax.text(width + max(top_features['score'])*0.01, bar.get_y() + bar.get_height()/2, 
-               f'{width:.3f}', ha='left', va='center', fontsize=8)
+    # Prepare data
+    top_features = featureRankDF.nlargest(top_n, columns="score").sort_values(by="score", ascending=True)
     
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"Feature ranking plot saved: {output_path}")
-
-def create_rfe_summary_table(rfeTbl, output_path):
-    """Create RFE summary table and save to CSV"""
-    summary_df = rfeTbl.groupby('n_features')['rfe_score'].agg(['mean', 'std', 'median']).reset_index()
-    summary_df.columns = ['n_features', 'mean_score', 'std_score', 'median_score']
-    summary_df.to_csv(output_path, index=False)
-    print(f"RFE summary table saved: {output_path}")
-    return summary_df
-
-def plot_recursive_elimination(rfeTbl, summary_df, output_path):
-    """Create recursive feature elimination plot and save to file"""
-    categories = sorted(rfeTbl['n_features'].unique())
-    grouped_data = [rfeTbl[rfeTbl['n_features'] == cat]['rfe_score'] for cat in categories]
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    box = ax.boxplot(grouped_data, labels=categories, patch_artist=True, showmeans=True)
-
-    # Calculate optimal number of features
-    global_median = rfeTbl['rfe_score'].median()
-    global_sd = (rfeTbl['rfe_score'].std() / 8)
-    filtered = summary_df[summary_df['median_score'] >= (global_median - global_sd)]
-    featureCutoff = int(filtered['n_features'].min())
-
-    # Color the optimal box
-    for patch, category in zip(box['boxes'], categories):
-        if category == featureCutoff:
-            patch.set_facecolor('lightgreen')
+    # Create figure - single plot with better proportions
+    fig, ax = plt.subplots(figsize=(12, max(8, top_n * 0.3)))
+    
+    # Color mapping based on percentile
+    percentiles = np.percentile(top_features['score'], [25, 50, 75])
+    
+    def get_color(score):
+        if score >= percentiles[2]:
+            return '#1f77b4'  # High importance - blue
+        elif score >= percentiles[1]:
+            return '#ff7f0e'  # Medium importance - orange  
+        elif score >= percentiles[0]:
+            return '#2ca02c'  # Low-medium importance - green
         else:
-            patch.set_facecolor('white')
+            return '#d62728'  # Low importance - red
     
-    for element in ['medians', 'means', 'whiskers', 'caps', 'fliers']:
-        plt.setp(box[element], color='black')
-
-    ax.set_xlabel('Number of Features')
-    ax.set_ylabel('RFE Score')
-    ax.set_title('Recursive Feature Elimination Analysis')
-    ax.grid(True, alpha=0.3)
+    colors = [get_color(score) for score in top_features['score']]
     
-    # Add optimal feature count annotation
-    ax.axvline(x=categories.index(featureCutoff) + 1, color='red', linestyle='--', alpha=0.7)
-    ax.text(categories.index(featureCutoff) + 1, ax.get_ylim()[1] * 0.95, 
-           f'Optimal: {featureCutoff}', ha='center', va='top', 
-           bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7))
-
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    # Create bars with enhanced styling
+    bars = ax.barh(range(len(top_features)), top_features['score'], 
+                   color=colors, alpha=0.8, height=0.7)
+    
+    # Add subtle border and shadow effect
+    for i, bar in enumerate(bars):
+        bar.set_edgecolor('white')
+        bar.set_linewidth(0.8)
+        
+        # Add subtle shadow
+        shadow = Rectangle((0, bar.get_y() + 0.05), bar.get_width(), bar.get_height(),
+                          facecolor='gray', alpha=0.1, zorder=bar.get_zorder()-1)
+        ax.add_patch(shadow)
+    
+    # Customize plot
+    ax.set_yticks(range(len(top_features)))
+    ax.set_yticklabels(top_features.index, fontsize=10, fontweight='medium')
+    ax.set_xlabel('Feature Importance Score', fontsize=12, fontweight='bold')
+    ax.set_title(f'Top {top_n} Most Important Features - {model_name}', 
+                 fontsize=16, fontweight='bold', pad=20)
+    
+    # Enhanced grid and styling
+    ax.grid(True, alpha=0.3, axis='x', linestyle='-', linewidth=0.5)
+    ax.set_axisbelow(True)
+    ax.set_facecolor('#fafafa')
+    
+    # Improve spines
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color('lightgray')
+    ax.spines['bottom'].set_color('lightgray')
+    
+    # Value labels with smart positioning
+    max_score = top_features['score'].max()
+    for i, (bar, score) in enumerate(zip(bars, top_features['score'])):
+        width = bar.get_width()
+        
+        # Choose label position based on bar width
+        if width > max_score * 0.15:
+            # Label inside bar if it's wide enough
+            label_x = width - max_score * 0.02
+            ha = 'right'
+            color = 'white'
+            weight = 'bold'
+        else:
+            # Label outside bar if it's narrow
+            label_x = width + max_score * 0.01
+            ha = 'left'
+            color = 'black'
+            weight = 'normal'
+        
+        ax.text(label_x, bar.get_y() + bar.get_height()/2, 
+               f'{width:.3f}', ha=ha, va='center', 
+               fontsize=9, color=color, fontweight=weight)
+    
+    # Create legend for importance levels
+    legend_elements = [
+        mpatches.Patch(color='#1f77b4', label=f'High (≥{percentiles[2]:.3f})'),
+        mpatches.Patch(color='#ff7f0e', label=f'Med-High ({percentiles[1]:.3f}-{percentiles[2]:.3f})'),
+        mpatches.Patch(color='#2ca02c', label=f'Med-Low ({percentiles[0]:.3f}-{percentiles[1]:.3f})'),
+        mpatches.Patch(color='#d62728', label=f'Low (<{percentiles[0]:.3f})')
+    ]
+    
+    ax.legend(handles=legend_elements, loc='lower right', fontsize=9,
+              frameon=True, fancybox=True, shadow=True)
+    
+    # Add summary statistics box
+    mean_importance = top_features['score'].mean()
+    std_importance = top_features['score'].std()
+    
+    stats_text = f'Mean: {mean_importance:.3f}\nStd: {std_importance:.3f}'
+    ax.text(0.98, 0.02, stats_text, transform=ax.transAxes, 
+            fontsize=9, ha='right', va='bottom',
+            bbox=dict(boxstyle='round,pad=0.4', facecolor='lightblue', alpha=0.6))
+    
+    # Set margins
+    ax.margins(x=0.1)
+    
+    # Tight layout with padding
+    plt.tight_layout(pad=2.0)
+    
+    # Save with high quality
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', 
+                facecolor='white', edgecolor='none')
     plt.close()
-    print(f"Recursive elimination plot saved: {output_path}")
-    
-    return featureCutoff
 
 ############################ PLOT AND TABLE GENERATION ############################
 
