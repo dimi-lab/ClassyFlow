@@ -103,6 +103,7 @@ process ADD_EMPTY_MARKER_NOISE {
 
     output:
     tuple val(batchID), path("merged_dataframe_${batchID}_mod.pkl"), emit: modbatchtables
+    tuple val(batchID), path("missing_data_fill_report_${batchID}.json"), emit: empty_marker_results
 
     script:
     """
@@ -136,6 +137,7 @@ process GENERATE_TRAINING_N_HOLDOUT{
     path("training_dataframe.pkl"), emit: training
 	path("celltypes.csv"), emit: lableFile
 	path("annotation_report.html")
+    path("training_split_report.json"), emit: training_holdout_results
 
     script:
     """
@@ -260,19 +262,22 @@ workflow {
         /*
          * - Subworkflow to handle all Normalization/Standardization Tasks - 
          */ 
-        normalizedDataFrames = normalization_wf(ADD_EMPTY_MARKER_NOISE.output.modbatchtables)
+        normalized_output = normalization_wf(ADD_EMPTY_MARKER_NOISE.output.modbatchtables)
+        normalizedDataFrames = normalized_output.normalized
         
         labledDataFrames = GENERATE_TRAINING_N_HOLDOUT(normalizedDataFrames.map{ it[1] }.collect())
         
         /*
          * - Subworkflow to examine Cell Type Specific interpetability & Feature Selections - 
          */ 
-        selectFeatures = featureselection_wf(labledDataFrames.training, labledDataFrames.lableFile)
+        feature_selection_results = featureselection_wf(labledDataFrames.training, labledDataFrames.lableFile)
+        selectFeatures = feature_selection_results.mas_results
         
         /*
          * - Subworkflow to generate models and then check them against the holdout - 
          */ 
-        bestModel = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures)
+        modeling_results = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures)
+        bestModel = modeling_results.best_model_results
         
         // Run the best model on the full input batches/files 
         PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
@@ -285,22 +290,22 @@ workflow {
         CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
 
         // Generate final HTML report for the whole run
-        // Collect normalization outputs (optional processes)
+        // Collect normalization outputs
         norm_outputs = Channel.empty()
             .mix(
-                normalization_wf.out.boxcox_results.ifEmpty([]),
-                normalization_wf.out.quantile_results.ifEmpty([]),
-                normalization_wf.out.minmax_results.ifEmpty([]),
-                normalization_wf.out.log_results.ifEmpty([])
+                normalized_output.boxcox_results.ifEmpty([]),
+                normalized_output.quantile_results.ifEmpty([]),
+                normalized_output.minmax_results.ifEmpty([]),
+                normalized_output.log_results.ifEmpty([])
             )
             .collect()
 
         // Collect feature selection outputs (multiple cell classes)
-        fs_outputs = featureselection_wf.out.feature_selection_results.collect()
+        fs_outputs = feature_selection_results.feature_results.collect()
 
         // Collect modeling outputs
-        xgb_winners = modelling_wf.out.xgboost_results
-        holdout_evals = modelling_wf.out.holdoutEval_results.collect()
+        xgb_winners = modeling_results.xgb_results
+        holdout_evals = modeling_results.holdout_results.collect()
 
         // Pass all to reporting
         GENERATE_FINAL_REPORT(

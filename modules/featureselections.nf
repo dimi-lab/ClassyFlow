@@ -230,6 +230,7 @@ workflow featureselection_wf {
 	mas = MERGE_AND_SORT_CSV(fts.feature_list.collect())
 	
 	emit:
-	mas
+	mas_results = mas
+    feature_results = fts.feature_selection_results
 
 }

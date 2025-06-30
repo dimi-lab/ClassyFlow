@@ -188,5 +188,7 @@ workflow modelling_wf {
     best_model_info.subscribe { println "Best Model: $it" }
 
     emit:
-    best_model_info
+    best_model_results = best_model_info
+    xgb_results = xgbModels.xgboost_results
+    holdout_results = allHoldoutResults. holdoutEval_results
 }
