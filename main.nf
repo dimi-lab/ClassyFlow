@@ -221,13 +221,16 @@ process QC_DENSITY {
 }
 
 process GENERATE_FINAL_REPORT {
-    publishDir "${params.outdir}/reports", mode: 'copy'
+    publishDir "${params.output_dir}/final_reports", pattern: "classyflow_report.html", mode: 'copy', overwrite: true
     
     input:
     path(norm_files, stageAs: "norm/*")
     path(fs_files, stageAs: "feature_selection/*") 
     path(xgb_winners, stageAs: "modeling/*")
     path(holdout_files, stageAs: "modeling/*")
+
+    output:
+    path("classyflow_report.html")
 
     script:
     """
@@ -290,22 +293,24 @@ workflow {
         CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
 
         // Generate final HTML report for the whole run
-        // Collect normalization outputs
-        norm_outputs = Channel.empty()
-            .mix(
-                normalized_output.boxcox_results.ifEmpty([]),
-                normalized_output.quantile_results.ifEmpty([]),
-                normalized_output.minmax_results.ifEmpty([]),
-                normalized_output.log_results.ifEmpty([])
-            )
-            .collect()
+        norm_outputs = Channel.empty().mix(
+        normalized_output.boxcox_results.map { it -> it[1..-1] }.ifEmpty([]),  // Skip batchID, take files
+        normalized_output.quantile_results.map { it -> it[1..-1] }.ifEmpty([]), // Skip batchID, take files  
+        normalized_output.minmax_results.map { it -> it[1..-1] }.ifEmpty([]),   // Skip batchID, take files
+        normalized_output.log_results.map { it -> it[1..-1] }.ifEmpty([])       // Skip batchID, take files
+    ).flatten().collect()
 
-        // Collect feature selection outputs (multiple cell classes)
-        fs_outputs = feature_selection_results.feature_results.collect()
+    fs_outputs = feature_selection_results.feature_results
+        .flatten()
+        .collect()
 
-        // Collect modeling outputs
-        xgb_winners = modeling_results.xgb_results
-        holdout_evals = modeling_results.holdout_results.collect()
+    xgb_winners = modeling_results.xgb_results
+        .flatten() 
+        .collect()
+        
+    holdout_evals = modeling_results.holdout_results
+        .flatten()
+        .collect()
 
         // Pass all to reporting
         GENERATE_FINAL_REPORT(
