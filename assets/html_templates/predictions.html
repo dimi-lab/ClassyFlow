@@ -1,0 +1,57 @@
+<div class="tab-content" id="predictions">
+
+<section class="page-section">
+    <h2>Cell Type Prediction Results</h2>
+    
+    <div class="alert alert-info">
+        Overview of model predictions on the dataset, including cell type abundance distribution and key prediction metrics.
+    </div>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ general.total_predicted_cells if general.total_predicted_cells else "N/A" }}%</div>
+                <div class="metric-label">Total Predicted Cells</div>
+                <span class="tooltiptext">
+                    The total number of cells that got assigned a predicted cell type across all batches
+                </span>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ general.most_common_prediction if general.most_common_prediction else "N/A" }}%</div>
+                <div class="metric-label">Most Abundant Cell Type</div>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ general.most_rare_prediction if general.most_rare_prediction else "N/A" }}%</div>
+                <div class="metric-label">Least Abundant Cell Type</div>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ general.total_low_density_cells if general.total_low_density_cells else "N/A" }}%</div>
+                <div class="metric-label">Number of Low Density Cells</div>
+                <span class="tooltiptext">
+                    This is the number of of cells in low density regions, or lonely cells.
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 2rem;">
+            {% if general.abundance_plot %}
+            <div class="plot-container">
+                <div class="plot-title">Cell Type Prediction Abundance Plot</div>
+                <img src="{{ general.abundance_plot }}" alt="Abundance plot" class="embedded-image" />
+                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
+                    The proportion of predicted cell types per sample/slide.
+                </p>
+            </div>
+            {% endif %}
+    </div>
+</section>
