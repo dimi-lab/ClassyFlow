@@ -294,7 +294,7 @@ def read_modeling_data(pipeline_output_dir: Path) -> Dict[str, Any]:
 
 def read_general_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     general_dir = Path(pipeline_output_dir, "general")
-    results = {}
+    results = {"per_slide": []}
 
     if not general_dir.exists():
         logger.error(f"General Metrics directory not found: {general_dir}")
@@ -312,6 +312,24 @@ def read_general_data(pipeline_output_dir: Path) -> Dict[str, Any]:
                 logger.error(f"Overwriting existing keys from {file_path}: {conflicting_keys}")
 
             results.update(json_results)
+            
+            logger.info(f"Loaded metrics from {file_path}")
+            
+        except Exception as e:
+            logger.error(f"Error reading metrics file {file_path}: {e}")
+
+    
+    json_files = glob.glob(str(general_dir / "per_slide" / "*.json"))
+
+    for file_path in json_files:
+        try:
+            with open(file_path, 'r') as f:
+                json_results = json.load(f)
+            
+            results["per_slide"].append({
+                'sample': json_results["sample_name"],
+                'data': json_results
+            })
             
             logger.info(f"Loaded metrics from {file_path}")
             

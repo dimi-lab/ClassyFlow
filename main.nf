@@ -193,6 +193,7 @@ process CLASSIFIED_REPORT_PER_SLIDE {
 
     output:
     path("*.html"), emit: slide_reports
+    tuple path("*.json"), path("*.png"), emit: slide_results
 
     script:
     """
@@ -246,6 +247,7 @@ process GENERATE_FINAL_REPORT {
     path(xgb_winners, stageAs: "modeling/*")
     path(holdout_files, stageAs: "modeling/*")
     path(abundance_results, stageAs: "general/*")
+    path(classified_results), stageAs: "genetal/per_slide/*"
 
     output:
     path("classyflow_report.html")
@@ -339,6 +341,10 @@ workflow {
 
     prediction_results = SUMMARIZE_PREDICTIONS.output.abundance_results
         .flatten()
+    
+    classified_results = CLASSIFIED_REPORT_PER_SLIDE.output.slide_results
+        .flatten()
+        .collect()
 
         // Pass all to reporting
         GENERATE_FINAL_REPORT(
@@ -348,7 +354,8 @@ workflow {
             fs_outputs, 
             xgb_winners,
             holdout_evals,
-            prediction_results
+            prediction_results,
+            classified_results
         )
 
     	
