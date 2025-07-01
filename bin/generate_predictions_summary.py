@@ -50,8 +50,6 @@ def read_prediction_files(input_dir, file_pattern="*qPRED.tsv"):
 
 def create_abundance_plot(df, output_file):
     """Create stacked bar plot with simplified dynamic sizing"""
-
-    
     # Calculate dataset characteristics for sizing
     n_samples = df['Sample'].nunique()
     n_cell_types = df['CellTypePrediction'].nunique()
@@ -74,7 +72,7 @@ def create_abundance_plot(df, output_file):
     
     proportions_df = pd.DataFrame(proportions_list)
     pivot_df = proportions_df.pivot(index='Sample', columns='CellType', values='Percentage').fillna(0)
-    
+    print(pivot_df)
     # Get overall cell type order (most abundant first)
     overall_abundance = df['CellTypePrediction'].value_counts()
     cell_type_order = overall_abundance.index.tolist()
@@ -88,6 +86,21 @@ def create_abundance_plot(df, output_file):
     # Generate colors
     colors = sns.color_palette("Set2", n_cell_types)
     
+    # Create stacked bars in order
+    bottom = np.zeros(len(pivot_df))
+    for i, cell_type in enumerate(pivot_df.columns):
+        ax.bar(
+            range(len(pivot_df)), 
+            pivot_df[cell_type], 
+            bottom=bottom,
+            label=cell_type,
+            color=colors[i],
+            alpha=0.85,
+            edgecolor='white',
+            linewidth=0.8
+        )
+        bottom += pivot_df[cell_type]
+        
     # Styling
     ax.set_title('Predicted Cell Type Composition by Sample', fontsize=16, fontweight='bold', pad=20)
     ax.set_xlabel('Sample', fontsize=12, fontweight='bold')
@@ -130,6 +143,7 @@ def create_abundance_plot(df, output_file):
     # Save figure
     plt.savefig(output_file, dpi=300, bbox_inches='tight', facecolor='white')
 
+
 def generate_abundance_results(df):
 
     results = {
@@ -161,9 +175,5 @@ def main():
     results = generate_abundance_results(df)
     
     
-
-
-
-
 if __name__ == "__main__":
     main()
