@@ -742,7 +742,8 @@
                 <li><a href="#summary" onclick="showTab('summary')">Summary</a></li>
                 <li><a href="#normalization" onclick="showTab('normalization')">Normalization</a></li>
                 <li><a href="#feature-selection" onclick="showTab('feature-selection')">Feature Selection</a></li>
-                <li><a href="#modeling" onclick="showTab('modeling')">Model Training</a></li>
+                <li><a href="#modeling" onclick="showTab('modeling')">Model Evaluation</a></li>
+                <li><a href="#predictions" onclick="showTab('predictions')">Predictions</a></li>
             </ul>
         </div>
     </nav>
@@ -752,6 +753,7 @@
     {% include 'normalization.html' %}
     {% include 'feature-selection.html' %}
     {% include 'modeling.html' %}
+    {% include 'predictions.html' %}
 
     <footer class="footer">
         <p>Generated on {{ generation_date }} | Pipeline Version {{ pipeline_version if pipeline_version else 'Unknown' }}</p>
