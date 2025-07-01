@@ -67,12 +67,9 @@ def plot_spatial(df, color_map, slide_name, output_file):
         template="simple_white"
     )
 
-    fig.write_image(
+    fig.write_html(
         output_file,
-        format="png",
-        width=1200,
-        height=800,
-        scale=2
+        include_plotlyjs='cdn'
     )
 
     return fig.to_html(full_html=False, include_plotlyjs='cdn')
@@ -179,13 +176,13 @@ def create_cell_type_bar_plot(df, sample_name, output_file):
 def main():
     args = parse_args()
     df = pd.read_csv(args.input_tsv, sep='\t')
-    slide_name = os.path.splitext(os.path.basename(args.input_tsv))[0]
+    slide_name = os.path.basename(args.input_tsv).split(".")[0]
     color_map = get_color_map(df["CellTypePrediction"].unique())
 
     results = {
         'sample_name': slide_name, 
         'celltype_barplot': f"{slide_name}_celltype_barplot.png",
-        'spatial_plot': f"{slide_name}_spatial_plot.png"
+        'spatial_plot': f"{slide_name}_spatial_plot.html"
     }
 
     # Generate plots

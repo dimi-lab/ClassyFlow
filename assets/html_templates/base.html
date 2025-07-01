@@ -419,6 +419,22 @@
             object-fit: contain;
         }
 
+        .plot-container.small img {
+            max-width: 75%;
+            max-height: 400px;
+        }
+
+        /* Large plots for detailed views */
+        .plot-container.large img {
+            max-width: 95%;
+            max-height: 600px;
+        }
+
+        .plot-container.full img {
+            max-width: 100%;
+            max-height: 800px;
+        }
+
         .embedded-image {
             max-width: 85%;
             max-height: 500px;
@@ -432,25 +448,6 @@
             font-weight: 600;
             margin-bottom: 1.5rem;
             color: #495057;
-        }
-
-        /* Small plots for dashboard-style layout */
-        .plot-container.small {
-            display: inline-block;
-            width: 48%;
-            margin: 1rem 1%;
-            vertical-align: top;
-        }
-
-        .plot-container.small img {
-            max-width: 100%;
-            max-height: 300px;
-        }
-
-        /* Large plots for detailed views */
-        .plot-container.large img {
-            max-width: 95%;
-            max-height: 600px;
         }
 
         /* Tooltips */
@@ -734,6 +731,22 @@
     <div class="letterhead-banner">
         <img src="{{ letterhead }}" alt="Organization Letterhead" />
     </div>
+    {% else %}
+    <header class="header">
+        <div class="header-content">
+            <div class="header-text-center">
+                <h1>{{ header_title if header_title else "ClassyFlow Report" }}</h1>
+            </div>
+            <div class="report-info">
+                <h2 class="report-subtitle">{{ header_subtitle if header_subtitle else "Automated Cell Type Classification Analysis" }}</h2>
+                <!-- <div class="report-details">
+                    <span class="report-date">Generated on {{ generation_date | strftime('%B %d, %Y') if generation_date else 'Unknown Date' }}</span>
+                    <span class="report-separator">•</span>
+                    <span class="report-version">Pipeline Version {{ pipeline_version if pipeline_version else 'Unknown' }}</span>
+                </div> -->
+            </div>
+        </div>
+    </header>
     {% endif %}
 
     <nav class="nav">
@@ -792,7 +805,7 @@
     // Add keyboard navigation
     document.addEventListener('keydown', (e) => {
         if (e.altKey) {
-            const tabs = ['summary', 'normalization', 'feature-selection', 'modeling'];
+            const tabs = ['summary', 'normalization', 'feature-selection', 'modeling', 'predictions'];
             const currentActive = document.querySelector('.nav a.active');
             if (currentActive) {
                 const currentHref = currentActive.getAttribute('href').substring(1);

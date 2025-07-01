@@ -75,7 +75,7 @@
 </section>
 
 <!-- Model Comparison Summary -->
-{% if modeling_data.model_comparisons %}
+<!-- {% if modeling_data.model_comparisons %}
     <section class="page-section">
         <div class="header-with-tooltip">
             <h3>Model Comparison and Selection</h3>
@@ -87,7 +87,6 @@
             </div>
         </div>
 
-        <!-- Comparison Visualizations -->
         <div class="header-with-tooltip">
             <h5>Model Comparison Visualizations</h5>
             <div class="tooltip-container">
@@ -121,7 +120,7 @@
         </div>
         
     </section>
-    {% endif %}
+    {% endif %} -->
 
 {% if modeling_data.holdout_evaluations %}
 <!-- Model Evaluation Tabs -->
@@ -431,7 +430,7 @@
 
         <div style="display: flex; flex-direction: column; gap: 2rem;">
             {% if model_eval.data.confusion_matrix_csv_path %}
-            <div class="plot-container">
+            <div class="plot-container large">
                 <div class="plot-title">Confusion Matrix</div>
                 <img src="{{ model_eval.data.confusion_matrix_csv_path }}" alt="Confusion Matrix" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">

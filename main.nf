@@ -188,12 +188,24 @@ process CLASSIFIED_REPORT_PER_SLIDE {
         mode: "copy"
     )
 
+    publishDir(
+        path: "${params.output_dir}/final_reports/plots",
+        pattern: "*_spatial_plot.html",
+        mode: "copy"
+    )
+
+    publishDir(
+        path: "${params.output_dir}/final_reports/plots",
+        pattern: "*_celltype_barplot.png",
+        mode: "copy"
+    )
+    
     input:
     path(prediction_tsv)
 
     output:
     path("*.html"), emit: slide_reports
-    tuple path("*.json"), path("*.png"), emit: slide_results
+    tuple path("*.json"), path("*_spatial_plot.html"), path("*_celltype_barplot.png"), emit: slide_results
 
     script:
     """
@@ -227,7 +239,7 @@ process SUMMARIZE_PREDICTIONS {
     path(prediction_files)
 
     output:
-    tuple path("abundance_metrics.json"), path("*.png"), emit: abundance_results
+    tuple path("abundance_metrics.json"), path("prediction_abundance_plot.png"), emit: abundance_results
 
     script:
     """
@@ -247,7 +259,7 @@ process GENERATE_FINAL_REPORT {
     path(xgb_winners, stageAs: "modeling/*")
     path(holdout_files, stageAs: "modeling/*")
     path(abundance_results, stageAs: "general/*")
-    path(classified_results), stageAs: "genetal/per_slide/*"
+    path(classified_results), stageAs: "general/per_slide/*"
 
     output:
     path("classyflow_report.html")
@@ -341,6 +353,7 @@ workflow {
 
     prediction_results = SUMMARIZE_PREDICTIONS.output.abundance_results
         .flatten()
+        .collect()
     
     classified_results = CLASSIFIED_REPORT_PER_SLIDE.output.slide_results
         .flatten()

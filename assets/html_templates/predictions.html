@@ -10,7 +10,7 @@
     <div class="metrics-grid">
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ general.total_predicted_cells if general.total_predicted_cells else "N/A" }}%</div>
+                <div class="metric-value">{{ general.total_predicted_cells if general.total_predicted_cells else "N/A" }}</div>
                 <div class="metric-label">Total Predicted Cells</div>
                 <span class="tooltiptext">
                     The total number of cells that got assigned a predicted cell type across all batches
@@ -20,21 +20,21 @@
 
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ general.most_common_prediction if general.most_common_prediction else "N/A" }}%</div>
+                <div class="metric-value">{{ general.most_common_prediction if general.most_common_prediction else "N/A" }}</div>
                 <div class="metric-label">Most Abundant Cell Type</div>
             </div>
         </div>
 
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ general.most_rare_prediction if general.most_rare_prediction else "N/A" }}%</div>
+                <div class="metric-value">{{ general.most_rare_prediction if general.most_rare_prediction else "N/A" }}</div>
                 <div class="metric-label">Least Abundant Cell Type</div>
             </div>
         </div>
 
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ general.total_low_density_cells if general.total_low_density_cells else "N/A" }}%</div>
+                <div class="metric-value">{{ general.total_low_density_cells if general.total_low_density_cells else "N/A" }}</div>
                 <div class="metric-label">Number of Low Density Cells</div>
                 <span class="tooltiptext">
                     This is the number of of cells in low density regions, or lonely cells.
@@ -45,7 +45,7 @@
 
     <div style="display: flex; flex-direction: column; gap: 2rem;">
             {% if general.abundance_plot %}
-            <div class="plot-container">
+            <div class="plot-container large">
                 <div class="plot-title">Cell Type Prediction Abundance Plot</div>
                 <img src="{{ general.abundance_plot }}" alt="Abundance plot" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
@@ -56,7 +56,7 @@
     </div>
 </section>
 
-{% if general.per-slide %}
+{% if general.per_slide %}
 <!-- Cell Type Tabs Navigation -->
 <section class="page-section">
     <style>
@@ -137,7 +137,7 @@
             {% if thissample.data.celltype_barplot %}
             <div class="plot-container large">
                 <div class="plot-title">Predicted Cell Types Barplot</div>
-                <img src="{{ thissample.data.celltype_barplot }}" alt="Cell Type Barplot" class="embedded-image" />
+                <img src="plots/{{ thissample.data.celltype_barplot }}" alt="Cell Type Barplot" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
                     Barplot summarizing the counts and percentages of cell types predicted fot this sample
                 </p>
@@ -145,19 +145,21 @@
             {% endif %}
 
             {% if thissample.data.spatial_plot %}
-            <div class="plot-container large">
-                <div class="plot-title">Predicted Spatial Plot</div>
-                <img src="{{ thissample.data.spatial_plot }}" alt="Spatial Plot" class="embedded-image" />
-                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
-                    Spatial plot of predicted cell types for this sample
-                </p>
+            <div class="plot-container full">
+                <object 
+                    data="plots/{{ thissample.data.spatial_plot}}"
+                    type="text/html"
+                    width="100%" 
+                    height="600px"
+                    style="border: 1px solid #ddd;">
+                </object>
             </div>
             {% endif %}
         </div>
     </div>
     {% endfor %}
 </section>
-
+ {% endif %}
 
 <script>
 function showSampleName(sampleName) {

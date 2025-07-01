@@ -335,7 +335,8 @@ def read_general_data(pipeline_output_dir: Path) -> Dict[str, Any]:
             
         except Exception as e:
             logger.error(f"Error reading metrics file {file_path}: {e}")
-
+    
+    print(results)
     return replace_png_with_base64(results, "./general")
 
 def collect_all_data(pipeline_output_dir: Path) -> Dict[str, Any]:
