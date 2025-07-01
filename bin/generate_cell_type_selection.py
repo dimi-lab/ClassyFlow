@@ -173,6 +173,57 @@ def plot_feature_ranking(featureRankDF, output_path, top_n=35, model_name="XGBoo
                 facecolor='white', edgecolor='none')
     plt.close()
 
+def create_rfe_summary_table(rfeTbl, output_path):
+    """Create RFE summary table and save to CSV"""
+    summary_df = rfeTbl.groupby('n_features')['rfe_score'].agg(['mean', 'std', 'median']).reset_index()
+    summary_df.columns = ['n_features', 'mean_score', 'std_score', 'median_score']
+    summary_df.to_csv(output_path, index=False)
+    print(f"RFE summary table saved: {output_path}")
+    return summary_df
+
+def plot_recursive_elimination(rfeTbl, summary_df, output_path):
+    """Create recursive feature elimination plot and save to file"""
+    categories = sorted(rfeTbl['n_features'].unique())
+    grouped_data = [rfeTbl[rfeTbl['n_features'] == cat]['rfe_score'] for cat in categories]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    box = ax.boxplot(grouped_data, labels=categories, patch_artist=True, showmeans=True)
+
+    # Calculate optimal number of features
+    global_median = rfeTbl['rfe_score'].median()
+    global_sd = (rfeTbl['rfe_score'].std() / 8)
+    filtered = summary_df[summary_df['median_score'] >= (global_median - global_sd)]
+    featureCutoff = int(filtered['n_features'].min())
+
+    # Color the optimal box
+    for patch, category in zip(box['boxes'], categories):
+        if category == featureCutoff:
+            patch.set_facecolor('lightgreen')
+        else:
+            patch.set_facecolor('white')
+    
+    for element in ['medians', 'means', 'whiskers', 'caps', 'fliers']:
+        plt.setp(box[element], color='black')
+
+    ax.set_xlabel('Number of Features')
+    ax.set_ylabel('RFE Score')
+    ax.set_title('Recursive Feature Elimination Analysis')
+    ax.grid(True, alpha=0.3)
+    
+    # Add optimal feature count annotation
+    ax.axvline(x=categories.index(featureCutoff) + 1, color='red', linestyle='--', alpha=0.7)
+    ax.text(categories.index(featureCutoff) + 1, ax.get_ylim()[1] * 0.95, 
+           f'Optimal: {featureCutoff}', ha='center', va='top', 
+           bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7))
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Recursive elimination plot saved: {output_path}")
+    
+    return featureCutoff
+
+
 ############################ PLOT AND TABLE GENERATION ############################
 
 def get_lasso_classification_features(
