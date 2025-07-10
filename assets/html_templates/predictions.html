@@ -1,0 +1,184 @@
+<div class="tab-content" id="predictions">
+
+<section class="page-section">
+    <h2>Cell Type Prediction Results</h2>
+    
+    <div class="alert alert-info">
+        Overview of model predictions on the dataset, including cell type abundance distribution and key prediction metrics.
+    </div>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ general.total_predicted_cells if general.total_predicted_cells else "N/A" }}</div>
+                <div class="metric-label">Total Predicted Cells</div>
+                <span class="tooltiptext">
+                    The total number of cells that got assigned a predicted cell type across all batches
+                </span>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ general.most_common_prediction if general.most_common_prediction else "N/A" }}</div>
+                <div class="metric-label">Most Abundant Cell Type</div>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ general.most_rare_prediction if general.most_rare_prediction else "N/A" }}</div>
+                <div class="metric-label">Least Abundant Cell Type</div>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ general.total_low_density_cells if general.total_low_density_cells else "N/A" }}</div>
+                <div class="metric-label">Number of Low Density Cells</div>
+                <span class="tooltiptext">
+                    This is the number of of cells in low density regions, or lonely cells.
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 2rem;">
+            {% if general.abundance_plot %}
+            <div class="plot-container large">
+                <div class="plot-title">Cell Type Prediction Abundance Plot</div>
+                <img src="{{ general.abundance_plot }}" alt="Abundance plot" class="embedded-image" />
+                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
+                    The proportion of predicted cell types per sample/slide.
+                </p>
+            </div>
+            {% endif %}
+    </div>
+</section>
+
+{% if general.per_slide %}
+<!-- Cell Type Tabs Navigation -->
+<section class="page-section">
+    <style>
+        .sample-tabs {
+            display: flex;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 2rem;
+            overflow-x: auto;
+            flex-wrap: wrap;
+        }
+
+        .sample-tab {
+            padding: 0.75rem 1.5rem;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-bottom: none;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.3s ease;
+            margin-right: 2px;
+            margin-bottom: 2px;
+            border-radius: 6px 6px 0 0;
+            min-width: 120px;
+            text-align: center;
+        }
+
+        .sample-tab:hover {
+            background-color: #e9ecef;
+        }
+
+        .sample-tab.active {
+            background-color: white;
+            border-bottom: 2px solid white;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .sample-content {
+            display: none;
+        }
+
+        .sample-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .sample-tabs {
+                flex-direction: column;
+            }
+            
+            .sample-tab {
+                margin-right: 0;
+                margin-bottom: 2px;
+                border-radius: 6px;
+                min-width: auto;
+            }
+        }
+    </style>
+
+    <!-- Cell Type Tabs -->
+    <div class="sample-tabs">
+        {% for thissample in general.per_slide %}
+        <div class="sample-tab {% if loop.first %}active{% endif %}" 
+             onclick="showSampleName('sample-{{ loop.index0 }}')">
+            {{ thissample.sample }}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Cell Type Content Panels -->
+    {% for thissample in general.per_slide %}
+    <div id="sample-{{ loop.index0 }}" class="sample-content {% if loop.first %}active{% endif %}">
+        
+        <!-- Cell Type Overview -->
+        <h3>{{ thissample.sample }} Prediction Results</h3>
+
+        <div style="display: flex; flex-direction: column; gap: 2rem;">
+            {% if thissample.data.celltype_barplot %}
+            <div class="plot-container large">
+                <div class="plot-title">Predicted Cell Types Barplot</div>
+                <img src="plots/{{ thissample.data.celltype_barplot }}" alt="Cell Type Barplot" class="embedded-image" />
+                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
+                    Barplot summarizing the counts and percentages of cell types predicted fot this sample
+                </p>
+            </div>
+            {% endif %}
+
+            {% if thissample.data.spatial_plot %}
+            <div class="plot-container full">
+                <object 
+                    data="plots/{{ thissample.data.spatial_plot}}"
+                    type="text/html"
+                    width="100%" 
+                    height="600px"
+                    style="border: 1px solid #ddd;">
+                </object>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</section>
+ {% endif %}
+
+<script>
+function showSampleName(sampleName) {
+    // Hide all celltype content
+    var contents = document.getElementsByClassName('sample-content');
+    for (var i = 0; i < contents.length; i++) {
+        contents[i].classList.remove('active');
+    }
+    
+    // Remove active class from all tabs
+    var tabs = document.getElementsByClassName('sample-tab');
+    for (var i = 0; i < tabs.length; i++) {
+        tabs[i].classList.remove('active');
+    }
+    
+    // Show selected celltype content
+    document.getElementById(sampleName).classList.add('active');
+    
+    // Add active class to clicked tab
+    event.target.classList.add('active');
+}
+</script>

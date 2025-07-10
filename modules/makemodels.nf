@@ -55,11 +55,6 @@ process MERGE_XGB_CSV {
 
 process XGBOOSTING_FINAL_MODEL {
     publishDir(
-        path: "${params.output_dir}/model_reports",
-        pattern: "*.pdf",
-        mode: "copy"
-    )
-    publishDir(
         path: "${params.output_dir}/models",
         pattern: "*_Model_*.pkl",
         overwrite: true,
@@ -80,8 +75,8 @@ process XGBOOSTING_FINAL_MODEL {
 	output:
 	path("XGBoost_Model_First.pkl"), emit: m1
 	path("XGBoost_Model_Second.pkl"), emit: m2
-	path("Model_Development_Xgboost.pdf")
 	path("classes.npy"), emit: classes
+    tuple path("xgbWinners_*.png"), path("xgbWinners_*.csv"), path("xgbWinners_results.json"), emit: xgboost_results
 	
 	script:
     """
@@ -89,7 +84,6 @@ process XGBOOSTING_FINAL_MODEL {
         --classColumn ${params.classifed_column_name} \
         --cpu_jobs 16 \
         --mim_class_label_threshold ${params.minimum_label_count} \
-        --letterhead "${params.letterhead}" \
         --model_performance_table ${model_performance_table} \
         --trainingDataframe ${trainingDataframe} \
         --select_features_csv ${select_features_csv}
@@ -97,28 +91,22 @@ process XGBOOSTING_FINAL_MODEL {
 }
 
 process HOLDOUT_XGB_EVALUATION {  
-    publishDir(
-        path: "${params.output_dir}/model_reports",
-        pattern: "*.pdf",
-        mode: "copy"
-    )
-	
 	input:
 	path(holdoutDataframe)
 	path(select_features_csv)
 	path(model_pickle)
 	path(leEncoderFile)
-	
+
 	output:
-	path("holdout_*.csv"), emit: eval
-	path("Holdout_on_*.pdf")
+	tuple path("holdoutEval_XGBoost_Model_*.png"), path("holdoutEval_XGBoost_Model_*_auc_rankings.csv"), path("holdoutEval_XGBoost_Model_*_results.json"), emit: holdoutEval_results
+    path("holdout_*.csv"), emit: eval
+
 	
 	script:
     """
     get_holdout_evaluation.py \
         --classColumn ${params.classifed_column_name} \
         --leEncoderFile ${leEncoderFile} \
-        --letterhead "${params.letterhead}" \
         --model_pickle ${model_pickle} \
         --holdoutDataframe ${holdoutDataframe} \
         --select_features_csv ${select_features_csv}
@@ -200,5 +188,7 @@ workflow modelling_wf {
     best_model_info.subscribe { println "Best Model: $it" }
 
     emit:
-    best_model_info
+    best_model_results = best_model_info
+    xgb_results = xgbModels.xgboost_results
+    holdout_results = allHoldoutResults. holdoutEval_results
 }

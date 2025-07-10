@@ -3,6 +3,7 @@
 import os, sys, csv, time
 import argparse
 import pandas as pd
+import json
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -29,6 +30,12 @@ def stratified_sample(df, stratify_cols, frac=0.01, min_count=3):
 
 def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegative, minimunHoldoutThreshold):
     dataframes = []
+    results = {
+        'holdout_fraction': holdoutFraction,
+        'negative_classes': ", ".join(cellTypeNegative),
+        'min_holdout_thresh': minimunHoldoutThreshold
+    }
+
     for file in pickle_files:
         print(f"Getting...{file}")
         if file.endswith('.pkl'):
@@ -41,10 +48,12 @@ def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegat
         dataframes.append(df)
     
     merged_df = pd.concat(dataframes, ignore_index=True)
+    results['total_cells'] = merged_df.shape[0]
     merged_df[classColumn] = merged_df[classColumn].str.strip()
     merged_df = merged_df.dropna(subset=[classColumn])
     merged_df = merged_df.loc[~(merged_df[classColumn].isin(cellTypeNegative))]
     merged_df = merged_df.reset_index()
+    results['total_annotated_cells'] = merged_df.shape[0]
 
     ct = merged_df[classColumn].value_counts()
     pt = merged_df[classColumn].value_counts(normalize=True).mul(100).round(2).astype(str) + '%'
@@ -52,11 +61,14 @@ def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegat
     holdoutDF = stratified_sample(merged_df, [batchColumn, classColumn], frac=holdoutFraction, min_count=minimunHoldoutThreshold)
     print(f"holdoutDF {holdoutDF.shape}")
     hd = holdoutDF[classColumn].value_counts()
+    results['total_holdout'] = holdoutDF.shape[0]
     
     freqTable = pd.concat([ct,pt,hd], axis=1, keys=['counts', '%', 'holdout']).reset_index()
     freqTable.rename(columns={'index': classColumn}, inplace=True)
     # Export as HTML instead of PNG
     freqTable.to_html('cell_count_table.html', index=False)
+    results['cell_count_table'] = "cell_count_table.csv"
+    freqTable.to_csv(results['cell_count_table'], index=False)
 
     keptFreq = freqTable[freqTable['holdout'].notna()]
     keptFreq.columns = keptFreq.columns.str.strip()
@@ -73,10 +85,14 @@ def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegat
     trainingDF = trainingDF.reset_index(drop=True)
     print(f"trainingDF {trainingDF.shape}")
     print(trainingDF[classColumn].value_counts())
+    results['total_training'] = trainingDF.shape[0]
     
     holdoutDF.reset_index(drop=True, inplace=True)
     holdoutDF.to_pickle('holdout_dataframe.pkl')
     trainingDF.to_pickle('training_dataframe.pkl')
+
+    with open('training_split_report.json', 'w') as f:
+        json.dump(results, f, indent=2)
 
 def create_html_report(letterhead_path, holdoutFraction, cellTypeNegative):
     from datetime import datetime

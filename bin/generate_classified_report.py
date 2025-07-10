@@ -5,9 +5,11 @@ import os
 import sys
 import pandas as pd
 import numpy as np
+import json
 import plotly.express as px
 import plotly.figure_factory as ff
 import plotly.graph_objects as go
+import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import umap
@@ -47,7 +49,7 @@ def get_color_map(cell_types):
             color_map[k] = v
     return color_map
 
-def plot_spatial(df, color_map, slide_name):
+def plot_spatial(df, color_map, slide_name, output_file):
     mx = df["Centroid Y µm"].max() + 1
     df["invertY"] = mx - df["Centroid Y µm"]
     fig = px.scatter(
@@ -64,6 +66,12 @@ def plot_spatial(df, color_map, slide_name):
         showlegend=False,
         template="simple_white"
     )
+
+    fig.write_html(
+        output_file,
+        include_plotlyjs='cdn'
+    )
+
     return fig.to_html(full_html=False, include_plotlyjs='cdn')
 
 def plot_umap(df, color_map):
@@ -116,16 +124,77 @@ def plot_dendrogram(df):
     fig.update_layout(title="Hierarchical Clustering Dendrogram", width=800, height=400)
     return fig.to_html(full_html=False, include_plotlyjs=False)
 
+def create_cell_type_bar_plot(df, sample_name, output_file):
+    # Get cell type counts
+    cell_counts = df['CellTypePrediction'].value_counts()
+    cell_percentages = df['CellTypePrediction'].value_counts(normalize=True) * 100
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Create horizontal bar plot
+    y_pos = np.arange(len(cell_counts))
+    colors = plt.cm.get_cmap('Set2')(np.linspace(0, 1, len(cell_counts)))
+    
+    bars = ax.barh(y_pos, cell_counts.values, color=colors, alpha=0.8, edgecolor='black', linewidth=0.5)
+    
+    # Customize the plot
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(cell_counts.index, fontsize=11)
+    ax.set_xlabel('Cell Count', fontsize=12, fontweight='bold')
+    ax.set_title(f'Cell Type Distribution - {sample_name}\nTotal Cells: {len(df):,}', 
+                fontsize=14, fontweight='bold', pad=20)
+    
+
+    for i, (bar, count, pct) in enumerate(zip(bars, cell_counts.values, cell_percentages.values)):
+        # Position label at end of bar
+        label_x = bar.get_width() + max(cell_counts) * 0.01
+        
+        # Create label text
+        label_parts = []
+        label_parts.append(f'{count:,}')
+        label_parts.append(f'({pct:.1f}%)')
+        
+        label_text = ' '.join(label_parts)
+        
+        ax.text(label_x, bar.get_y() + bar.get_height()/2, label_text,
+                ha='left', va='center', fontsize=10, fontweight='bold')
+    
+    # Add grid for easier reading
+    ax.grid(axis='x', alpha=0.3, linestyle='--')
+    ax.set_axisbelow(True)
+    
+    # Remove top and right spines
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
+
+    plt.savefig(output_file, dpi=300, bbox_inches="tight", facecolor='white')
+
 def main():
     args = parse_args()
     df = pd.read_csv(args.input_tsv, sep='\t')
-    slide_name = os.path.splitext(os.path.basename(args.input_tsv))[0]
+    slide_name = os.path.basename(args.input_tsv).split(".")[0]
     color_map = get_color_map(df["CellTypePrediction"].unique())
 
+    results = {
+        'sample_name': slide_name, 
+        'celltype_barplot': f"{slide_name}_celltype_barplot.png",
+        'spatial_plot': f"{slide_name}_spatial_plot.html"
+    }
+
     # Generate plots
-    spatial_html = plot_spatial(df, color_map, slide_name)
+    spatial_html = plot_spatial(df, color_map, slide_name, results["spatial_plot"])
     umap_html = plot_umap(df, color_map)
     dendro_html = plot_dendrogram(df)
+    create_cell_type_bar_plot(df, slide_name, results["celltype_barplot"])
+
+    #Save json
+    with open(f"{slide_name}_classified.json", 'w') as f:
+        json.dump(results, f, indent=2, default=str)
+
 
     # Compose HTML report
     html_template = """
