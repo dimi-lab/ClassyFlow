@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Cell Type Classification Report{% endblock %}</title>
+    <style>
+        /* Reset and base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+            max-width: 90%;
+            margin: 0 auto;
+        }
+
+        /* Header - Reduced height */
+        .header-with-description {
+            margin-bottom: 1rem;
+        }
+
+        .header-description {
+            margin: 0.5rem 0 0 0;
+            color: #6c757d;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header-image {
+            position: absolute;
+            top: 0;
+            right: 0;
+            height: 100%;
+            width: 250px;
+            opacity: 0.15;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            position: relative;
+            z-index: 2;
+            display: block;
+            text-align: center;
+            min-height: 80px;
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        }
+
+        .letterhead {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .letterhead img {
+            max-width: 100%;
+            height: auto;
+            max-height: 80px;
+            object-fit: contain;
+        }
+
+        .letterhead-banner {
+            width: 100%;
+            background: white;
+            padding: 0;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .letterhead-banner img {
+            width: 100%;
+            height: auto;
+            display: block;
+            object-fit: contain;
+            max-height: 100px;
+        }
+
+        .header-text-center {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .report-info {
+            text-align: center;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            padding-top: 1rem;
+        }
+
+        .report-subtitle {
+            font-size: 1.2rem;
+            font-weight: 400;
+            margin-bottom: 0.5rem;
+            color: white;
+            opacity: 0.95;
+        }
+
+        .report-details {
+            font-size: 0.9rem;
+            opacity: 0.85;
+            color: white;
+        }
+
+        .report-separator {
+            margin: 0 0.75rem;
+            opacity: 0.7;
+        }
+
+        .report-date, .report-version {
+            font-weight: 500;
+        }
+
+        .header-text {
+            flex: 1;
+            max-width: 70%;
+        }
+
+        .header-logo {
+            flex-shrink: 0;
+            margin-left: 2rem;
+            max-height: 60px;
+            max-width: 180px;
+        }
+
+        .header-logo img {
+            max-height: 100%;
+            max-width: 100%;
+            object-fit: contain;
+            opacity: 0.9;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 300;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        /* Navigation - Enhanced styling and sizing */
+        .nav {
+            background-color: white;
+            border-bottom: 2px solid #e9ecef;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .nav-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .nav ul {
+            list-style: none;
+            display: flex;
+            margin: 0;
+            padding: 0;
+            justify-content: center;
+        }
+
+        .nav li {
+            margin: 0;
+        }
+
+        .nav a {
+            display: block;
+            padding: 1.2rem 2rem;
+            text-decoration: none;
+            color: #495057;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            border-bottom: 4px solid transparent;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: relative;
+        }
+
+        .nav a:hover {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            background-color: #f8f9fa;
+            transform: translateY(-1px);
+        }
+
+        .nav a.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            background-color: #f8f9fa;
+            font-weight: 700;
+        }
+
+        /* Main content */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        .page-section {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 1px solid #e9ecef;
+        }
+
+        /* Typography */
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #2c3e50;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        h3 {
+            font-size: 1.4rem;
+            color: #495057;
+            margin-top: 2rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: #6c757d;
+        }
+
+        /* Cards and metrics */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 1.8rem;
+            border-radius: 12px;
+            border-left: 5px solid #667eea;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.18);
+        }
+
+        .metric-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            font-size: 0.95rem;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .metric-description {
+            font-size: 0.85rem;
+            color: #868e96;
+            margin-top: 0.5rem;
+        }
+
+        /* Tables */
+        .table-container {
+            overflow-x: auto;
+            margin: 2rem 0;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        /* Table width control classes */
+        .table-container.narrow {
+            max-width: 600px;
+            margin: 2rem auto;
+        }
+
+        .table-container.medium {
+            max-width: 1000px;
+            margin: 2rem auto;
+        }
+
+        .table-container.small {
+            max-width: 450px;
+            margin: 2rem auto;
+        }
+
+        .table-container.compact {
+            max-width: 350px;
+            margin: 2rem auto;
+        }
+
+        .table-container.centered {
+            margin: 2rem auto;
+        }
+
+        /* Table layout variations */
+        .table-container.left-aligned {
+            margin: 2rem 0 2rem 0;
+        }
+
+        .table-container.right-aligned {
+            margin: 2rem 0 2rem auto;
+        }
+
+        /* Inline tables for side-by-side layout */
+        .table-container.inline {
+            display: inline-block;
+            width: 48%;
+            margin: 1rem 1%;
+            vertical-align: top;
+        }
+
+        .table-container.inline-third {
+            display: inline-block;
+            width: 30%;
+            margin: 1rem 1.5%;
+            vertical-align: top;
+        }
+
+        th, td {
+            padding: 1rem 1.2rem;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            letter-spacing: 0.5px;
+        }
+
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .table-responsive {
+            margin: 20px 0;
+        }
+
+        .table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: rgba(0,123,255,.075);
+        }
+
+        /* Images and plots - Better proportions */
+        .plot-container {
+            text-align: center;
+            margin: 2rem 0;
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+            max-width: 100%;
+        }
+
+        .plot-container img {
+            max-width: 85%;
+            max-height: 500px;
+            height: auto;
+            border-radius: 8px;
+            object-fit: contain;
+        }
+
+        .plot-container.small img {
+            max-width: 75%;
+            max-height: 400px;
+        }
+
+        /* Large plots for detailed views */
+        .plot-container.large img {
+            max-width: 95%;
+            max-height: 600px;
+        }
+
+        .plot-container.full img {
+            max-width: 100%;
+            max-height: 800px;
+        }
+
+        .embedded-image {
+            max-width: 85%;
+            max-height: 500px;
+            height: auto;
+            border-radius: 8px;
+            object-fit: contain;
+        }
+
+        .plot-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: #495057;
+        }
+
+        /* Tooltips */
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 300px;
+            background-color: #2c3e50;
+            color: white;
+            text-align: left;
+            border-radius: 8px;
+            padding: 1rem;
+            position: absolute;
+            z-index: 1000;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -150px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .tooltip .tooltiptext::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #2c3e50 transparent transparent transparent;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .header-with-tooltip {
+            display: flex;
+            align-items: center;
+        }
+
+        .header-with-tooltip h3 {
+            margin: 0;
+            margin-right: 8px;
+        }
+
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background-color: #007acc;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: help;
+            transition: all 0.3s ease;
+        }
+
+        .tooltip-icon:hover {
+            background-color: #0056b3;
+            transform: scale(1.1);
+        }
+
+        .tooltip-popup {
+            visibility: hidden;
+            width: 300px;
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            border-radius: 10px;
+            padding: 15px;
+            position: absolute;
+            z-index: 1000;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -150px;
+            opacity: 0;
+            transition: opacity 0.3s, visibility 0.3s;
+            font-size: 14px;
+            line-height: 1.4;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+
+        .tooltip-popup::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+
+        .tooltip-container:hover .tooltip-popup {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Alerts and callouts */
+        .alert {
+            padding: 1.2rem 1.8rem;
+            margin: 1.5rem 0;
+            border-radius: 8px;
+            border-left: 5px solid;
+            font-size: 0.95rem;
+        }
+
+        .alert-info {
+            background-color: #d1ecf1;
+            border-color: #17a2b8;
+            color: #0c5460;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+
+        .alert-warning {
+            background-color: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+
+        /* Footer */
+        .footer {
+            background-color: #343a40;
+            color: white;
+            text-align: center;
+            padding: 1.5rem 0;
+            margin-top: 2rem;
+        }
+
+        .footer p {
+            color: #ced4da;
+            margin: 0;
+            font-size: 0.9rem;
+        }
+
+        /* Tab content styling */
+        .tab-content {
+            display: none;
+            padding: 0;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .nav a.active {
+            background-color: #667eea;
+            color: white;
+            border-radius: 8px 8px 0 0;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            body {
+                max-width: 95%;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            .header-content {
+                padding: 0 1rem;
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .header-text {
+                max-width: 100%;
+            }
+
+            .header-logo {
+                margin-left: 0;
+                margin-top: 1rem;
+                max-height: 50px;
+            }
+
+            .header-image {
+                width: 150px;
+                opacity: 0.1;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .nav-content {
+                padding: 0 1rem;
+            }
+
+            .nav ul {
+                flex-direction: column;
+            }
+
+            .nav a {
+                padding: 1rem 0;
+                border-bottom: none;
+                border-left: 4px solid transparent;
+                text-align: center;
+            }
+
+            .nav a:hover,
+            .nav a.active {
+                border-left-color: #667eea;
+                border-bottom-color: transparent;
+            }
+
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .table-container.small,
+            .table-container.inline,
+            .table-container.inline-third {
+                width: 100%;
+                margin: 1rem 0;
+            }
+
+            .plot-container img,
+            .embedded-image {
+                max-width: 95%;
+            }
+
+            .tooltip .tooltiptext,
+            .tooltip-popup {
+                width: 250px;
+                margin-left: -125px;
+            }
+        }
+
+        /* Print styles */
+        @media print {
+            .nav, .footer {
+                display: none;
+            }
+
+            .page-section {
+                box-shadow: none;
+                border: 1px solid #ccc;
+                page-break-inside: avoid;
+            }
+
+            .header {
+                background: #667eea !important;
+                -webkit-print-color-adjust: exact;
+            }
+
+            .plot-container img {
+                max-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    {% if letterhead %}
+    <div class="letterhead-banner">
+        <img src="{{ letterhead }}" alt="Organization Letterhead" />
+    </div>
+    {% else %}
+    <header class="header">
+        <div class="header-content">
+            <div class="header-text-center">
+                <h1>{{ header_title if header_title else "ClassyFlow Report" }}</h1>
+            </div>
+            <div class="report-info">
+                <h2 class="report-subtitle">{{ header_subtitle if header_subtitle else "Automated Cell Type Classification Analysis" }}</h2>
+                <!-- <div class="report-details">
+                    <span class="report-date">Generated on {{ generation_date | strftime('%B %d, %Y') if generation_date else 'Unknown Date' }}</span>
+                    <span class="report-separator">•</span>
+                    <span class="report-version">Pipeline Version {{ pipeline_version if pipeline_version else 'Unknown' }}</span>
+                </div> -->
+            </div>
+        </div>
+    </header>
+    {% endif %}
+
+    <nav class="nav">
+        <div class="nav-content">
+            <ul>
+                <li><a href="#summary" onclick="showTab('summary')">Summary</a></li>
+                <li><a href="#normalization" onclick="showTab('normalization')">Normalization</a></li>
+                <li><a href="#feature-selection" onclick="showTab('feature-selection')">Feature Selection</a></li>
+                <li><a href="#modeling" onclick="showTab('modeling')">Model Evaluation</a></li>
+                <li><a href="#predictions" onclick="showTab('predictions')">Predictions</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Include all tab content -->
+    {% include 'summary.html' %}
+    {% include 'normalization.html' %}
+    {% include 'feature-selection.html' %}
+    {% include 'modeling.html' %}
+    {% include 'predictions.html' %}
+
+    <footer class="footer">
+        <p>Generated on {{ generation_date }} | Pipeline Version {{ pipeline_version if pipeline_version else 'Unknown' }}</p>
+    </footer>
+
+    <script>
+    function showTab(tabName) {
+        // Hide all tab content
+        document.querySelectorAll('.tab-content').forEach(el => {
+            el.style.display = 'none';
+        });
+        
+        // Remove active class from all nav links
+        document.querySelectorAll('.nav a').forEach(el => {
+            el.classList.remove('active');
+        });
+        
+        // Show selected tab and mark as active
+        const selectedTab = document.getElementById(tabName);
+        const selectedNavLink = document.querySelector(`a[href="#${tabName}"]`);
+        
+        if (selectedTab) {
+            selectedTab.style.display = 'block';
+        }
+        
+        if (selectedNavLink) {
+            selectedNavLink.classList.add('active');
+        }
+    }
+
+    // Initialize first tab on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        showTab('summary');
+    });
+
+    // Add keyboard navigation
+    document.addEventListener('keydown', (e) => {
+        if (e.altKey) {
+            const tabs = ['summary', 'normalization', 'feature-selection', 'modeling', 'predictions'];
+            const currentActive = document.querySelector('.nav a.active');
+            if (currentActive) {
+                const currentHref = currentActive.getAttribute('href').substring(1);
+                const currentIndex = tabs.indexOf(currentHref);
+                
+                if (e.key === 'ArrowLeft' && currentIndex > 0) {
+                    showTab(tabs[currentIndex - 1]);
+                } else if (e.key === 'ArrowRight' && currentIndex < tabs.length - 1) {
+                    showTab(tabs[currentIndex + 1]);
+                }
+            }
+        }
+    });
+    </script>
+</body>
+</html>
