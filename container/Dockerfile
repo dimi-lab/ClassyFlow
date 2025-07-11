@@ -42,7 +42,7 @@ WORKDIR /app
 COPY bin/ /app/bin
 COPY conf/ /app/conf
 COPY data/ /app/data
-COPY images/ /app/images
+COPY assets/ /app/assets
 COPY main.nf /app/main.nf
 COPY modules/ /app/modules
 COPY nextflow.config /app/nextflow.config

@@ -1,0 +1,154 @@
+<div class="tab-content" id="summary">
+
+<section class="page-section">
+    <h2>Pipeline Summary</h2>
+    
+    <div class="alert alert-info">
+        <strong>Analysis Overview:</strong> This report presents the results of automated cell type classification 
+        performed on segmented MxIF data using machine learning techniques. The analysis includes data normalization, 
+        feature selection, model training, and comprehensive evaluation of classification performance.
+    </div>
+
+    <!-- Key Metrics Grid -->
+    <div class="header-with-tooltip">
+        <h3>Input Data and Normalization</h3>
+        <div class="tooltip-container">
+            <div class="tooltip-icon">i</div>
+            <div class="tooltip-popup">
+                This section summarizes the input data and pre-processing methods
+                used.
+            </div>
+        </div>
+    </div>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ total_cells | default("N/A") | number_format }}</div>
+                <div class="metric-label">Total Cells</div>
+                <span class="tooltiptext">
+                    Total number of cells. This includes both 
+                    labeled and unlabeled cells across all batches used in this analysis.
+                </span>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ total_labels | default("N/A") | number_format }}</div>
+                <div class="metric-label">Total Labelled Cells</div>
+                <span class="tooltiptext">
+                    Total number of labeled cells. These cells will be used for training
+                    anf evaluating the model
+                </span>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ training_classes | default("N/A") }}</div>
+                <div class="metric-label">Training Classes</div>
+                <span class="tooltiptext">
+                    Number of cell type classes that met the minimum requirements for model training 
+                    (sufficient sample size) and were included in the final model.
+                </span>
+            </div>
+        </div>
+
+        <div class="metric-card">
+    <div class="tooltip">
+        <div class="metric-value">{{ normalization_method | default("N/A") }}</div>
+        <div class="metric-label">Normalization Method</div>
+        <span class="tooltiptext">
+            {% if normalization_method == "N/A" or normalization_method is none %}
+                No normalization method was set in the pipeline's configuration.
+            {% else %}
+                The normalization technique applied to standardize the feature data before model training. 
+                Normalization methods in ClassyFlow include boxcox, quantile, log and minmax.
+            {% endif %}
+        </span>
+    </div>
+</div>
+    </div>
+
+    <!-- Model Performance Metrics -->
+    <div class="header-with-tooltip">
+        <h3>Model Performance</h3>
+        <div class="tooltip-container">
+            <div class="tooltip-icon">i</div>
+            <div class="tooltip-popup">
+                This section summarizes the performance of the best model that was used
+                to predict all cell types
+            </div>
+        </div>
+    </div>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ (holdout_accuracy * 100) | round(1) if holdout_accuracy else "N/A" }}%</div>
+                <div class="metric-label">Holdout Accuracy</div>
+                <span class="tooltiptext">
+                    Percentage of correctly classified cells in the holdout test set. This metric indicates 
+                    the overall performance of the model on unseen data and represents the expected accuracy 
+                    for new predictions.
+                </span>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ (f1_score * 100) | round(1) if f1_score else "N/A" }}%</div>
+                <div class="metric-label">F1 Score</div>
+                <span class="tooltiptext">
+                    The weighted F1 score balances precision and recall across all classes. This metric 
+                    is particularly useful for datasets with imbalanced classes, providing a more 
+                    comprehensive view of model performance than accuracy alone.
+                </span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Next Steps -->
+<section class="page-section">
+    <h2>Next Steps</h2>
+    
+    {% if normalization_method == "N/A" or normalization_method is none %}
+    <div class="alert alert-warning" id="normalization-warning">
+        <span class="alert-icon">⚠️</span>
+        <strong>Warning:</strong> No normalization method was applied to this dataset. 
+        This may affect model performance and result interpretation. Consider reviewing the normalization
+        reports under the Normalization tab, and re-run the pipeline with one of the available
+        normalization methods.
+    </div>
+    {% else %}
+    <div class="alert alert-success">
+        <strong>Analysis Complete:</strong> The cell type classification has been successfully completed. 
+        Review the following sections for detailed information about the methodology and results:
+    </div>
+    {% endif %}
+
+    <ul style="margin-left: 2rem; color: #6c757d;">
+        <li><strong>Normalization Results:</strong> Details about data preprocessing and quality control measures</li>
+        <li><strong>Feature Selection:</strong> Information about which features were most important for classification</li>
+        <li><strong>Model Training:</strong> Comprehensive evaluation of model performance and validation results</li>
+        <li><strong>Prediction:</strong> Summary of the final predicted cell types</li>
+    </ul>
+
+    <div style="margin-top: 2rem; padding: 1rem; background-color: #f8f9fa; border-radius: 6px;">
+        <strong>For questions about this analysis:</strong> Contact your bioinformatics team or refer to the 
+        pipeline documentation for detailed methodology and parameter settings.
+    </div>
+</section>
+
+</div>
+
+<!-- Custom Jinja2 filters that should be available in your template engine -->
+{% macro number_format(value) %}
+    {% if value is number %}
+        {{ "{:,}".format(value) }}
+    {% else %}
+        {{ value }}
+    {% endif %}
+{% endmacro %}

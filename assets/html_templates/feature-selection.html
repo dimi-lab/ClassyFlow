@@ -1,0 +1,208 @@
+<div class="tab-content" id="feature-selection">
+
+<section class="page-section">
+    <h2>Feature Selection Results</h2>
+    
+    <div class="alert alert-info">
+        <strong>Feature Selection Overview:</strong> This section presents the results of feature selection analysis 
+        performed for each cell type. Feature selection identifies the most informative protein markers for 
+        distinguishing each cell type, improving model performance and interpretability.
+    </div>
+
+{% if feature_selection_data.feature_selection_results %}
+<!-- Cell Type Tabs Navigation -->
+<section class="page-section">
+    <style>
+        .celltype-tabs {
+            display: flex;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 2rem;
+            overflow-x: auto;
+            flex-wrap: wrap;
+        }
+
+        .celltype-tab {
+            padding: 0.75rem 1.5rem;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-bottom: none;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.3s ease;
+            margin-right: 2px;
+            margin-bottom: 2px;
+            border-radius: 6px 6px 0 0;
+            min-width: 120px;
+            text-align: center;
+        }
+
+        .celltype-tab:hover {
+            background-color: #e9ecef;
+        }
+
+        .celltype-tab.active {
+            background-color: white;
+            border-bottom: 2px solid white;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .celltype-content {
+            display: none;
+        }
+
+        .celltype-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .celltype-tabs {
+                flex-direction: column;
+            }
+            
+            .celltype-tab {
+                margin-right: 0;
+                margin-bottom: 2px;
+                border-radius: 6px;
+                min-width: auto;
+            }
+        }
+    </style>
+
+    <!-- Cell Type Tabs -->
+    <div class="celltype-tabs">
+        {% for celltype_result in feature_selection_data.feature_selection_results %}
+        <div class="celltype-tab {% if loop.first %}active{% endif %}" 
+             onclick="showCellType('celltype-{{ loop.index0 }}')">
+            {{ celltype_result.celltype }}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Cell Type Content Panels -->
+    {% for celltype_result in feature_selection_data.feature_selection_results %}
+    <div id="celltype-{{ loop.index0 }}" class="celltype-content {% if loop.first %}active{% endif %}">
+        
+        <!-- Cell Type Overview -->
+        <h3>{{ celltype_result.celltype }} Feature Selection</h3>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ celltype_result.data.feature_selection_summary.original_features }}</div>
+                    <div class="metric-label">Original Features</div>
+                    <span class="tooltiptext">
+                        Number of features available before feature selection for this cell type.
+                    </span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ celltype_result.data.feature_selection_summary.non_variant_removed | default("N/A") }}</div>
+                    <div class="metric-label">Non-Variant Removed</div>
+                    <span class="tooltiptext">
+                        Number of features removed due to low or zero variance across samples.
+                    </span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ "%.1f" | format((celltype_result.data.optimal_n_features / celltype_result.data.feature_selection_summary.original_features * 100)) if celltype_result.data.feature_selection_summary.original_features > 0 else "N/A" }}%</div>
+                    <div class="metric-label">Reduction Rate</div>
+                    <span class="tooltiptext">
+                        Percentage of original features reduced after selection process.
+                    </span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ celltype_result.data.optimal_n_features }}</div>
+                    <div class="metric-label">Final Selection</div>
+                    <span class="tooltiptext">
+                        Final number of features selected as optimal for this cell type classification.
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Visualization Plots -->
+        <div class="header-with-tooltip">
+            <h4>Feature Selection Visualizations</h4>
+            <div class="tooltip-container">
+                <div class="tooltip-icon">i</div>
+                <div class="tooltip-popup">
+                    Visual representations of the feature selection process and results for {{ celltype_result.celltype }}.
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 2rem;">
+            {% if celltype_result.data.feature_ranking_plot_path %}
+            <div class="plot-container full">
+                <div class="plot-title">Feature Ranking</div>
+                <img src="{{ celltype_result.data.feature_ranking_plot_path }}" alt="Feature Ranking Plot" class="embedded-image" />
+                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
+                    Ranking of features by importance for {{ celltype_result.celltype }} classification.
+                </p>
+            </div>
+            {% endif %}
+
+            {% if celltype_result.data.alpha_plot_path %}
+            <div class="plot-container small">
+                <div class="plot-title">Alpha Optimization</div>
+                <img src="{{ celltype_result.data.alpha_plot_path }}" alt="Alpha Optimization Plot" class="embedded-image" />
+                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
+                    Optimization of regularization parameter (alpha) for feature selection.
+                </p>
+            </div>
+            {% endif %}
+
+            {% if celltype_result.data.rfe_plot_path and celltype_result.data.rfe_plot_path %}
+            <div class="plot-container small">
+                <div class="plot-title">RFE Analysis</div>
+                <img src="{{ celltype_result.data.rfe_plot_path }}" alt="RFE Analysis Plot" class="embedded-image" />
+                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
+                    Recursive Feature Elimination analysis showing performance vs. number of features.
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</section>
+
+<script>
+function showCellType(celltypeId) {
+    // Hide all celltype content
+    var contents = document.getElementsByClassName('celltype-content');
+    for (var i = 0; i < contents.length; i++) {
+        contents[i].classList.remove('active');
+    }
+    
+    // Remove active class from all tabs
+    var tabs = document.getElementsByClassName('celltype-tab');
+    for (var i = 0; i < tabs.length; i++) {
+        tabs[i].classList.remove('active');
+    }
+    
+    // Show selected celltype content
+    document.getElementById(celltypeId).classList.add('active');
+    
+    // Add active class to clicked tab
+    event.target.classList.add('active');
+}
+</script>
+
+{% else %}
+<section class="page-section">
+    <div class="alert alert-warning">
+        <strong>No Feature Selection Data Available:</strong> No feature selection results were found. This may indicate 
+        that feature selection was not performed or the results files are missing.
+    </div>
+</section>
+{% endif %}
+
+</div>
