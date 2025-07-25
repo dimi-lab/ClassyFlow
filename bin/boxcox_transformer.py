@@ -200,7 +200,7 @@ def collect_and_transform(df, batchName, quantType, nucMark, plotFraction):
     # Apply Box-Cox transformation (preserve original logic)
     metrics = []
     bcDf = df.fillna(0).copy()
-    stat_cols = list(bcDf.filter(regex='(Min|Max|Median|Mean|StdDev)'))
+    stat_cols = list(bcDf.filter(regex='(Min|Max|Median|Mean|Std*|Variance)'))
     
     for fld in stat_cols:
         preMu = bcDf[fld].mean()
