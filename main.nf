@@ -13,8 +13,8 @@ params.input_dirs = [
 params.output_dir = "${workflow.projectDir}/output"
 
 //Static Assests for beautification
-params.letterhead = "${projectDir}/assets/images/ClassyFlow_Letterhead.PNG"
-params.html_template = "${projectDir}/assets/html_templates"
+params.letterhead = file("${projectDir}/assets/images/ClassyFlow_Letterhead.PNG", checkIfExists: true)
+params.html_template = file("${projectDir}/assets/html_templates", checkIfExists: true)
 params.pipeline_version = "1.0"
 
 // Build Input List of Batches
@@ -260,15 +260,17 @@ process GENERATE_FINAL_REPORT {
     path(holdout_files, stageAs: "modeling/*")
     path(abundance_results, stageAs: "general/*")
     path(classified_results), stageAs: "general/per_slide/*"
+    path(template_dir)
+    path(letterhead_file)
 
     output:
     path("classyflow_report.html")
 
     script:
     """
-    generate_final_report.py --template-dir ${params.html_template} \
+    generate_final_report.py --template-dir ${template_dir} \
                             --report-name classyflow_report.html \
-                            --letterhead ${params.letterhead} \
+                            --letterhead ${letterhead_file} \
                             --version ${params.pipeline_version}
     """
 
@@ -368,7 +370,9 @@ workflow {
             xgb_winners,
             holdout_evals,
             prediction_results,
-            classified_results
+            classified_results,
+            params.html_template,
+            params.letterhead
         )
 
     	
