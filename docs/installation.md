@@ -14,17 +14,7 @@
 - [Docker](https://www.docker.com/) (optional)
 
 ### Python Dependencies
-```
-fpdf 1.7.2
-numpy 1.23.5
-matplotlib 3.8.0
-dataframe-image 0.2.3
-pandas 2.2.0
-seaborn 0.13.1
-xgboost 1.6.2
-scipy 1.12.0
-scikit-learn 1.4.0
-```
+See [requirements.txt](../requirements.txt) for the full list of dependencies.
 
 ## Option 1: Local Installation
 
