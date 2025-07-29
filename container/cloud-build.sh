@@ -13,7 +13,7 @@ fi
 gcloud builds submit \
   --region=us-central1 \
   --config=container/build-config.yaml \
-  --substitutions _GCP_REPOSITORY=$GCP_ARTIFACT_REPOSITORY \
+  --substitutions _GCP_REPOSITORY=$GCP_ARTIFACT_REPOSITORY,_GCP_CONTAINER=$GCP_CONTAINER \
   --async \
   .
 
