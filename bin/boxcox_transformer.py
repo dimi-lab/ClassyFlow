@@ -200,9 +200,17 @@ def collect_and_transform(df, batchName, quantType, nucMark, plotFraction):
     # Apply Box-Cox transformation (preserve original logic)
     metrics = []
     bcDf = df.fillna(0).copy()
-    stat_cols = list(bcDf.filter(regex='(Min|Max|Median|Mean|Std*|Variance)'))
+    stat_cols = list(bcDf.filter(regex='(Min|Max|Median|Mean|Std*|Variance|Area)'))
     
     for fld in stat_cols:
+        # Skip columns that are entirely empty (all NaN or zero length)
+        col_values = bcDf[fld].dropna()
+        if col_values.empty:
+            bcDf[fld] = np.nan
+            mxLambda = 'SkippedEmpty'
+            preMu = np.nan
+            metrics.append([fld, preMu, mxLambda, np.nan, np.nan, np.nan])
+            continue
         preMu = bcDf[fld].mean()
         try:
             nArr, mxLambda = boxcox(bcDf[fld].add(1).values)
@@ -214,8 +222,8 @@ def collect_and_transform(df, batchName, quantType, nucMark, plotFraction):
         metrics.append([fld, preMu, mxLambda, bcDf[fld].mean(), bcDf[fld].min(), bcDf[fld].max()])
 
     bxcxMetrics = pd.DataFrame(metrics, columns=['Feature', 'Pre_Mean', 'Lambda', 'Post_Mean', 'Post_Min', 'Post_Max'])
-    bxcxMetrics.to_csv("BoxCoxRecord.csv", index=False)
-    
+    bxcxMetrics.to_csv(f"BoxCoxRecord_{myFileIdx}.csv", index=False)
+
     # Calculate CV metrics
     cv_df = calculate_cv_metrics(df, bcDf, batchName)
     
