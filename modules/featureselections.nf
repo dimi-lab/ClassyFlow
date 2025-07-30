@@ -159,78 +159,67 @@ process MERGE_AND_SORT_CSV {
 
 
 workflow featureselection_wf {
-	take: 
-	trainingPickleTable
-	celltypeCsv
-	
-	main:
-	// Step1. Split the list into individual elements
-	list_channel = celltypeCsv
-		.splitCsv(header: false, sep: ',').flatten()
-	list_channel.dump(tag: 'markers', pretty: true)
+    take: 
+    trainingPickleTable
+    celltypeCsv
+    
+    main:
+    // Step 1: Split the celltype CSV into individual cell type labels
+    list_channel = celltypeCsv
+        .splitCsv(header: false, sep: ',').flatten()
+    list_channel.dump(tag: 'markers', pretty: true)
 
-    //Step 2. Generate binary data frames for each label    
+    // Step 2: Generate binary data frames for each cell type label
     bls = TOP_LABEL_SPLIT(trainingPickleTable, list_channel)
 
-    //lgVals = logspace_values  //.collate(2)   //[a,b,c,d] = [[a,b],[c,d]]
+    // Step 3: Generate logarithmically spaced alpha values for regularization search
     logspace_values_channel = Channel.from(
-    (0..<96).collect { idx -> 
-        Math.exp(-5.1 + idx * (Math.log(10) * (-0.0004 - (-5.1)) / 95)) 
+        (0..<96).collect { idx -> 
+            Math.exp(-5.1 + idx * (Math.log(10) * (-0.00004 - (-5.1)) / 95)) / 100 
         }
     ).collate(6).map{ list -> list.join(',') }.flatten()
         
-    // Step 3: Combine bls and logspace_values_channel
+    // Step 4: Combine binary data frames and alpha values for parameter search
     combined_channel = bls.combine(logspace_values_channel).map { lbl, binary_df, logspace_values_chunk ->
         tuple( lbl, binary_df, logspace_values_chunk )
     }
     combined_channel.dump(tag: 'alpha_searching', pretty: true)
     
-    // Step 4. Search many parameters to determine best alpha per label
+    // Step 5: Search for best alpha parameters for each cell type
     sfa = SEARCH_FOR_ALPHAS(combined_channel)
     
-    // Step 5. Merge CSV files into one per label
+    // Step 6: Merge alpha search results CSV files for each cell type
     merged_csv = MERGE_ALPHAS_SEARCH_CSV_FILES(sfa.alphas.groupTuple())
 
-    // Step 6. Sort and Select the best alpha from the merged CSV
+    // Step 7: Select the best alpha value from merged CSVs
     best_alpha_channel = SELECT_BEST_ALPHA(merged_csv)
     
-    
-    //bls.view()    
-    //best_alpha_channel.view()
-    
-    
-    // Debugging intermediate outputs
+    // Step 8: Combine binary data frames and best alpha values for downstream analysis
     labelWithAlphas = bls
-    .combine(best_alpha_channel, by: 0)
-    //    labelWithAlphas.view() // Check the structure of the combined tuples
+        .combine(best_alpha_channel, by: 0)
+    // labelWithAlphas.view() // Check the structure of the combined tuples
     labelWithAlphas.dump(tag: 'labelWithAlphas', pretty: true)
     
+    // Step 9: Generate a channel of feature counts for RFE (Recursive Feature Elimination)
     ref_counts = Channel.from(params.min_rfe_nfeatures..params.max_rfe_nfeatures)
-    //ref_counts.view()
-    //labelWithAlphas.view()
-    // Combine the `labelWithAlphas` with `ref_counts`
+    // Combine labelWithAlphas and feature counts for RFE
     scatter2_channel = labelWithAlphas.combine(ref_counts)
     //scatter2_channel.view()
-       scatter2_channel.dump(tag: 'alpha_and_rfe', pretty: true)
+    scatter2_channel.dump(tag: 'alpha_and_rfe', pretty: true)
     rfeRez = RUN_ALL_RFE(scatter2_channel)
-    
     refScores = MERGE_RFE_SCORE_CSV_FILES(rfeRez.feature_scores.groupTuple())
     
-    //labelWithEverything = labelWithAlphas.join(refScores, by: 0).map { labelAlpha, rfe_tuple ->
-    //    def (celltype1, binary_df, best_alpha) = labelAlpha
-    //    def (celltype2, rfe_csv) = rfe_tuple
-    //    return tuple(celltype1, binary_df, best_alpha, rfe_csv)
-    //}
+    // Step 10: Join all relevant results for final feature selection and reporting
     labelWithEverything = labelWithAlphas.join(refScores, by: 0).join(merged_csv, by: 0)
     //labelWithEverything.view()    
     labelWithEverything.dump(tag: 'feat_sec_everything', pretty: true)
-	
-	fts = EXAMINE_CLASS_LABEL(labelWithEverything)
-		
-	mas = MERGE_AND_SORT_CSV(fts.feature_list.collect())
-	
-	emit:
-	mas_results = mas
+    
+    // Step 11: Run feature selection and generate outputs
+    fts = EXAMINE_CLASS_LABEL(labelWithEverything)
+    mas = MERGE_AND_SORT_CSV(fts.feature_list.collect())
+    
+    // Step 12: Emit final results
+    emit:
+    mas_results = mas
     feature_results = fts.feature_selection_results
-
 }

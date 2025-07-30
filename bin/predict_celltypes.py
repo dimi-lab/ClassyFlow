@@ -47,9 +47,17 @@ def write_to_pdf(pdf, words):
 
 def predict_on_xgb_best_model(toCheckDF, xgbM, bID, leEncoderFile, columnsToExport):
     allPDFText = {}
+    print("[DEBUG] DataFrame columns before prediction:", list(toCheckDF.columns))
+    print("[DEBUG] DataFrame head before prediction:\n", toCheckDF.head())
     le = preprocessing.LabelEncoder()
     le.classes_ = np.load(leEncoderFile, allow_pickle=True)
+    # Drop 'index' column if present
+    if 'index' in toCheckDF.columns:
+        print("[DEBUG] Dropping 'index' column from DataFrame.")
+        toCheckDF = toCheckDF.drop(columns=['index'])
+    print("[DEBUG] Model expects features:", xgbM.feature_names)
     toGetDataFrame = toCheckDF[xgbM.feature_names]
+    print("[DEBUG] DataFrame used for prediction head:\n", toGetDataFrame.head())
     # Make predictions
     dmatrix = xgb.DMatrix(toGetDataFrame)
     y_pred_all = xgbM.predict(dmatrix)

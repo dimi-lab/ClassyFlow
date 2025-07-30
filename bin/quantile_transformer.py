@@ -189,7 +189,7 @@ def collect_and_transform(df, batchName, quantType, nucMark, plotFraction, quant
     
     # Apply quantile transformation (preserve original logic)
     scaler = QuantileTransformer(n_quantiles=quantileSplit, random_state=0)
-    imgMets = df.filter(regex='(Min|Max|Median|Mean|StdDev)', axis=1)
+    imgMets = df.filter(regex='(Min|Max|Median|Mean|Std*|Variance|Area)', axis=1)
     df_norm = pd.DataFrame(scaler.fit_transform(imgMets), columns=imgMets.columns)
     df_a = df[df.columns.difference(imgMets.columns)]
     bcDf = pd.concat([df_a.reset_index(drop=True), df_norm], axis=1).fillna(0)

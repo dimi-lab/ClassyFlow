@@ -65,7 +65,6 @@ def plot_feature_ranking(featureRankDF, output_path, top_n=35, model_name="XGBoo
     """
     Advanced version with color-coded importance levels and enhanced styling
     """
-    
     # Prepare data
     top_features = featureRankDF.nlargest(top_n, columns="score").sort_values(by="score", ascending=True)
     
@@ -239,26 +238,29 @@ def get_lasso_classification_features(
     
     print(f"\n=== FEATURE SELECTION FOR {celltype} ===")
     print(df.groupby([batchColumn, 'Lasso_Binary']).size())
-    
-    # Create binary count table
-    binary_table_path = f"{output_prefix}_binary_counts.csv"
-    binary_table = create_binary_count_table(df, binary_table_path)
-    results['binary_count_table_path'] = binary_table_path
-
-    # Process alpha optimization results
-    scores = aTbl["mean_test_score"].values
-    scores_std = aTbl["std_test_score"].values
-    alphas = list(aTbl["input_a"].str.split('-').str[0].astype(float))
-    
-    # Create alpha plot
-    alpha_plot_path = f"{output_prefix}_alpha_optimization.png"
-    plot_best_alpha(scores, scores_std, alphas, a, n_folds, alpha_plot_path)
-    results['alpha_plot_path'] = alpha_plot_path
 
     # Prepare feature data
     XAll = df[list(df.select_dtypes(include=[np.number]).columns.values)]
     XAll = XAll[XAll.columns.drop(list(XAll.filter(regex='(Centroid|Binary|cnt|Name)')))].fillna(0)
     yAll = df['Lasso_Binary']
+
+    
+
+    # Print input summary
+    print("\nInput summary:")
+    print(f"• Data shape: {df.shape}")
+    print(f"• Celltype: {celltype}")
+    print(f"• Alpha value: {a}")
+    print(f"• Alpha scores shape: {aTbl.shape}")
+    print(f"• RFE scores shape: {rfeTbl.shape}")
+    print(f"• Variance threshold: {varThreshold}")
+    print(f"• n_folds: {n_folds}")
+    print(f"• n_features_to_RFE: {n_features_to_RFE}")
+    print(f"• ifSubsetData: {ifSubsetData}")
+    print(f"• max_workers: {max_workers}")
+    print(f"• mim_class_label_threshold: {mim_class_label_threshold}")
+    print(f"• classColumn: {classColumn}")
+    print(f"• output_prefix: {output_prefix}")
 
     # Variance threshold filtering
     sel = VarianceThreshold(threshold=varThreshold)
@@ -266,13 +268,21 @@ def get_lasso_classification_features(
     nonVarFeatures = [x for x in XAll.columns if x not in XAll.columns[sel.get_support()]]
     print(f"Non-variant Features: {', '.join(nonVarFeatures)}")
 
-    # Feature importance from Lasso
+    # Print model description
+    print("\nModel description:")
+    print(f"• Model type: Lasso regression")
+    print(f"• Alpha parameter: {a}")
+    print(f"• Number of input features: {XAll.shape[1]}")
+    print(f"• Number of samples: {XAll.shape[0]}")
+    print(f"• Target variable: Lasso_Binary")
     clf = Lasso(alpha=a)
+    print(f"• Model object: {clf}")
     clf.fit(XAll, yAll)
+    print("• Model fit complete.")
+
     features = XAll.columns.values.tolist()
     coefficients = clf.coef_
     importance = np.abs(coefficients)
-    
     featureRankDF = pd.DataFrame(data=importance, index=features, columns=["score"])
     
     # Create feature ranking plot
@@ -295,6 +305,25 @@ def get_lasso_classification_features(
     featureCutoff = plot_recursive_elimination(rfeTbl, summary_df, rfe_plot_path)
     results['rfe_plot_path'] = rfe_plot_path
     results['optimal_n_features'] = int(featureCutoff)
+
+    # Generate tile plot (heatmap) of numeric columns vs Lasso_Binary
+    print("\nGenerating tile plot (heatmap) of numeric columns vs Lasso_Binary...")
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    # Remove columns matching Centroid|Binary|cnt|Name
+    numeric_cols = [col for col in numeric_cols if not re.search(r'(Centroid|Binary|cnt|Name)', col)]
+    tile_data = df.groupby('Lasso_Binary')[numeric_cols].mean()
+    tile_data = tile_data.transpose()  # Flip rows and columns
+    plt.figure(figsize=(max(8, len(tile_data.index)*0.5), 6))
+    sns.heatmap(tile_data, annot=True, fmt='.2f', cmap='viridis', cbar=True)
+    plt.title('Mean Values of Numeric Features by Lasso_Binary (Transposed)')
+    plt.xlabel('Lasso_Binary')
+    plt.ylabel('Features')
+    tile_plot_path = f"{output_prefix}_tileplot.png"
+    plt.tight_layout()
+    plt.savefig(tile_plot_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Tile plot saved: {tile_plot_path}")
+    results['tile_plot_path'] = tile_plot_path
 
     # Feature selection summary
     results['feature_selection_summary'] = {
