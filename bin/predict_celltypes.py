@@ -12,43 +12,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-import fpdf
-from fpdf import FPDF
-import dataframe_image as dfi
 from random import randint
 
 ## Static Variables: File Formatting
 # columnsToExport and cpu_jobs will be set from command line arguments
 
-############################ PDF REPORTING ############################
-def create_letterhead(pdf, WIDTH, letterhead_path):
-    pdf.image(letterhead_path, 0, 0, WIDTH)     
-
-def create_title(title, pdf):
-    # Add main title
-    pdf.set_font('Helvetica', 'b', 20)  
-    pdf.ln(40)
-    pdf.write(5, title)
-    pdf.ln(10)
-    # Add date of report
-    pdf.set_font('Helvetica', '', 14)
-    pdf.set_text_color(r=128,g=128,b=128)
-    today = pd.Timestamp.now().strftime("%d/%m/%Y")
-    pdf.write(4, f'{today}')
-    # Add line break
-    pdf.ln(10)
-
-def write_to_pdf(pdf, words):
-    # Set text colour, font size, and font type
-    pdf.set_text_color(r=0,g=0,b=0)
-    pdf.set_font('Helvetica', '', 12)
-    pdf.write(5, words)
-############################ PDF REPORTING ############################
-
 def predict_on_xgb_best_model(toCheckDF, xgbM, bID, leEncoderFile, columnsToExport):
-    allPDFText = {}
-    print("[DEBUG] DataFrame columns before prediction:", list(toCheckDF.columns))
-    print("[DEBUG] DataFrame head before prediction:\n", toCheckDF.head())
     le = preprocessing.LabelEncoder()
     le.classes_ = np.load(leEncoderFile, allow_pickle=True)
     # Drop 'index' column if present
