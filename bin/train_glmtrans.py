@@ -76,7 +76,7 @@ def evaluate(model, scaler, le, X, y, out_prefix):
         except Exception:
             auc_score = float('nan')
         print(f"[DEBUG] Accuracy: {acc}, AUC: {auc_score}")
-        report = classification_report(y_enc, y_pred, output_dict=True)
+        report = classification_report(y_enc, y_pred, output_dict=True, zero_division=0)
         print(f"[DEBUG] Classification report: {json.dumps(report, indent=2)}")
         fpr, tpr, _ = roc_curve(y_enc, y_prob_1)
         plt.figure()
@@ -104,7 +104,7 @@ def evaluate(model, scaler, le, X, y, out_prefix):
         auc_macro = roc_auc_score(y_bin, y_prob, average='macro', multi_class='ovr')
         auc_micro = roc_auc_score(y_bin, y_prob, average='micro', multi_class='ovr')
         print(f"[DEBUG] Accuracy: {acc}, Macro AUC: {auc_macro}, Micro AUC: {auc_micro}")
-        report = classification_report(y_enc, y_pred, output_dict=True)
+        report = classification_report(y_enc, y_pred, output_dict=True, zero_division=0)
         print(f"[DEBUG] Classification report: {json.dumps(report, indent=2)}")
         # Plot ROC for each class
         plt.figure(figsize=(8, 6))
