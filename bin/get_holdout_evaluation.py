@@ -177,52 +177,72 @@ def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
     create_confusion_matrix_plot(cm_df, uniqNames, confusion_matrix_plot)
     results['confusion_matrix_csv_path'] = confusion_matrix_plot
 
-    # Multiclass case
-    y_true_binarized = label_binarize(y_holdout, classes=np.arange(n_classes))
-    y_pred_binarized = label_binarize(y_pred_proba, classes=np.arange(n_classes))
+    # Multiclass ROC/AUC computation and plotting
+    def compute_multiclass_roc_auc(y_true, y_pred, n_classes):
+        y_true_bin = label_binarize(y_true, classes=np.arange(n_classes))
+        y_pred_bin = label_binarize(y_pred, classes=np.arange(n_classes))
+        auc_scores = {}
+        fpr_dict, tpr_dict = {}, {}
+        for i in range(n_classes):
+            fpr, tpr, _ = roc_curve(y_true_bin[:, i], y_pred_bin[:, i])
+            roc_auc = auc(fpr, tpr)
+            auc_scores[i] = roc_auc
+            fpr_dict[i] = fpr
+            tpr_dict[i] = tpr
+        return auc_scores, fpr_dict, tpr_dict, y_true_bin, y_pred_bin
 
-    #fpr = dict()
-    #tpr = dict()
-    #roc_auc = dict()
-
-    #for i in range(n_classes):
-    #   fpr[i], tpr[i], _ = roc_curve(y_true_binarized[:, i], y_pred_binarized[:, i])
-    #   roc_auc[i] = auc(fpr[i], tpr[i])
-
-    #plt.figure()
-    #colors = ['aqua', 'darkorange', 'cornflowerblue', 'red', 'green', 'yellow']
-    #for i in range(n_classes):
-    #   plt.plot(fpr[i], tpr[i], color=colors[i % len(colors)], lw=2,
-    #   label=f'{lableHash[i]} (a={roc_auc[i]:.2f})')
-
-    #plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-    #plt.xlim([0.0, 1.0])
-    #plt.ylim([0.0, 1.05])
-    #plt.xlabel('False Positive Rate')
-    #plt.ylabel('True Positive Rate')
-    #plt.title('Receiver Operating Characteristic on Holdout')
-    #plt.legend(loc="lower right")
-    #plt.show()
-    #plt.savefig("auc_curve_multiclass.png", dpi=300, bbox_inches='tight')
-
-    # Compute AUC for each class
-    auc_scores = {}
-    for i in range(n_classes):
-        fpr, tpr, _ = roc_curve(y_true_binarized[:, i], y_pred_binarized[:, i])
-        roc_auc = auc(fpr, tpr)
-        auc_scores[i] = roc_auc
-
-    # Rank AUC scores
+    auc_scores, fpr_dict, tpr_dict, y_true_binarized, y_pred_binarized = compute_multiclass_roc_auc(y_holdout, y_pred_proba, n_classes)
     sorted_auc_scores = sorted(auc_scores.items(), key=lambda x: x[1], reverse=True)
 
-    # Plot AUC for each class
+    def export_roc_plot(y_true_bin, y_pred_bin, label_hash, n_classes, auc_scores, output_path):
+        plt.figure(figsize=(10, 8))
+        colors = plt.cm.tab10(np.linspace(0, 1, n_classes))
+        for i, color in zip(range(n_classes), colors):
+            fpr, tpr, _ = roc_curve(y_true_bin[:, i], y_pred_bin[:, i])
+            roc_auc = auc(fpr, tpr)
+            plt.plot(fpr, tpr, color=color, lw=2, label=f'{label_hash[i]} (AUC={roc_auc:.2f})')
+        plt.plot([0, 1], [0, 1], 'k--', lw=2, alpha=0.5, label='Random Classifier')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver Operating Characteristic (ROC) Curves')
+        plt.legend(loc="lower right", fontsize=9)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"ROC curves plot saved: {output_path}")
+
     roc_curves_plot = f"{output_prefix}_roc_curves.png"
-    create_roc_curves_plot(y_true_binarized, y_pred_binarized, lableHash, n_classes, auc_scores, roc_curves_plot)
+    export_roc_plot(y_true_binarized, y_pred_binarized, lableHash, n_classes, auc_scores, roc_curves_plot)
     results['roc_curves_plot_path'] = roc_curves_plot
 
-    # Create and save AUC rankings table
+    def export_auc_table(sorted_auc_scores, label_hash, output_path):
+        rankings_data = []
+        for rank, (class_index, auc_score) in enumerate(sorted_auc_scores, 1):
+            if class_index in label_hash:
+                if auc_score >= 0.9:
+                    performance = 'Excellent'
+                elif auc_score >= 0.8:
+                    performance = 'Good'
+                elif auc_score >= 0.7:
+                    performance = 'Fair'
+                else:
+                    performance = 'Poor'
+                rankings_data.append({
+                    'Rank': rank,
+                    'Class': label_hash[class_index],
+                    'AUC_Score': round(auc_score, 3),
+                    'Performance': performance
+                })
+        rankings_df = pd.DataFrame(rankings_data)
+        rankings_df.to_csv(output_path, index=False)
+        print(f"AUC rankings table saved: {output_path}")
+        return rankings_df
+
     auc_table_path = f"{output_prefix}_auc_rankings.csv"
-    auc_df = create_auc_rankings_table(sorted_auc_scores, lableHash, auc_table_path)
+    auc_df = export_auc_table(sorted_auc_scores, lableHash, auc_table_path)
     results['auc_rankings_csv_path'] = auc_table_path
 
     # Prepare results data

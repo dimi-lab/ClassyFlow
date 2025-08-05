@@ -1,29 +1,29 @@
 // Produce Batch based normalization - boxcox
 process BOXCOX {
-	tag { batchID }
-	
-	input:
-	tuple val(batchID), path(pickleTable)
-	
-	output:
-	tuple val(batchID), path("boxcox_transformed_${batchID}.tsv"), emit: norm_df
-	tuple val(batchID), path ("boxcox_results_${batchID}.json"), path("boxcox_*.png"), emit: boxcox_results
-	
-	script:
-	"""
-	boxcox_transformer.py \
-		--pickleTable ${pickleTable} \
-		--batchID ${batchID} \
-		--quantType ${params.qupath_object_type} \
-		--nucMark ${params.nucleus_marker} \
-		--plotFraction ${params.plot_fraction}
-	"""
+    tag { batchID }
+    
+    input:
+    tuple val(batchID), path(pickleTable)
+    
+    output:
+    tuple val(batchID), path("boxcox_transformed_${batchID}.tsv"), emit: norm_df
+    tuple val(batchID), path ("boxcox_results_${batchID}.json"), path("boxcox_*.png"), emit: boxcox_results
+    
+    script:
+    """
+    boxcox_transformer.py \
+        --pickleTable ${pickleTable} \
+        --batchID ${batchID} \
+        --quantType ${params.qupath_object_type} \
+        --nucMark ${params.nucleus_marker} \
+        --plotFraction ${params.plot_fraction}
+    """
 }
     
     
 // Produce Batch based normalization - quantile
 process QUANTILE {
-	tag { batchID }
+    tag { batchID }
 
     input:
     tuple val(batchID), path(pickleTable)
@@ -47,17 +47,17 @@ process QUANTILE {
 
 // Produce Batch based normalization - min/max scaling
 process MINMAX {
-	tag { batchID }
-	
-	input:
-	tuple val(batchID), path(pickleTable)
-	
-	output:
-	tuple val(batchID), path("minmax_transformed_${batchID}.tsv"), emit: norm_df
-	tuple val(batchID), path ("minmax_results_${batchID}.json"), path("minmax_*.png"), emit: minmax_results
-	
-	script:
-	"""
+    tag { batchID }
+    
+    input:
+    tuple val(batchID), path(pickleTable)
+    
+    output:
+    tuple val(batchID), path("minmax_transformed_${batchID}.tsv"), emit: norm_df
+    tuple val(batchID), path ("minmax_results_${batchID}.json"), path("minmax_*.png"), emit: minmax_results
+    
+    script:
+    """
     minmax_transformer.py \
         --pickleTable ${pickleTable} \
         --batchID ${batchID} \
@@ -69,17 +69,17 @@ process MINMAX {
 }
 
 process LOGSCALE {
-	tag { batchID }
-	
-	input:
-	tuple val(batchID), path(pickleTable)
-	
-	output:
-	tuple val(batchID), path("log_transformed_${batchID}.tsv"), emit: norm_df
-	tuple val(batchID), path ("log_results_${batchID}.json"), path("log_*.png"), emit: log_results
-	
-	script:
-	"""
+    tag { batchID }
+    
+    input:
+    tuple val(batchID), path(pickleTable)
+    
+    output:
+    tuple val(batchID), path("log_transformed_${batchID}.tsv"), emit: norm_df
+    tuple val(batchID), path ("log_results_${batchID}.json"), path("log_*.png"), emit: log_results
+    
+    script:
+    """
     log_transformer.py \
         --pickleTable ${pickleTable} \
         --batchID ${batchID} \
@@ -92,41 +92,51 @@ process LOGSCALE {
 
 // Look at all of the normalizations within a batch and attempt to idendity the best approach
 process IDENTIFY_BEST{
-	publishDir(
+    publishDir(
         path: "${params.output_dir}/normalization",
         pattern: "*.pdf",
         mode: "copy"
     )
 
-	input:
-	tuple val(batchID), path(all_possible_tables)
-	
-	output:
-	tuple val(batchID), path("normalized_${batchID}.pkl"), emit: norm_df
-	path("multinormalize_report_${batchID}.pdf")
-	path("normalized_*_${batchID}.tsv")
+    input:
+    tuple val(batchID), path(all_possible_tables)
+    
+    output:
+    tuple val(batchID), path("normalized_${batchID}.pkl"), emit: norm_df
+    path("multinormalize_report_${batchID}.pdf")
+    path("normalized_*_${batchID}.tsv")
 
-	script:
-	template 'characterize_normalization.py'
+    script:
+    template 'characterize_normalization.py'
 }
 
 
 process AUGMENT_WITH_LEIDEN_CLUSTERS{
-	publishDir(
+    publishDir(
         path: "${params.output_dir}/clusters",
-        pattern: "*.pdf",
-        mode: "copy"
+        pattern: '*.{html,png}',
+        mode: 'copy'
     )
-    
-	input:
-	tuple val(batchID), path(norms_pkl)
 
-	output:
-    path("x_dataframe.pkl"), emit: norm_df
-	path("*report.pdf")
+    input:
+    tuple val(batchID), path(norms_pkl)
+
+    output:
+    tuple val(batchID), path("scimap_extended_${batchID}.tsv"), emit: norm_df
+    path("*.png"), optional: true
+    path("*.html")
 
     script:
-    template 'scimap_clustering.py'
+    """
+    scimap_clustering.py \
+        --input_tsv ${norms_pkl} \
+        --roi_name ${batchID} \
+        --resolution ${params.scimap_resolution} \
+        --label_fraction ${params.scimap_label_fraction} \
+        --perc_top_features ${params.scimap_top_feature_prec} \
+        --qupath_object_type ${params.qupath_object_type} \
+        --classifed_column_name ${params.classifed_column_name}
+    """
 }
 
 process GMM_GATING {
@@ -160,54 +170,61 @@ workflow normalization_wf {
     batchPickleTable
 
     main:
-	def best_ch
+    // Declare variables for normalization results and channels
+    def best_ch
     def bc
     def lg
     def qt
     def mm
     def mxchannels
 
+    // Step 1: Choose normalization method based on override parameter
     if (params.override_normalization == "boxcox") {
+        // Use BoxCox normalization
         bc = BOXCOX(batchPickleTable)
         best_ch = bc.norm_df
     }
     else if (params.override_normalization == "quantile") {
+        // Use Quantile normalization
         qt = QUANTILE(batchPickleTable)
         best_ch = qt.norm_df
     }
     else if (params.override_normalization == "minmax") {
+        // Use MinMax normalization
         mm = MINMAX(batchPickleTable)
         best_ch = mm.norm_df
     }
     else if (params.override_normalization == "logscale") {
+        // Use LogScale normalization
         lg = LOGSCALE(batchPickleTable)
         best_ch = lg.norm_df
     }
     else {
+        // Run all normalization methods and group results for comparison
         bc = BOXCOX(batchPickleTable).norm_df
         qt = QUANTILE(batchPickleTable).norm_df
         mm = MINMAX(batchPickleTable).norm_df
         lg = LOGSCALE(batchPickleTable).norm_df
 
+        // Mix all normalization results and group them for best selection
         mxchannels = batchPickleTable.mix(bc, qt, mm, lg).groupTuple()
         mxchannels.dump(tag: 'debug_normalization_channels', pretty: true)
 
+        // Identify the best normalization approach
         def best = IDENTIFY_BEST(mxchannels)
     }
 
-    // Insert GMM gating after normalization
+    // Step 2: Apply GMM gating to the normalized data
     def gmm_gated = GMM_GATING(best_ch)
     best_ch = gmm_gated.norm_df
 
+    // Step 3: Optionally augment with Leiden clusters if enabled
     if (params.run_get_leiden_clusters) {
         def leiden_augmented = AUGMENT_WITH_LEIDEN_CLUSTERS(best_ch)
         best_ch = leiden_augmented.norm_df
     }
 
-    // ## future add flag column for bin density ##
-
-    // ## add column for sig sum ##
-
+    // Step 4: Emit final results and normalization outputs
     emit:
     normalized = best_ch
     boxcox_results = bc ? bc.boxcox_results : Channel.empty()
