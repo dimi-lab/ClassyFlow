@@ -312,7 +312,7 @@ workflow {
         /*
          * - Subworkflow to generate models and then check them against the holdout - 
          */ 
-        modeling_results = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures)
+        modeling_results = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures, labledDataFrames.lableFile)
         bestModel = modeling_results.best_model_results
         
         // Run the best model on the full input batches/files 
