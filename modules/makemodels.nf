@@ -161,8 +161,7 @@ process GLMTRANS_MODEL {
     output:
     path("GLMtrans_model.pkl"), emit: glm_model
     path("GLMtrans_eval.json"), emit: glm_eval
-    path("GLMtrans_coefficients.png"), emit: glm_coeffs
-    path("GLMtrans_vs_xgb_comparison.png"), emit: glm_vs_xgb
+    path("*.png"), emit: glm_coeffs
 
     script:
     """
