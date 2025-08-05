@@ -122,7 +122,7 @@ process AUGMENT_WITH_LEIDEN_CLUSTERS{
     tuple val(batchID), path(norms_pkl)
 
     output:
-    tuple val(batchID), path("scimap_clusters_${batchID}.tsv"), emit: norm_df
+    tuple val(batchID), path("scimap_extended_${batchID}.tsv"), emit: norm_df
     path("*.png"), optional: true
     path("*.html")
 
@@ -133,6 +133,7 @@ process AUGMENT_WITH_LEIDEN_CLUSTERS{
         --roi_name ${batchID} \
         --resolution ${params.scimap_resolution} \
         --label_fraction ${params.scimap_label_fraction} \
+        --perc_top_features ${params.scimap_top_feature_prec} \
         --qupath_object_type ${params.qupath_object_type} \
         --classifed_column_name ${params.classifed_column_name}
     """
