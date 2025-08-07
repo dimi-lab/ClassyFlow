@@ -14,8 +14,8 @@ params.input_dirs = [
 params.output_dir = "${workflow.projectDir}/output"
 
 //Static Assests for beautification
-params.letterhead = "${projectDir}/assets/images/ClassyFlow_Letterhead.PNG"
-params.html_template = "${projectDir}/assets/html_templates"
+params.letterhead = file("${projectDir}/assets/images/ClassyFlow_Letterhead.PNG", checkIfExists: true)
+params.html_template = file("${projectDir}/assets/html_templates", checkIfExists: true)
 params.pipeline_version = "1.0"
 
 // Build Input List of Batches
@@ -133,6 +133,7 @@ process GENERATE_TRAINING_N_HOLDOUT{
     
 	input:
 	path(norms_pkl_collected)
+    path(letterhead_file)
 
 	output:
     path("holdout_dataframe.pkl"), emit: holdout
@@ -149,7 +150,7 @@ process GENERATE_TRAINING_N_HOLDOUT{
         --cellTypeNegative "${params.filter_out_junk_celltype_labels}" \
         --minimunHoldoutThreshold ${params.minimum_label_count} \
         --pickle_files "${norms_pkl_collected}" \
-        --letterhead "${params.letterhead}"
+        --letterhead "${letterhead_file}"
     """
 
 }
@@ -262,6 +263,8 @@ process GENERATE_FINAL_REPORT {
     path(holdout_files, stageAs: "modeling/*")
     path(abundance_results, stageAs: "general/*")
     path(classified_results), stageAs: "general/per_slide/*"
+    path(template_dir)
+    path(letterhead_file)
 
     output:
     path("classyflow_report.html")
@@ -323,7 +326,7 @@ workflow {
         normalized_output = normalization_wf(ADD_EMPTY_MARKER_NOISE.output.modbatchtables)
         normalizedDataFrames = normalized_output.normalized
         
-        labledDataFrames = GENERATE_TRAINING_N_HOLDOUT(normalizedDataFrames.map{ it[1] }.collect())
+        labledDataFrames = GENERATE_TRAINING_N_HOLDOUT(normalizedDataFrames.map{ it[1] }.collect(), params.letterhead)
         
         /*
          * - Subworkflow to examine Cell Type Specific interpetability & Feature Selections - 
@@ -390,7 +393,9 @@ workflow {
             xgb_winners,
             holdout_evals,
             prediction_results,
-            classified_results
+            classified_results,
+            params.html_template,
+            params.letterhead
         )
 
     	
