@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeline Configuration</title>
+    <style>
+        /* Base styles similar to main report */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+            max-width: 90%;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 300;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .config-section {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 1px solid #e9ecef;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: #2c3e50;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 0.5rem;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .config-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.2rem;
+            border-left: 4px solid #667eea;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .config-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .config-key {
+            font-weight: 600;
+            color: #495057;
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .config-value {
+            font-family: 'Courier New', monospace;
+            color: #2c3e50;
+            font-size: 0.9rem;
+            background: white;
+            padding: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+            word-break: break-all;
+        }
+
+        .config-value.boolean {
+            color: #28a745;
+            font-weight: 600;
+        }
+
+        .config-value.number {
+            color: #007bff;
+            font-weight: 600;
+        }
+
+        .config-value.null {
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .search-container {
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            font-size: 1rem;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            background: white;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+            font-size: 1.2rem;
+        }
+
+        .stats-bar {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 1rem;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .back-link:hover {
+            color: #495057;
+        }
+
+        .back-link::before {
+            content: "← ";
+            margin-right: 0.5rem;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            body {
+                max-width: 95%;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-bar {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+        }
+
+        /* Print styles */
+        @media print {
+            .search-container,
+            .back-link {
+                display: none;
+            }
+
+            .config-section {
+                box-shadow: none;
+                border: 1px solid #ccc;
+            }
+
+            .header {
+                background: #667eea !important;
+                -webkit-print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Pipeline Configuration</h1>
+        <p>Complete list of parameters used in this pipeline run</p>
+    </header>
+
+    <div class="container">
+        <a href="javascript:history.back()" class="back-link">Back to Report</a>
+
+        <div class="search-container">
+            <input type="text" class="search-box" id="searchBox" placeholder="Search configuration parameters...">
+            <span class="search-icon">🔍</span>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat-item">
+                <div class="stat-value" id="totalParams">{{ config_data|length }}</div>
+                <div class="stat-label">Total Parameters</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="visibleParams">{{ config_data|length }}</div>
+                <div class="stat-label">Visible Parameters</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ generation_date }}</div>
+                <div class="stat-label">Generated</div>
+            </div>
+        </div>
+
+        <div class="config-section">
+            <h2>Configuration Parameters</h2>
+            <div class="config-grid" id="configGrid">
+                {% for key, value in config_data.items() %}
+                <div class="config-item" data-key="{{ key|lower }}" data-value="{{ value|string|lower }}">
+                    <div class="config-key">{{ key }}</div>
+                    <div class="config-value {% if value is boolean %}boolean{% elif value is number %}number{% elif value is none %}null{% endif %}">
+                        {% if value is none %}
+                            null
+                        {% elif value is boolean %}
+                            {{ value|string|lower }}
+                        {% else %}
+                            {{ value }}
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Search functionality
+        const searchBox = document.getElementById('searchBox');
+        const configGrid = document.getElementById('configGrid');
+        const visibleParamsCounter = document.getElementById('visibleParams');
+        const totalParams = {{ config_data|length }};
+
+        function updateVisibleCount() {
+            const visibleItems = configGrid.querySelectorAll('.config-item:not(.hidden)');
+            visibleParamsCounter.textContent = visibleItems.length;
+        }
+
+        function filterConfigs() {
+            const searchTerm = searchBox.value.toLowerCase().trim();
+            const configItems = configGrid.querySelectorAll('.config-item');
+
+            configItems.forEach(item => {
+                const key = item.dataset.key;
+                const value = item.dataset.value;
+                
+                if (searchTerm === '' || 
+                    key.includes(searchTerm) || 
+                    value.includes(searchTerm)) {
+                    item.classList.remove('hidden');
+                } else {
+                    item.classList.add('hidden');
+                }
+            });
+
+            updateVisibleCount();
+        }
+
+        // Add event listener for search
+        searchBox.addEventListener('input', filterConfigs);
+
+        // Add keyboard shortcut for search focus
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'f') {
+                e.preventDefault();
+                searchBox.focus();
+            }
+        });
+
+        // Initialize visible count
+        updateVisibleCount();
+    </script>
+</body>
+</html>

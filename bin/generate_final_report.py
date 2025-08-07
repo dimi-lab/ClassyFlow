@@ -115,6 +115,18 @@ def setup_jinja_environment(template_dir: str):
     return jinja_env
 
 
+def read_config_file(config_path: str) -> Dict[str, Any]:
+    """Read pipeline configuration from JSON file."""
+    try:
+        with open(config_path, 'r') as f:
+            config_data = json.load(f)
+        logger.info(f"Loaded configuration from {config_path}")
+        return config_data
+    except Exception as e:
+        logger.error(f"Error reading config file {config_path}: {e}")
+        return {}
+
+
 def read_normalization_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     """Read normalization results from norm directory."""
     norm_dir = Path(pipeline_output_dir, "norm")
@@ -381,6 +393,44 @@ def csv_to_dict(csv_file_path, max_rows=None):
         return {'headers': [], 'rows': []}
 
 
+def generate_config_report(config_data: Dict[str, Any],
+                          output_file: str,
+                          jinja_env,
+                          generation_date: str):
+    """
+    Generate the configuration HTML report.
+    
+    Args:
+        config_data: Dictionary containing pipeline configuration
+        output_file: Path to output HTML file
+        jinja_env: Jinja2 environment
+        generation_date: Date string for the report
+    """
+    print(config_data)
+    try:
+        # Load template from file instead of string
+        template = jinja_env.get_template('configs.html')
+        
+        # Render the template
+        html_content = template.render(
+            config_data=config_data,
+            generation_date=generation_date
+        )
+        
+        # Write to output file
+        output_path = Path(output_file)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        logger.info(f"Configuration report generated successfully: {output_path}")
+        
+    except Exception as e:
+        logger.error(f"Error generating configuration report: {e}")
+        raise
+
+
 def generate_report(all_data: Dict[str, Any], 
                    output_file: str, 
                    jinja_env, 
@@ -395,7 +445,8 @@ def generate_report(all_data: Dict[str, Any],
         output_file: Path to output HTML file
         jinja_env: Jinja2 environment
         template_name: Name of the Jinja2 template file
-        header_logo_path: Optional path to header logo image
+        letterhead: Optional path to letterhead image
+        pipeline_version: Pipeline version string
     """
     try:
         template = jinja_env.get_template(template_name)
@@ -413,7 +464,7 @@ def generate_report(all_data: Dict[str, Any],
             'normalization_method': all_data['normalization_data']["primary_method"],
             'holdout_accuracy': all_data['modeling_data']["holdout_accuracy"],
             'f1_score': all_data['modeling_data']["f1_score"],
-            'letterhead': encode_image_to_base64(letterhead)
+            'letterhead': encode_image_to_base64(letterhead) if letterhead else None
         }
 
         template_data.update(all_data)
@@ -470,6 +521,10 @@ def main():
         default="N/A"
     )
     parser.add_argument(
+        '--config',
+        help='Path to pipeline configuration JSON file'
+    )
+    parser.add_argument(
         '--debug',
         action='store_true',
         help='Enable debug logging'
@@ -486,17 +541,34 @@ def main():
     # Collect all data
     all_data = collect_all_data(args.input_dir)
     
-    # Generate report
+    # Generate main report
     output_file = Path(args.report_dir) / args.report_name
     generate_report(
-        all_data = all_data, 
-        output_file = output_file, 
-        jinja_env = jinja_env, 
-        letterhead = args.letterhead,
-        pipeline_version = args.version
+        all_data=all_data, 
+        output_file=output_file, 
+        jinja_env=jinja_env, 
+        letterhead=args.letterhead,
+        pipeline_version=args.version
     )
     
-    print(f"Report generated: {output_file}")
+    # Generate configuration report if config file is provided
+    if args.config:
+        config_data = read_config_file(args.config)
+        if config_data:
+            config_output_file = Path(args.report_dir) / "pipeline_config.html"
+            generate_config_report(
+                config_data=config_data,
+                output_file=config_output_file,
+                jinja_env=jinja_env,
+                generation_date=datetime.now().strftime("%B %d, %Y")
+            )
+            print(f"Configuration report generated: {config_output_file}")
+        else:
+            logger.warning("Configuration file could not be read - skipping config report generation")
+    else:
+        logger.info("No configuration file provided - skipping config report generation")
+    
+    print(f"Main report generated: {output_file}")
     print("All images have been embedded - the report is completely standalone!")
 
 
