@@ -19,6 +19,9 @@
             background-color: #f8f9fa;
             max-width: 90%;
             margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
         }
 
         /* Header - Reduced height */
@@ -216,7 +219,12 @@
             font-weight: 700;
         }
 
-        /* Main content */
+        /* Main content - Updated to ensure proper footer positioning */
+        .main-content {
+            flex: 1;
+            padding-bottom: 2rem;
+        }
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -590,19 +598,40 @@
             color: #856404;
         }
 
-        /* Footer */
+        /* Footer - Fixed to always be visible */
         .footer {
             background-color: #343a40;
             color: white;
             text-align: center;
             padding: 1.5rem 0;
-            margin-top: 2rem;
+            margin-top: auto;
+            flex-shrink: 0;
         }
 
         .footer p {
             color: #ced4da;
-            margin: 0;
+            margin: 0 0 0.5rem 0;
             font-size: 0.9rem;
+        }
+
+        .footer-links {
+            margin-top: 0.5rem;
+        }
+
+        .footer-links a {
+            color: #adb5bd;
+            text-decoration: none;
+            font-size: 0.85rem;
+            border: 1px solid #495057;
+            padding: 0.3rem 0.8rem;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: #fff;
+            border-color: #667eea;
+            background-color: #667eea;
         }
 
         /* Tab content styling */
@@ -761,15 +790,20 @@
         </div>
     </nav>
 
-    <!-- Include all tab content -->
-    {% include 'summary.html' %}
-    {% include 'normalization.html' %}
-    {% include 'feature-selection.html' %}
-    {% include 'modeling.html' %}
-    {% include 'predictions.html' %}
+    <div class="main-content">
+        <!-- Include all tab content -->
+        {% include 'summary.html' %}
+        {% include 'normalization.html' %}
+        {% include 'feature-selection.html' %}
+        {% include 'modeling.html' %}
+        {% include 'predictions.html' %}
+    </div>
 
     <footer class="footer">
         <p>Generated on {{ generation_date }} | Pipeline Version {{ pipeline_version if pipeline_version else 'Unknown' }}</p>
+        <div class="footer-links">
+            <a href="pipeline_config.html" target="_blank">View Pipeline Configuration</a>
+        </div>
     </footer>
 
     <script>

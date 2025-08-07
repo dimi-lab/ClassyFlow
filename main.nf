@@ -1,4 +1,5 @@
 #!/usr/bin/env nextflow
+import groovy.json.JsonOutput
 
 // Using DSL-2
 nextflow.enable.dsl=2
@@ -249,7 +250,8 @@ process SUMMARIZE_PREDICTIONS {
 }
 
 process GENERATE_FINAL_REPORT {
-    publishDir "${params.output_dir}/final_reports", pattern: "classyflow_report.html", mode: 'copy', overwrite: true
+    publishDir "${params.output_dir}/final_reports", pattern: "*.html", mode: 'copy', overwrite: true
+    publishDir "${params.output_dir}/final_reports", pattern: "pipeline_config.json", mode: 'copy', overwrite: true
     
     input:
     path(missing_files, stageAs: "general/*")
@@ -263,13 +265,33 @@ process GENERATE_FINAL_REPORT {
 
     output:
     path("classyflow_report.html")
+    path("pipeline_config.html")
 
     script:
+    def filtered_params = params.findAll { key, value ->
+        // Skip certain problematic parameters
+        !key.startsWith('_') &&  // Skip internal params
+        key != 'schema_ignore_params' &&
+        key != 'validationSchemaIgnoreParams' &&
+        key != 'genomes' &&  // Often contains complex nested structures
+        // Only include simple types
+        (value instanceof String || 
+         value instanceof Number || 
+         value instanceof Boolean ||
+         value == null)
+    }
+    
+    def config_json = groovy.json.JsonOutput.toJson(filtered_params)
     """
-    generate_final_report.py --template-dir ${params.html_template} \
+    cat > pipeline_config.json << 'EOF'
+${config_json}
+EOF
+
+    generate_final_report.py --template-dir ${template_dir} \
                             --report-name classyflow_report.html \
-                            --letterhead ${params.letterhead} \
-                            --version ${params.pipeline_version}
+                            --letterhead ${letterhead_file} \
+                            --version ${params.pipeline_version} \
+                            --config pipeline_config.json
     """
 
 }
