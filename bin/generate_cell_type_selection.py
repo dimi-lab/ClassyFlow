@@ -313,8 +313,19 @@ def get_lasso_classification_features(
     numeric_cols = [col for col in numeric_cols if not re.search(r'(Centroid|Binary|cnt|Name)', col)]
     tile_data = df.groupby('Lasso_Binary')[numeric_cols].mean()
     tile_data = tile_data.transpose()  # Flip rows and columns
-    plt.figure(figsize=(max(8, len(tile_data.index)*0.5), 6))
-    sns.heatmap(tile_data, annot=True, fmt='.2f', cmap='viridis', cbar=True)
+
+    # Calculate dimensions
+    max_width, max_height = 20, 15
+    min_width, min_height = 8, 6
+
+    width = min(max_width, max(min_width, len(tile_data.columns) * 0.5))
+    height = min(max_height, max(min_height, len(tile_data.index) * 0.4))
+
+    # Disable annotations for very large datasets to improve readability
+    show_annotations = len(tile_data.index) * len(tile_data.columns) < 500
+
+    plt.figure(figsize=(width, height))
+    sns.heatmap(tile_data, annot=show_annotations, fmt='.2f', cmap='viridis', cbar=True)
     plt.title('Mean Values of Numeric Features by Lasso_Binary (Transposed)')
     plt.xlabel('Lasso_Binary')
     plt.ylabel('Features')
