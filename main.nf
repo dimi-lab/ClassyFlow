@@ -17,6 +17,9 @@ params.output_dir = "${workflow.projectDir}/output"
 params.letterhead = file("${projectDir}/assets/images/ClassyFlow_Letterhead.PNG", checkIfExists: true)
 params.html_template = file("${projectDir}/assets/html_templates", checkIfExists: true)
 params.pipeline_version = "1.0"
+params.reports_dir = "${params.output_dir}/final_reports"
+
+params.config_file = file(workflow.configFiles[0], checkIfExists: true)
 
 // Build Input List of Batches
 Channel.fromList(params.input_dirs)
@@ -125,6 +128,8 @@ process ADD_EMPTY_MARKER_NOISE {
  * ensuring balanced and reproducible training/validation splits for downstream modeling.
  */
 process GENERATE_TRAINING_N_HOLDOUT{
+    machineType 'n2-standard-32'	
+
 	publishDir(
         path: "${params.output_dir}/celltype_reports",
         pattern: "*.pdf",
@@ -252,52 +257,51 @@ process SUMMARIZE_PREDICTIONS {
 
 process GENERATE_FINAL_REPORT {
     publishDir "${params.output_dir}/final_reports", pattern: "*.html", mode: 'copy', overwrite: true
-    publishDir "${params.output_dir}/final_reports", pattern: "pipeline_config.json", mode: 'copy', overwrite: true
+    publishDir "${params.output_dir}/final_reports/pages/", pattern: "nextflow.config", mode: 'copy', overwrite: true
     
     input:
     path(missing_files, stageAs: "general/*")
     path(split_files, stageAs: "general/*")
-    path(norm_files, stageAs: "norm/*")
-    path(fs_files, stageAs: "feature_selection/*") 
+    path(norm_html)
+    path(fs_html) 
     path(xgb_winners, stageAs: "modeling/*")
     path(holdout_files, stageAs: "modeling/*")
     path(abundance_results, stageAs: "general/*")
     path(classified_results), stageAs: "general/per_slide/*"
     path(template_dir)
     path(letterhead_file)
+    path(nf_config)
 
     output:
     path("classyflow_report.html")
-    path("pipeline_config.html")
 
     script:
-    def filtered_params = params.findAll { key, value ->
-        // Skip certain problematic parameters
-        !key.startsWith('_') &&  // Skip internal params
-        key != 'schema_ignore_params' &&
-        key != 'validationSchemaIgnoreParams' &&
-        key != 'genomes' &&  // Often contains complex nested structures
-        // Only include simple types
-        (value instanceof String || 
-         value instanceof Number || 
-         value instanceof Boolean ||
-         value == null)
-    }
-    
-    def config_json = groovy.json.JsonOutput.toJson(filtered_params)
     """
-    cat > pipeline_config.json << 'EOF'
-${config_json}
-EOF
-
     generate_final_report.py --template-dir ${template_dir} \
                             --report-name classyflow_report.html \
                             --letterhead ${letterhead_file} \
-                            --version ${params.pipeline_version} \
-                            --config pipeline_config.json
+                            --version ${params.pipeline_version} 
     """
 
 }
+
+process ZIP_PUBLISHED {
+    tag "zipping published dir"
+    publishDir "${params.output_dir}", pattern: "final_reports.zip", mode: 'copy', overwrite: true
+
+    input:
+    val trigger
+    path("final_reports/")
+
+    output:
+    path "final_reports.zip"
+
+    script:
+    """
+    zip -r final_reports.zip final_reports/
+    """
+}
+
 // -------------------------------------- //
 
 
@@ -357,46 +361,38 @@ workflow {
         missing_outputs = ADD_EMPTY_MARKER_NOISE.output.empty_marker_results.flatten().collect()
         split_outputs = labledDataFrames.training_holdout_results.flatten().collect()
 
-        norm_outputs = Channel.empty().mix(
-        normalized_output.boxcox_results.map { it -> it[1..-1] }.ifEmpty([]),  // Skip batchID, take files
-        normalized_output.quantile_results.map { it -> it[1..-1] }.ifEmpty([]), // Skip batchID, take files  
-        normalized_output.minmax_results.map { it -> it[1..-1] }.ifEmpty([]),   // Skip batchID, take files
-        normalized_output.log_results.map { it -> it[1..-1] }.ifEmpty([])       // Skip batchID, take files
-    ).flatten().collect()
+        xgb_winners = modeling_results.xgb_results
+            .flatten() 
+            .collect()
+            
+        holdout_evals = modeling_results.holdout_results
+            .flatten()
+            .collect()
 
-    fs_outputs = feature_selection_results.feature_results
-        .flatten()
-        .collect()
-
-    xgb_winners = modeling_results.xgb_results
-        .flatten() 
-        .collect()
+        prediction_results = SUMMARIZE_PREDICTIONS.output.abundance_results
+            .flatten()
+            .collect()
         
-    holdout_evals = modeling_results.holdout_results
-        .flatten()
-        .collect()
-
-    prediction_results = SUMMARIZE_PREDICTIONS.output.abundance_results
-        .flatten()
-        .collect()
-    
-    classified_results = CLASSIFIED_REPORT_PER_SLIDE.output.slide_results
-        .flatten()
-        .collect()
+        classified_results = CLASSIFIED_REPORT_PER_SLIDE.output.slide_results
+            .flatten()
+            .collect()
 
         // Pass all to reporting
-        GENERATE_FINAL_REPORT(
+        final_report = GENERATE_FINAL_REPORT(
             missing_outputs,
             split_outputs,
-            norm_outputs,
-            fs_outputs, 
+            normalized_output.report,
+            feature_selection_results.report, 
             xgb_winners,
             holdout_evals,
             prediction_results,
             classified_results,
             params.html_template,
-            params.letterhead
+            params.letterhead,
+            params.config_file
         )
+
+        ZIP_PUBLISHED(final_report.map {"done"}, params.reports_dir)
 
     	
     }

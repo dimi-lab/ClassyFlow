@@ -8,6 +8,9 @@ import seaborn as sns
 from sklearn.preprocessing import QuantileTransformer
 import argparse
 import numpy as np
+from scipy.stats import pearsonr
+from jinja2 import Template
+from pathlib import Path
 
 # Set style for professional plots
 plt.style.use('default')
@@ -40,30 +43,6 @@ def calculate_cv_metrics(df, df_transformed, batchName):
     cv_df = pd.DataFrame(cv_data)
     return cv_df
 
-def create_cv_heatmap(cv_df, filename, plot_type='improvement'):
-    """Create CV heatmap showing improvement or transformed values"""
-    
-    if plot_type == 'improvement':
-        pivot_data = cv_df.pivot(index='marker', columns='slide', values='cv_improvement')
-        title = 'CV Improvement by Marker and Slide (Original - Transformed)'
-        cmap = 'RdYlGn'  # Red = worse, Green = better
-    else:
-        pivot_data = cv_df.pivot(index='marker', columns='slide', values='cv_transformed')
-        title = 'Coefficient of Variation After Transformation'
-        cmap = 'YlOrRd_r'  # Lower CV = better
-    
-    plt.figure(figsize=(12, 8))
-    sns.heatmap(pivot_data, annot=True, fmt='.3f', cmap=cmap, center=0 if plot_type == 'improvement' else None,
-                cbar_kws={'label': 'CV Improvement' if plot_type == 'improvement' else 'CV'})
-    plt.title(title, fontsize=14, fontweight='bold')
-    plt.xlabel('Slide', fontsize=12)
-    plt.ylabel('Marker', fontsize=12)
-    plt.xticks(rotation=45)
-    plt.yticks(rotation=0)
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
-
 def get_worst_performing_markers(cv_df, n_markers=5):
     """Identify markers with worst CV performance"""
     marker_performance = cv_df.groupby('marker').agg({
@@ -75,111 +54,315 @@ def get_worst_performing_markers(cv_df, n_markers=5):
     worst_markers = marker_performance.nsmallest(n_markers, 'cv_improvement')['marker'].tolist()
     return worst_markers
 
-def create_slide_boxplots(df, df_transformed, filename, plotFraction):
-    """Create before/after boxplots by slide"""
+def create_all_transformation_plots_html(df, df_transformed, batchName, transformation_type='Quantile', quantileSplit=100):
+    """Create individual plots for all markers and generate single HTML with dropdown"""
     
-    # Sample data for plotting
-    smTble_orig = df.groupby('Slide', group_keys=False).apply(lambda x: x.sample(frac=plotFraction))
-    smTble_trans = df_transformed.groupby('Slide', group_keys=False).apply(lambda x: x.sample(frac=plotFraction))
+    # Create plots directory
+    plots_dir = Path('plots')
+    plots_dir.mkdir(exist_ok=True)
     
-    # Filter for mean/median columns
-    df_batching_orig = smTble_orig.filter(regex='(Mean|Median|Slide)', axis=1)
-    df_batching_trans = smTble_trans.filter(regex='(Mean|Median|Slide)', axis=1)
+    # Define metric types to process
+    metric_types = ['Min', 'Max', 'Median', 'Mean', 'Std', 'Variance', 'Area']
     
-    # Melt for plotting
-    df_melted_orig = pd.melt(df_batching_orig, id_vars=["Slide"])
-    df_melted_trans = pd.melt(df_batching_trans, id_vars=["Slide"])
+    # Store all plot data organized by metric type
+    all_metrics_data = {}
     
-    # Create subplots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 12))
-    
-    # Original values
-    sns.boxplot(x='Slide', y='value', data=df_melted_orig, ax=ax1, 
-                color="#CD7F32", showfliers=False)
-    ax1.set_title('Combined Marker Distribution (Original Values)', fontsize=14, fontweight='bold')
-    ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45, ha='right')
-    
-    # Transformed values
-    sns.boxplot(x='Slide', y='value', data=df_melted_trans, ax=ax2, 
-                color="#50C878", showfliers=False)
-    ax2.set_title('Combined Marker Distribution (Quantile Transformed)', fontsize=14, fontweight='bold')
-    ax2.set_xticklabels(ax2.get_xticklabels(), rotation=45, ha='right')
-    
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
-
-def create_transformation_examples(df, df_transformed, filename, nucMark, n_examples=5):
-    """Create transformation scatter plots for representative markers"""
-    
-    mean_cols = [col for col in df.columns if 'Mean' in col]
-    nuc_col = next((col for col in mean_cols if nucMark in col), mean_cols[0])
-    
-    # Select every nth marker to get good representation
-    step = max(1, len(mean_cols) // n_examples)
-    example_markers = mean_cols[::step][:n_examples]
-    
-    # Ensure nucleus marker is included
-    if nuc_col not in example_markers:
-        example_markers[0] = nuc_col
-    
-    fig, axes = plt.subplots(1, n_examples, figsize=(20, 4))
-    if n_examples == 1:
-        axes = [axes]
-    
-    for i, marker in enumerate(example_markers):
-        # Create scatter plot
-        axes[i].scatter(df[marker], df_transformed[marker], alpha=0.6, s=1)
+    for metric_type in metric_types:
+        # Get columns for this metric type
+        if metric_type == 'Std':
+            metric_cols = [col for col in df.columns if 'Std' in col]
+        else:
+            metric_cols = [col for col in df.columns if f': {metric_type}' in col or f' {metric_type}' in col]
         
-        # Add diagonal line
-        max_orig = df[marker].max()
-        max_trans = df_transformed[marker].max()
-        axes[i].plot([0, max_orig], [0, max_trans], 'r--', alpha=0.7, linewidth=2)
-        
-        # Formatting
-        marker_name = marker.replace('Cell: ', '').replace(': Mean', '')
-        axes[i].set_title(f'Quantile Transform: {marker_name}', fontweight='bold')
-        axes[i].set_xlabel('Original Value')
-        axes[i].set_ylabel('Transformed Value')
-        axes[i].grid(True, alpha=0.3)
-    
-    plt.suptitle('Transformation Examples', fontsize=16, fontweight='bold')
-    plt.tight_layout()
-    
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
-
-def create_distribution_comparison(df, df_transformed, worst_markers, filename):
-    """Create density plots for worst performing markers"""
-    
-    n_markers = len(worst_markers)
-    fig, axes = plt.subplots(n_markers, 1, figsize=(12, 3*n_markers))
-    if n_markers == 1:
-        axes = [axes]
-    
-    for i, marker in enumerate(worst_markers):
-        # Find the actual column name
-        marker_col = next((col for col in df.columns if marker in col and 'Mean' in col), None)
-        if marker_col is None:
+        if not metric_cols:
+            print(f"No columns found for metric type: {metric_type}")
             continue
-            
-        # Create density plots
-        axes[i].hist(df[marker_col], bins=50, alpha=0.7, density=True, 
-                    label='Original', color='#CD7F32')
-        axes[i].hist(df_transformed[marker_col], bins=50, alpha=0.7, density=True, 
-                    label='Quantile Transformed', color='#50C878')
         
-        axes[i].set_title(f'{marker} Distribution Comparison', fontweight='bold')
-        axes[i].set_xlabel('Value')
-        axes[i].set_ylabel('Density')
-        axes[i].legend()
-        axes[i].grid(True, alpha=0.3)
+        print(f"Processing {len(metric_cols)} columns for {metric_type} metric...")
+        
+        # Store plot information for this metric type
+        plot_data = []
+        
+        # Create individual plots for each marker
+        for i, marker_col in enumerate(metric_cols):
+            # Calculate correlation
+            orig_values = df[marker_col].dropna()
+            trans_values = df_transformed[marker_col].dropna()
+            
+            # Ensure same length arrays for correlation
+            min_len = min(len(orig_values), len(trans_values))
+            if min_len > 0:
+                correlation, _ = pearsonr(orig_values[:min_len], trans_values[:min_len])
+            else:
+                correlation = 0
+            
+            # Create figure
+            fig, ax = plt.subplots(figsize=(6, 6))
+            
+            # Scatter plot
+            ax.scatter(df[marker_col], df_transformed[marker_col], alpha=0.6, s=1, color='blue')
+            
+            # Add diagonal reference line
+            max_orig = df[marker_col].max()
+            max_trans = df_transformed[marker_col].max()
+            ax.plot([0, max_orig], [0, max_trans], 'r--', alpha=0.7, linewidth=2, label='Identity Line')
+            
+            # Formatting
+            ax.set_title(f'{transformation_type} Transform: {marker_col}', fontweight='bold', fontsize=12)
+            ax.set_xlabel('Original Value', fontsize=10)
+            ax.set_ylabel('Transformed Value', fontsize=10)
+            ax.grid(True, alpha=0.3)
+            
+            # Add text box with stats
+            textstr = f'Quantiles = {quantileSplit}\nr = {correlation:.3f}'
+            props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+            ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=9,
+                    verticalalignment='top', bbox=props)
+            
+            plt.tight_layout()
+            
+            # Save plot with metric type in filename
+            safe_marker_name = marker_col.replace("/", "_").replace(" ", "_").replace(":", "")
+            plot_filename = f'quantile_{batchName}_{metric_type.lower()}_{i:03d}_{safe_marker_name}.png'
+            plot_path = plots_dir / plot_filename
+            plt.savefig(plot_path, dpi=150, bbox_inches='tight')
+            plt.close()
+            
+            # Store plot information
+            plot_data.append({
+                'marker_name': marker_col,
+                'filename': str(plot_path),
+                'correlation': correlation
+            })
+        
+        if plot_data:
+            all_metrics_data[metric_type] = {
+                'plots': plot_data,
+                'total': len(metric_cols)
+            }
     
-    plt.suptitle('Distribution Comparison: Worst Performing Markers', fontsize=16, fontweight='bold')
-    plt.tight_layout()
+    # Generate single HTML with dropdown
+    generate_combined_html(all_metrics_data, batchName, transformation_type, quantileSplit)
     
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
+    print(f"Individual plots saved in: {plots_dir}/")
+    
+    return all_metrics_data
+
+def generate_combined_html(all_metrics_data, batchName, transformation_type, quantileSplit):
+    """Generate a single HTML file with dropdown to switch between metric types"""
+    
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{transformation_type} Transformation - {batchName}</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }}
+        h1 {{
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }}
+        .controls {{
+            text-align: center;
+            margin: 20px 0;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        .metric-selector {{
+            padding: 10px 20px;
+            font-size: 16px;
+            border: 2px solid #2196F3;
+            border-radius: 5px;
+            background-color: white;
+            cursor: pointer;
+        }}
+        .metric-selector:hover {{
+            background-color: #f0f0f0;
+        }}
+        .metadata {{
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+        }}
+        .stats-summary {{
+            background-color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: none;
+        }}
+        .stats-summary.active {{
+            display: block;
+        }}
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }}
+        .stat-item {{
+            text-align: center;
+        }}
+        .stat-value {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #2196F3;
+        }}
+        .stat-label {{
+            font-size: 12px;
+            color: #666;
+        }}
+        .plots-container {{
+            display: none;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }}
+        .plots-container.active {{
+            display: grid;
+        }}
+        .plot-item {{
+            background-color: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        .plot-item h3 {{
+            margin-top: 0;
+            color: #333;
+            font-size: 14px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }}
+        .plot-item img {{
+            width: 100%;
+            height: auto;
+        }}
+        .plot-stats {{
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+            font-size: 12px;
+            color: #666;
+        }}
+        .good-correlation {{
+            color: #4CAF50;
+            font-weight: bold;
+        }}
+        .poor-correlation {{
+            color: #f44336;
+            font-weight: bold;
+        }}
+    </style>
+</head>
+<body>
+    <h1>{transformation_type} Transformation Results</h1>
+    <div class="metadata">
+        <p><strong>Batch:</strong> {batchName} | <strong>Generated:</strong> {time.strftime("%Y-%m-%d %H:%M:%S")} | <strong>Quantiles:</strong> {quantileSplit}</p>
+    </div>
+    
+    <div class="controls">
+        <label for="metricSelector" style="margin-right: 10px; font-weight: bold;">Select Metric Type:</label>
+        <select id="metricSelector" class="metric-selector" onchange="showMetric(this.value)">
+            <option value="">-- Select a Metric --</option>
+"""
+    
+    # Add options for each metric type
+    for metric_type in all_metrics_data.keys():
+        html_content += f'            <option value="{metric_type}">{metric_type} ({all_metrics_data[metric_type]["total"]} markers)</option>\n'
+    
+    html_content += """        </select>
+    </div>
+"""
+    
+    # Add content for each metric type
+    for metric_type, metric_data in all_metrics_data.items():
+        html_content += f"""
+    <div class="stats-summary" id="stats-{metric_type}">
+        <h2>{metric_type} Transformation Summary</h2>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value">{metric_data['total']}</div>
+                <div class="stat-label">Total Markers</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{quantileSplit}</div>
+                <div class="stat-label">Quantile Splits</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="plots-container" id="plots-{metric_type}">
+"""
+        
+        for plot in metric_data['plots']:
+            correlation_class = ''
+            if plot['correlation'] > 0.8:
+                correlation_class = 'good-correlation'
+            elif plot['correlation'] < 0.5:
+                correlation_class = 'poor-correlation'
+            
+            html_content += f"""        <div class="plot-item">
+            <h3>{plot['marker_name']}</h3>
+            <img src="{plot['filename']}" alt="{plot['marker_name']} transformation">
+            <div class="plot-stats">
+                <span>Quantiles: {quantileSplit}</span>
+                <span class="{correlation_class}">Correlation: {plot['correlation']:.3f}</span>
+            </div>
+        </div>
+"""
+        
+        html_content += "    </div>\n"
+    
+    # Add JavaScript for switching between metrics
+    html_content += """
+    <script>
+        function showMetric(metricType) {
+            // Hide all stats and plots
+            const allStats = document.querySelectorAll('.stats-summary');
+            const allPlots = document.querySelectorAll('.plots-container');
+            
+            allStats.forEach(el => el.classList.remove('active'));
+            allPlots.forEach(el => el.classList.remove('active'));
+            
+            // Show selected metric
+            if (metricType) {
+                const statsEl = document.getElementById('stats-' + metricType);
+                const plotsEl = document.getElementById('plots-' + metricType);
+                if (statsEl) statsEl.classList.add('active');
+                if (plotsEl) plotsEl.classList.add('active');
+            }
+        }
+        
+        // Show first metric by default
+        window.onload = function() {
+            const selector = document.getElementById('metricSelector');
+            if (selector.options.length > 1) {
+                selector.selectedIndex = 1;
+                showMetric(selector.options[1].value);
+            }
+        }
+    </script>
+</body>
+</html>"""
+    
+    # Save HTML file
+    html_filename = f'quantile_all_plots_{batchName}.html'
+    with open(html_filename, 'w') as f:
+        f.write(html_content)
+    
+    print(f"Combined HTML report generated: {html_filename}")
+
 
 def collect_and_transform(df, batchName, quantType, nucMark, plotFraction, quantileSplit):
     """Main transformation and plotting function"""
@@ -200,31 +383,14 @@ def collect_and_transform(df, batchName, quantType, nucMark, plotFraction, quant
     # Get worst performing markers
     worst_markers = get_worst_performing_markers(cv_df, n_markers=5)
     
-    # Generate plots
-    results = {
-        'slide_boxplots': f'quantile_slide_boxplots_{batchName}.png',
-        'cv_heatmap': f'quantile_cv_improvement_heatmap_{batchName}.png',
-        'transformation_examples': f'quantile_transformation_examples_{batchName}.png',
-        'distribution_comparison': f'quantile_distribution_comparison_{batchName}.png'
-    }
-    
-    # 1. Slide boxplots
-    create_slide_boxplots(df, bcDf, results['slide_boxplots'], plotFraction)
-    
-    # 2. CV heatmap
-    create_cv_heatmap(cv_df, results['cv_heatmap'], plot_type='improvement')
-    
-    # 3. Transformation examples
-    create_transformation_examples(df, bcDf, results['transformation_examples'], nucMark)
-    
-    # 4. Distribution comparison
-    create_distribution_comparison(df, bcDf, worst_markers, results['distribution_comparison'])
+    # Create HTML with all transformation plots for all metric types
+    all_plot_data = create_all_transformation_plots_html(df, bcDf, batchName, 'Quantile', quantileSplit)
     
     # Save transformation results
     bcDf.to_csv(f"quantile_transformed_{batchName}.tsv", sep="\t")
     
     # Calculate summary metrics
-    results.update({
+    results = {
         'transformation_type': 'quantile',
         'batch_name': batchName,
         'quantile_splits': quantileSplit,
@@ -238,8 +404,9 @@ def collect_and_transform(df, batchName, quantType, nucMark, plotFraction, quant
             'markers_improved': (cv_df['cv_improvement'] > 0).sum(),
             'markers_worsened': (cv_df['cv_improvement'] < 0).sum()
         },
+        'all_transformation_plots': all_plot_data,
         'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
-    })
+    }
     
     return results
 

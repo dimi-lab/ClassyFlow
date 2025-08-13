@@ -9,6 +9,32 @@
         distinguishing each cell type, improving model performance and interpretability.
     </div>
 
+    <!-- Summary Statistics -->
+    {% if feature_selection_data.summary_statistics %}
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-value">{{ feature_selection_data.total_cell_types }}</div>
+            <div class="metric-label">Cell Types Analyzed</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ feature_selection_data.summary_statistics.avg_original_features }}</div>
+            <div class="metric-label">Avg Original Features</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ feature_selection_data.summary_statistics.avg_selected_features }}</div>
+            <div class="metric-label">Avg Selected Features</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ feature_selection_data.summary_statistics.avg_reduction_rate }}%</div>
+            <div class="metric-label">Avg Reduction Rate</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ feature_selection_data.summary_statistics.cv_folds_summary }}</div>
+            <div class="metric-label">CV Folds Used</div>
+        </div>
+    </div>
+    {% endif %}
+
 {% if feature_selection_data.feature_selection_results %}
 <!-- Cell Type Tabs Navigation -->
 <section class="page-section">
@@ -34,6 +60,16 @@
             border-radius: 6px 6px 0 0;
             min-width: 120px;
             text-align: center;
+            position: relative;
+        }
+
+        .celltype-tab.has-warning::after {
+            content: "⚠";
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            color: #ff9800;
+            font-weight: bold;
         }
 
         .celltype-tab:hover {
@@ -55,6 +91,48 @@
             display: block;
         }
 
+        .warning-badge {
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+            display: inline-block;
+        }
+
+        .feature-list {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 1rem;
+            margin: 1rem 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .feature-list-header {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            color: #495057;
+        }
+
+        .feature-item {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .feature-name {
+            color: #333;
+        }
+
+        .feature-score {
+            color: #667eea;
+            font-weight: 600;
+        }
+
         @media (max-width: 768px) {
             .celltype-tabs {
                 flex-direction: column;
@@ -72,7 +150,7 @@
     <!-- Cell Type Tabs -->
     <div class="celltype-tabs">
         {% for celltype_result in feature_selection_data.feature_selection_results %}
-        <div class="celltype-tab {% if loop.first %}active{% endif %}" 
+        <div class="celltype-tab {% if loop.first %}active{% endif %} {% if celltype_result.rfe_warning %}has-warning{% endif %}" 
              onclick="showCellType('celltype-{{ loop.index0 }}')">
             {{ celltype_result.celltype }}
         </div>
@@ -85,6 +163,15 @@
         
         <!-- Cell Type Overview -->
         <h3>{{ celltype_result.celltype }} Feature Selection</h3>
+
+        <!-- RFE Warning if applicable -->
+        {% if celltype_result.rfe_warning %}
+        <div class="warning-badge">
+            ⚠️ <strong>Warning:</strong> Selected features ({{ celltype_result.data.optimal_n_features }}) 
+            is below the 2% threshold ({{ celltype_result.min_features_threshold }} features). 
+            This may lead to overfitting. Consider increasing the feature count.
+        </div>
+        {% endif %}
 
         <div class="metrics-grid">
             <div class="metric-card">
@@ -109,24 +196,56 @@
 
             <div class="metric-card">
                 <div class="tooltip">
-                    <div class="metric-value">{{ "%.1f" | format((celltype_result.data.optimal_n_features / celltype_result.data.feature_selection_summary.original_features * 100)) if celltype_result.data.feature_selection_summary.original_features > 0 else "N/A" }}%</div>
-                    <div class="metric-label">Reduction Rate</div>
+                    <div class="metric-value">{{ celltype_result.data.optimal_n_features }}</div>
+                    <div class="metric-label">Selected Features</div>
                     <span class="tooltiptext">
-                        Percentage of original features reduced after selection process.
+                        Final number of features selected as optimal for this cell type classification.
                     </span>
                 </div>
             </div>
 
             <div class="metric-card">
                 <div class="tooltip">
-                    <div class="metric-value">{{ celltype_result.data.optimal_n_features }}</div>
-                    <div class="metric-label">Final Selection</div>
+                    <div class="metric-value">{{ celltype_result.cv_folds | default("N/A") }}</div>
+                    <div class="metric-label">CV Folds</div>
                     <span class="tooltiptext">
-                        Final number of features selected as optimal for this cell type classification.
+                        Number of cross-validation folds used in the feature selection process.
+                    </span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="tooltip">
+                    <div class="metric-value">{{ "%.1f" | format(celltype_result.data.feature_selection_summary.reduction_percentage) if celltype_result.data.feature_selection_summary.reduction_percentage else "N/A" }}%</div>
+                    <div class="metric-label">Reduction Rate</div>
+                    <span class="tooltiptext">
+                        Percentage of original features reduced after selection process.
                     </span>
                 </div>
             </div>
         </div>
+
+        <!-- Selected Features List -->
+        {% if celltype_result.selected_features %}
+        <div class="feature-list">
+            <div class="feature-list-header">
+                Selected Features (Top {{ celltype_result.selected_features_count }})
+            </div>
+            {% for feature in celltype_result.selected_features[:20] %}
+            <div class="feature-item">
+                <span class="feature-name">{{ feature }}</span>
+                {% if celltype_result.feature_importance and feature in celltype_result.feature_importance %}
+                <span class="feature-score">{{ "%.4f" | format(celltype_result.feature_importance[feature]) }}</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% if celltype_result.selected_features|length > 20 %}
+            <div class="feature-item" style="font-style: italic; color: #6c757d;">
+                ... and {{ celltype_result.selected_features|length - 20 }} more features
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
 
         <!-- Visualization Plots -->
         <div class="header-with-tooltip">
@@ -142,30 +261,52 @@
         <div style="display: flex; flex-direction: column; gap: 2rem;">
             {% if celltype_result.data.feature_ranking_plot_path %}
             <div class="plot-container full">
-                <div class="plot-title">Feature Ranking</div>
+                <div class="plot-title">Feature Ranking with Selection Cutoff</div>
                 <img src="{{ celltype_result.data.feature_ranking_plot_path }}" alt="Feature Ranking Plot" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
-                    Ranking of features by importance for {{ celltype_result.celltype }} classification.
+                    Features ranked by importance. Blue bars indicate selected features, gray bars are not selected.
                 </p>
             </div>
             {% endif %}
 
-            {% if celltype_result.data.alpha_plot_path %}
-            <div class="plot-container small">
-                <div class="plot-title">Alpha Optimization</div>
-                <img src="{{ celltype_result.data.alpha_plot_path }}" alt="Alpha Optimization Plot" class="embedded-image" />
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                {% if celltype_result.data.rfe_plot_path %}
+                <div class="plot-container">
+                    <div class="plot-title">Recursive Feature Elimination</div>
+                    <img src="{{ celltype_result.data.rfe_plot_path }}" alt="RFE Analysis Plot" class="embedded-image" />
+                    <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
+                        Performance analysis showing optimal number of features.
+                    </p>
+                </div>
+                {% endif %}
+
+                {% if celltype_result.data.stability_analysis_path %}
+                <div class="plot-container">
+                    <div class="plot-title">Feature Stability Analysis</div>
+                    <img src="{{ celltype_result.data.stability_analysis_path }}" alt="Stability Analysis" class="embedded-image" />
+                    <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
+                        Feature selection consistency across CV folds.
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if celltype_result.data.correlation_matrix_path %}
+            <div class="plot-container large">
+                <div class="plot-title">Feature Correlation Matrix</div>
+                <img src="{{ celltype_result.data.correlation_matrix_path }}" alt="Correlation Matrix" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
-                    Optimization of regularization parameter (alpha) for feature selection.
+                    Correlation between selected features helps identify redundant markers.
                 </p>
             </div>
             {% endif %}
 
-            {% if celltype_result.data.rfe_plot_path and celltype_result.data.rfe_plot_path %}
-            <div class="plot-container small">
-                <div class="plot-title">RFE Analysis</div>
-                <img src="{{ celltype_result.data.rfe_plot_path }}" alt="RFE Analysis Plot" class="embedded-image" />
+            {% if celltype_result.data.tile_plot_path %}
+            <div class="plot-container large">
+                <div class="plot-title">Selected Features Heatmap</div>
+                <img src="{{ celltype_result.data.tile_plot_path }}" alt="Feature Heatmap" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
-                    Recursive Feature Elimination analysis showing performance vs. number of features.
+                    Mean values of selected features by classification category.
                 </p>
             </div>
             {% endif %}
@@ -189,10 +330,19 @@ function showCellType(celltypeId) {
     }
     
     // Show selected celltype content
-    document.getElementById(celltypeId).classList.add('active');
+    var selectedContent = document.getElementById(celltypeId);
+    if (selectedContent) {
+        selectedContent.classList.add('active');
+    }
     
-    // Add active class to clicked tab
-    event.target.classList.add('active');
+    // Find and activate the clicked tab
+    for (var i = 0; i < tabs.length; i++) {
+        var onclick = tabs[i].getAttribute('onclick');
+        if (onclick && onclick.includes(celltypeId)) {
+            tabs[i].classList.add('active');
+            break;
+        }
+    }
 }
 </script>
 
