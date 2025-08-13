@@ -183,52 +183,6 @@ def read_normalization_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     
     return replace_png_with_base64(norm_template, "./norm")
 
-
-def read_feature_selection_data(pipeline_output_dir: Path) -> Dict[str, Any]:
-    """Read feature selection results from feature_selection directory."""
-    
-    fs_dir = Path(pipeline_output_dir, "feature_selection")
-    fs_data = {
-        'cell_types_processed': [],
-        'feature_selection_results': [],
-        'total_cell_types': 0
-    }
-    
-    if not fs_dir.exists():
-        logger.error(f"Feature selection directory not found: {fs_dir}")
-    
-    # Look for feature selection result files
-    fs_files = glob.glob(str(fs_dir / "feature_selection_*_results.json"))
-    
-    if not fs_files:
-        logger.error("No feature selection result files found")
-    
-    for file_path in fs_files:
-        try:
-            with open(file_path, 'r') as f:
-                fs_result = json.load(f)
-            
-            celltype = fs_result.get('celltype')
-            
-            fs_data['cell_types_processed'].append(celltype)
-            fs_data['feature_selection_results'].append({
-                'celltype': celltype,
-                'data': fs_result  # Full JSON data with embedded PNGs
-            })
-            
-            logger.info(f"Loaded feature selection data for {celltype}")
-            
-        except Exception as e:
-            logger.error(f"Error reading feature selection file {file_path}: {e}")
-    
-    # Update metadata
-    fs_data.update({
-        'total_cell_types': len(fs_data['cell_types_processed'])
-    })
-    
-    return replace_png_with_base64(fs_data, "./feature_selection")
-
-
 def read_modeling_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     """Read modeling results from modeling directory."""
     modeling_dir = Path(pipeline_output_dir, "modeling")
@@ -355,20 +309,14 @@ def collect_all_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     """Collect all data from pipeline outputs."""
     logger.info("Collecting general metrics...")
     general_data = read_general_data(pipeline_output_dir)
-
-    logger.info("Collecting normalization data...")
-    norm_data = read_normalization_data(pipeline_output_dir)
-    
-    logger.info("Collecting feature selection data...")
-    fs_data = read_feature_selection_data(pipeline_output_dir)
     
     logger.info("Collecting modeling data...")
     modeling_data = read_modeling_data(pipeline_output_dir)
     
     all_jsons = {
         'general': general_data,
-        'normalization_data': norm_data,
-        'feature_selection_data': fs_data,
+        'normalization_report': "normalization_report.html",
+        'feature_selection_data': "feature_selection_report.html",
         'modeling_data': modeling_data
         }
 
@@ -391,45 +339,6 @@ def csv_to_dict(csv_file_path, max_rows=None):
         return data
     except:
         return {'headers': [], 'rows': []}
-
-
-def generate_config_report(config_data: Dict[str, Any],
-                          output_file: str,
-                          jinja_env,
-                          generation_date: str):
-    """
-    Generate the configuration HTML report.
-    
-    Args:
-        config_data: Dictionary containing pipeline configuration
-        output_file: Path to output HTML file
-        jinja_env: Jinja2 environment
-        generation_date: Date string for the report
-    """
-    print(config_data)
-    try:
-        # Load template from file instead of string
-        template = jinja_env.get_template('configs.html')
-        
-        # Render the template
-        html_content = template.render(
-            config_data=config_data,
-            generation_date=generation_date
-        )
-        
-        # Write to output file
-        output_path = Path(output_file)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-        
-        logger.info(f"Configuration report generated successfully: {output_path}")
-        
-    except Exception as e:
-        logger.error(f"Error generating configuration report: {e}")
-        raise
-
 
 def generate_report(all_data: Dict[str, Any], 
                    output_file: str, 
@@ -454,17 +363,23 @@ def generate_report(all_data: Dict[str, Any],
         # Embed all images
         logger.info("Embedding images into report...")
 
+        with open('normalization_report.html', 'r', encoding='utf-8') as f:
+            normalization_html = f.read()
+
+        with open('feature_selection_report.html', 'r', encoding='utf-8') as f:
+            feature_selection_html = f.read()
+
         template_data = {
             'pipeline_version': pipeline_version,
             'generation_date': datetime.now().strftime("%B %d, %Y"),
             'total_cells': all_data['general']['total_cells'], 
-            'total_batches': all_data['normalization_data']['total_batches'],
             'total_labels': all_data['general']["total_annotated_cells"],
             'training_classes': all_data['modeling_data']["training_classes"],
-            'normalization_method': all_data['normalization_data']["primary_method"],
             'holdout_accuracy': all_data['modeling_data']["holdout_accuracy"],
             'f1_score': all_data['modeling_data']["f1_score"],
-            'letterhead': encode_image_to_base64(letterhead) if letterhead else None
+            'letterhead': encode_image_to_base64(letterhead) if letterhead else None,
+            'normalization_html_content': normalization_html,
+            'feature_selection_html_content': feature_selection_html
         }
 
         template_data.update(all_data)
@@ -521,10 +436,6 @@ def main():
         default="N/A"
     )
     parser.add_argument(
-        '--config',
-        help='Path to pipeline configuration JSON file'
-    )
-    parser.add_argument(
         '--debug',
         action='store_true',
         help='Enable debug logging'
@@ -551,26 +462,7 @@ def main():
         pipeline_version=args.version
     )
     
-    # Generate configuration report if config file is provided
-    if args.config:
-        config_data = read_config_file(args.config)
-        if config_data:
-            config_output_file = Path(args.report_dir) / "pipeline_config.html"
-            generate_config_report(
-                config_data=config_data,
-                output_file=config_output_file,
-                jinja_env=jinja_env,
-                generation_date=datetime.now().strftime("%B %d, %Y")
-            )
-            print(f"Configuration report generated: {config_output_file}")
-        else:
-            logger.warning("Configuration file could not be read - skipping config report generation")
-    else:
-        logger.info("No configuration file provided - skipping config report generation")
-    
     print(f"Main report generated: {output_file}")
-    print("All images have been embedded - the report is completely standalone!")
-
 
 if __name__ == "__main__":
     main()

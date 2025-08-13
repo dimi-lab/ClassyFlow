@@ -793,8 +793,8 @@
     <div class="main-content">
         <!-- Include all tab content -->
         {% include 'summary.html' %}
-        {% include 'normalization.html' %}
-        {% include 'feature-selection.html' %}
+        {{ normalization_html_content | safe }}
+        {{ feature_selection_html_content | safe }}
         {% include 'modeling.html' %}
         {% include 'predictions.html' %}
     </div>
@@ -802,7 +802,7 @@
     <footer class="footer">
         <p>Generated on {{ generation_date }} | Pipeline Version {{ pipeline_version if pipeline_version else 'Unknown' }}</p>
         <div class="footer-links">
-            <a href="pipeline_config.html" target="_blank">View Pipeline Configuration</a>
+            <a href="pages/nextflow.config" target="_blank">View Nextflow Pipeline Configuration</a>
         </div>
     </footer>
 
