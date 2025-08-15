@@ -221,7 +221,7 @@ def collect_feature_selection_data(fs_dir: Path) -> Dict[str, Any]:
 def generate_section_report(fs_data: Dict[str, Any],
                           output_file: Path,
                           jinja_env,
-                          template_name: str = "feature_selection.html"):
+                          template_name: str = "feature-selection.html"):
     """
     Generate feature selection section for inclusion in main report.
     
@@ -318,7 +318,7 @@ def main():
     generate_section_report(fs_data, args.output_file, jinja_env)
     
     # Export JSON if requested
-    export_feature_selection_json(fs_data, "feature_selection_results.json")
+    # export_feature_selection_json(fs_data, "feature_selection_results.json")
     
     # Print summary
     print("\n" + "="*60)

@@ -164,7 +164,7 @@ process GENERATE_FS_REPORT {
     path(html_template)
 
     output:
-    path("normalization_report.html"), emit: norm_html
+    path("feature_selection_report.html"), emit: fs_html
 
     script:
     """
@@ -247,5 +247,5 @@ workflow featureselection_wf {
     // Step 12: Emit final results
     emit:
     mas_results = mas
-    report = fs_report
+    report = fs_report.fs_html
 }
