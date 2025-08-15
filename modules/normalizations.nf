@@ -169,7 +169,7 @@ process GMM_GATING {
 
     output:
     tuple val(batchID), path("gmm_gated_${batchID}.tsv"), emit: norm_df
-    path("gmm_gated_${batchID}.html"), emit: gmm_html
+    tuple val(batchID), path("gmm_gated_${batchID}.html"), emit: gmm_html
     
     script:
     """

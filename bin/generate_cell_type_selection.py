@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib import rcParams
 from matplotlib.patches import Rectangle
 import matplotlib.patches as mpatches
+from matplotlib.lines import Line2D
 rcParams.update({'figure.autolayout': True})
 from matplotlib import pyplot
 from numpy import mean
@@ -137,7 +138,7 @@ def plot_feature_ranking_with_cutoff(featureRankDF, output_path, cutoff_n, top_n
     legend_elements = [
         mpatches.Patch(color='#1f77b4', label=f'Selected ({cutoff_n} features)'),
         mpatches.Patch(color='#cccccc', label=f'Not selected'),
-        mpatches.Line2D([0], [0], color='red', linestyle='--', label='Selection cutoff')
+        Line2D([0], [0], color='red', linestyle='--', label='Selection cutoff')
     ]
     
     ax.legend(handles=legend_elements, loc='lower right', fontsize=9,
@@ -335,7 +336,12 @@ def analyze_feature_stability(df, selected_features, n_folds, output_path, cellt
     
     for fold_idx, (train_idx, test_idx) in enumerate(skf.split(X, y)):
         X_train = X.iloc[train_idx]
-        y_train = y[train_idx] if hasattr(y, 'iloc') else y[train_idx]
+        
+        # Fix: Use iloc for pandas Series/DataFrame, direct indexing for numpy arrays
+        if hasattr(y, 'iloc'):
+            y_train = y.iloc[train_idx]  # Use iloc for pandas Series
+        else:
+            y_train = y[train_idx]  # Use direct indexing for numpy arrays
         
         # Simple variance-based selection for stability check
         variances = X_train.var()

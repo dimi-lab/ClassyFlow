@@ -18,7 +18,7 @@ RUN apt-get install -y --no-install-recommends \
 # Set system default python to 3.11 (10 == priority, not sure this matters much)
 RUN apt-get remove -y python3.12 && \
     apt-get autoremove -y && \
-    apt-get install -y --no-install-recommends python3.11-full python3.11-dev python3.11-distutils python3.11-venv && \
+    apt-get install -y --no-install-recommends python3.11-full python3.11-dev python3.11-distutils python3.11-venv zip && \
     python3.11 -m ensurepip && \
     python3.11 -m pip install --upgrade pip && \
     update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
