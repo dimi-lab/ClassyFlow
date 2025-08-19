@@ -1,8 +1,6 @@
 // Produce Batch based normalization - boxcox
 process BOXCOX {
     tag { batchID }
-
-    publishDir "${params.output_dir}/final_reports/plots", pattern: "boxcox_*.png", mode: 'copy'
     publishDir "${params.output_dir}/final_reports/pages", pattern: "boxcox_*.html", mode: 'copy'
     publishDir "${params.output_dir}/temp/", pattern: "boxcox_*.json", mode: 'copy'
     
@@ -10,7 +8,6 @@ process BOXCOX {
     tuple val(batchID), path(pickleTable)
     
     output:
-    path("boxcox_*.png")
     tuple val(batchID), path("boxcox_transformed_${batchID}.tsv"), emit: norm_df
     tuple val(batchID), path ("boxcox_results_${batchID}.json"), path("boxcox_all_plots_${batchID}.html"), emit: boxcox_results
     
@@ -30,7 +27,6 @@ process BOXCOX {
 process QUANTILE {
     tag { batchID }
 
-    publishDir "${params.output_dir}/final_reports/plots", pattern: "quantile_*.png", mode: 'copy'
     publishDir "${params.output_dir}/final_reports/pages", pattern: "quantile_*.html", mode: 'copy'
     publishDir "${params.output_dir}/temp/", pattern: "quantile_*.json", mode: 'copy'
 
@@ -39,7 +35,7 @@ process QUANTILE {
 
     output:
     tuple val(batchID), path("quantile_transformed_${batchID}.tsv"), emit: norm_df
-    tuple val(batchID), path ("quantile_results_${batchID}.json"), path("quantile_*.png"), path("quantile_all_plots_${batchID}.html"), emit: quantile_results
+    tuple val(batchID), path ("quantile_results_${batchID}.json"), path("quantile_all_plots_${batchID}.html"), emit: quantile_results
 
     script:
     """
@@ -58,7 +54,6 @@ process QUANTILE {
 process MINMAX {
     tag { batchID }
 
-    publishDir "${params.output_dir}/final_reports/plots", pattern: "minmax_*.png", mode: 'copy'
     publishDir "${params.output_dir}/final_reports/pages", pattern: "minmax_*.html", mode: 'copy'
     publishDir "${params.output_dir}/temp/", pattern: "minmax_*.json", mode: 'copy'
     
@@ -67,7 +62,7 @@ process MINMAX {
     
     output:
     tuple val(batchID), path("minmax_transformed_${batchID}.tsv"), emit: norm_df
-    tuple val(batchID), path ("minmax_results_${batchID}.json"), path("minmax_*.png"), path("minmax_all_plots_${batchID}.html"), emit: minmax_results
+    tuple val(batchID), path ("minmax_results_${batchID}.json"), path("minmax_all_plots_${batchID}.html"), emit: minmax_results
     
     script:
     """
@@ -84,7 +79,6 @@ process MINMAX {
 process LOGSCALE {
     tag { batchID }
 
-    publishDir "${params.output_dir}/final_reports/plots", pattern: "log_*.png", mode: 'copy'
     publishDir "${params.output_dir}/final_reports/pages", pattern: "log_*.html", mode: 'copy'
     publishDir "${params.output_dir}/temp/", pattern: "log_*.json", mode: 'copy'
     
@@ -93,7 +87,7 @@ process LOGSCALE {
     
     output:
     tuple val(batchID), path("log_transformed_${batchID}.tsv"), emit: norm_df
-    tuple val(batchID), path ("log_results_${batchID}.json"), path("log_*.png"), path("log_all_plots_${batchID}.html"), emit: log_results
+    tuple val(batchID), path ("log_results_${batchID}.json"), path("log_all_plots_${batchID}.html"), emit: log_results
     
     script:
     """

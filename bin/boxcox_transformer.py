@@ -11,6 +11,8 @@ from scipy.stats import boxcox
 from scipy.stats import pearsonr
 from jinja2 import Template
 from pathlib import Path
+import base64
+from io import BytesIO
 
 # Set style for professional plots
 plt.style.use('default')
@@ -150,17 +152,17 @@ def create_all_transformation_plots_html(df, df_transformed, bxcxMetrics, batchN
             
             plt.tight_layout()
             
-            # Save plot with group name in filename
-            safe_marker_name = marker_col.replace("/", "_").replace(" ", "_").replace(":", "")
-            safe_group_name = group_name.lower().replace(" ", "_")
-            plot_filename = f'boxcox_{batchName}_{safe_group_name}_{i:03d}_{safe_marker_name}.png'
-            plt.savefig(plot_filename, dpi=150, bbox_inches='tight')
+            # Convert plot to base64 instead of saving to file
+            buf = BytesIO()
+            plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
             plt.close()
+            buf.seek(0)
+            img_b64 = base64.b64encode(buf.read()).decode('utf-8')
             
             # Store plot information
             plot_data.append({
                 'marker_name': marker_col,
-                'filename': str(plot_filename),
+                'img_b64': img_b64,
                 'lambda_value': lambda_value,
                 'correlation': correlation
             })
@@ -354,7 +356,7 @@ def generate_combined_html(all_metrics_data, batchName, transformation_type):
             
             html_content += f"""        <div class="plot-item">
             <h3>{plot['marker_name']}</h3>
-            <img src="{plot['filename']}" alt="{plot['marker_name']} transformation">
+            <img src="data:image/png;base64,{plot['img_b64']}" alt="{plot['marker_name']} transformation">
             <div class="plot-stats">
                 <span>Lambda: {plot['lambda_value']}</span>
                 <span class="{correlation_class}">Correlation: {plot['correlation']:.3f}</span>

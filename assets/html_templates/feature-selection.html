@@ -262,39 +262,27 @@
             {% if celltype_result.data.feature_ranking_plot_path %}
             <div class="plot-container full">
                 <div class="plot-title">Feature Ranking with Selection Cutoff</div>
-                <img src="{{ celltype_result.data.feature_ranking_plot_path }}" alt="Feature Ranking Plot" class="embedded-image" />
+                <img src="plots/{{ celltype_result.data.feature_ranking_plot_path }}" alt="Feature Ranking Plot" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
                     Features ranked by importance. Blue bars indicate selected features, gray bars are not selected.
                 </p>
             </div>
             {% endif %}
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-                {% if celltype_result.data.rfe_plot_path %}
-                <div class="plot-container">
-                    <div class="plot-title">Recursive Feature Elimination</div>
-                    <img src="{{ celltype_result.data.rfe_plot_path }}" alt="RFE Analysis Plot" class="embedded-image" />
+            {% if celltype_result.data.rfe_plot_path %}
+            <div class="plot-container large">
+                <div class="plot-title">Recursive Feature Elimination</div>
+                    <img src="plots/{{ celltype_result.data.rfe_plot_path }}" alt="RFE Analysis Plot" class="embedded-image" />
                     <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
                         Performance analysis showing optimal number of features.
                     </p>
-                </div>
-                {% endif %}
-
-                {% if celltype_result.data.stability_analysis_path %}
-                <div class="plot-container">
-                    <div class="plot-title">Feature Stability Analysis</div>
-                    <img src="{{ celltype_result.data.stability_analysis_path }}" alt="Stability Analysis" class="embedded-image" />
-                    <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
-                        Feature selection consistency across CV folds.
-                    </p>
-                </div>
-                {% endif %}
             </div>
+            {% endif %}
 
             {% if celltype_result.data.correlation_matrix_path %}
             <div class="plot-container large">
                 <div class="plot-title">Feature Correlation Matrix</div>
-                <img src="{{ celltype_result.data.correlation_matrix_path }}" alt="Correlation Matrix" class="embedded-image" />
+                <img src="plots/{{ celltype_result.data.correlation_matrix_path }}" alt="Correlation Matrix" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
                     Correlation between selected features helps identify redundant markers.
                 </p>
@@ -304,7 +292,7 @@
             {% if celltype_result.data.tile_plot_path %}
             <div class="plot-container large">
                 <div class="plot-title">Selected Features Heatmap</div>
-                <img src="{{ celltype_result.data.tile_plot_path }}" alt="Feature Heatmap" class="embedded-image" />
+                <img src="plots/{{ celltype_result.data.tile_plot_path }}" alt="Feature Heatmap" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
                     Mean values of selected features by classification category.
                 </p>
