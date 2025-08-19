@@ -270,7 +270,7 @@ process GENERATE_FINAL_REPORT {
     path(classified_results), stageAs: "general/per_slide/*"
     path(template_dir)
     path(letterhead_file)
-    path(nf_config)
+    path(nf_config, stageAs: "nextflow.config")
 
     output:
     path("classyflow_report.html")
