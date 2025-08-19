@@ -116,6 +116,8 @@ process MERGE_RFE_SCORE_CSV_FILES {
 
 // Need to generate a comma seperated list of Celltype labels from Pandas
 process EXAMINE_CLASS_LABEL{
+    publishDir "${params.output_dir}/final_reports/plots", pattern: "feature_selection_*.png", mode: 'copy'
+
 	input:
 	tuple val(celltype), path(trainingDataframe), val(best_alpha), path(rfe_scores), path(alpha_scores)
     	
@@ -155,6 +157,24 @@ process MERGE_AND_SORT_CSV {
     tail -n +2 -q ${csv_files.join(' ')} | sort >> selected_features.csv
     """
 }
+
+process GENERATE_FS_REPORT {
+    input:
+    path(fs_files)
+    path(html_template)
+
+    output:
+    path("feature_selection_report.html"), emit: fs_html
+
+    script:
+    """
+    generate_feature_selection_report.py \
+            --output-file feature_selection_report.html \
+            --template-dir $html_template
+    """
+}
+
+
 // -------------------------------------- //
 
 
@@ -217,9 +237,15 @@ workflow featureselection_wf {
     // Step 11: Run feature selection and generate outputs
     fts = EXAMINE_CLASS_LABEL(labelWithEverything)
     mas = MERGE_AND_SORT_CSV(fts.feature_list.collect())
+
+    final_results = fts.feature_selection_results
+            .flatten()
+            .collect()
+
+    fs_report = GENERATE_FS_REPORT(final_results, params.html_template)
     
     // Step 12: Emit final results
     emit:
     mas_results = mas
-    feature_results = fts.feature_selection_results
+    report = fs_report.fs_html
 }

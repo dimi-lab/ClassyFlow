@@ -8,6 +8,11 @@ import seaborn as sns
 import numpy as np
 import argparse
 from scipy.stats import boxcox
+from scipy.stats import pearsonr
+from jinja2 import Template
+from pathlib import Path
+import base64
+from io import BytesIO
 
 # Set style for professional plots
 plt.style.use('default')
@@ -40,30 +45,6 @@ def calculate_cv_metrics(df, df_transformed, batchName):
     cv_df = pd.DataFrame(cv_data)
     return cv_df
 
-def create_cv_heatmap(cv_df, filename, plot_type='improvement'):
-    """Create CV heatmap showing improvement or transformed values"""
-    
-    if plot_type == 'improvement':
-        pivot_data = cv_df.pivot(index='marker', columns='slide', values='cv_improvement')
-        title = 'CV Improvement by Marker and Slide (Original - Transformed)'
-        cmap = 'RdYlGn'  # Red = worse, Green = better
-    else:
-        pivot_data = cv_df.pivot(index='marker', columns='slide', values='cv_transformed')
-        title = 'Coefficient of Variation After Transformation'
-        cmap = 'YlOrRd_r'  # Lower CV = better
-    
-    plt.figure(figsize=(12, 8))
-    sns.heatmap(pivot_data, annot=True, fmt='.3f', cmap=cmap, center=0 if plot_type == 'improvement' else None,
-                cbar_kws={'label': 'CV Improvement' if plot_type == 'improvement' else 'CV'})
-    plt.title(title, fontsize=14, fontweight='bold')
-    plt.xlabel('Slide', fontsize=12)
-    plt.ylabel('Marker', fontsize=12)
-    plt.xticks(rotation=45)
-    plt.yticks(rotation=0)
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
-
 def get_worst_performing_markers(cv_df, n_markers=5):
     """Identify markers with worst CV performance"""
     marker_performance = cv_df.groupby('marker').agg({
@@ -75,112 +56,356 @@ def get_worst_performing_markers(cv_df, n_markers=5):
     worst_markers = marker_performance.nsmallest(n_markers, 'cv_improvement')['marker'].tolist()
     return worst_markers
 
-def create_slide_boxplots(df, df_transformed, filename, plotFraction):
-    """Create before/after boxplots by slide"""
+def create_all_transformation_plots_html(df, df_transformed, bxcxMetrics, batchName, target_features=None, transformation_type='Box-Cox'):
+    """
+    Create individual plots for selected markers and generate single HTML with dropdown
     
-    # Sample data for plotting
-    smTble_orig = df.groupby('Slide', group_keys=False).apply(lambda x: x.sample(frac=plotFraction))
-    smTble_trans = df_transformed.groupby('Slide', group_keys=False).apply(lambda x: x.sample(frac=plotFraction))
+    Args:
+        df: Original dataframe
+        df_transformed: Transformed dataframe
+        bxcxMetrics: Box-Cox metrics dataframe
+        batchName: Name of the batch
+        target_features: List of strings to match column names (e.g., ['Cell: Mean', 'Cell: Max'])
+        transformation_type: Type of transformation
+    """
     
-    # Filter for mean/median columns
-    df_batching_orig = smTble_orig.filter(regex='(Mean|Median|Slide)', axis=1)
-    df_batching_trans = smTble_trans.filter(regex='(Mean|Median|Slide)', axis=1)
+    # Parse comma-separated target features
+    target_list = [f.strip() for f in target_features.split(',')]
     
-    # Melt for plotting
-    df_melted_orig = pd.melt(df_batching_orig, id_vars=["Slide"])
-    df_melted_trans = pd.melt(df_batching_trans, id_vars=["Slide"])
+    # Find all columns that match any of the target features
+    target_cols = []
+    for target in target_list:
+        matching_cols = [col for col in df.columns if target in col]
+        target_cols.extend(matching_cols)
     
-    # Create subplots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 12))
+    # Remove duplicates while preserving order
+    target_cols = list(dict.fromkeys(target_cols))
     
-    # Original values
-    sns.boxplot(x='Slide', y='value', data=df_melted_orig, ax=ax1, 
-                color="#CD7F32", showfliers=False)
-    ax1.set_title('Combined Marker Distribution (Original Values)', fontsize=14, fontweight='bold')
-    ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45, ha='right')
+    if not target_cols:
+        print(f"Error: No columns found matching any of the target features: {target_features}")
+        return {}
     
-    # Transformed values
-    sns.boxplot(x='Slide', y='value', data=df_melted_trans, ax=ax2, 
-                color="#50C878", showfliers=False)
-    ax2.set_title('Combined Marker Distribution (Box-Cox Transformed)', fontsize=14, fontweight='bold')
-    ax2.set_xticklabels(ax2.get_xticklabels(), rotation=45, ha='right')
+    print(f"Total columns to plot: {len(target_cols)}")
     
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
-
-def create_transformation_examples(df, df_transformed, filename, nucMark, n_examples=5):
-    """Create transformation scatter plots for representative markers"""
-    
-    mean_cols = [col for col in df.columns if 'Mean' in col]
-    nuc_col = next((col for col in mean_cols if nucMark in col), mean_cols[0])
-    
-    # Select every nth marker to get good representation
-    step = max(1, len(mean_cols) // n_examples)
-    example_markers = mean_cols[::step][:n_examples]
-    
-    # Ensure nucleus marker is included
-    if nuc_col not in example_markers:
-        example_markers[0] = nuc_col
-    
-    fig, axes = plt.subplots(1, n_examples, figsize=(20, 4))
-    if n_examples == 1:
-        axes = [axes]
-    
-    for i, marker in enumerate(example_markers):
-        # Create scatter plot
-        axes[i].scatter(df[marker], df_transformed[marker], alpha=0.6, s=1)
+    # Group columns by feature type for organization
+    feature_groups = {}
+    for col in target_cols:
+        last_field = col.split(': ')[-1]
+        group = last_field.strip().title()
         
-        # Add diagonal line
-        max_orig = df[marker].max()
-        max_trans = df_transformed[marker].max()
-        axes[i].plot([0, max_orig], [0, max_trans], 'r--', alpha=0.7, linewidth=2)
-        
-        # Formatting
-        marker_name = marker.replace('Cell: ', '').replace(': Mean', '')
-        axes[i].set_title(f'Box-Cox Transform: {marker_name}', fontweight='bold')
-        axes[i].set_xlabel('Original Value')
-        axes[i].set_ylabel('Transformed Value')
-        axes[i].grid(True, alpha=0.3)
+        if group not in feature_groups:
+            feature_groups[group] = []
+        feature_groups[group].append(col)
     
-    plt.suptitle('Transformation Examples', fontsize=16, fontweight='bold')
-    plt.tight_layout()
+    # Store all plot data organized by group
+    all_metrics_data = {}
     
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
-
-def create_distribution_comparison(df, df_transformed, worst_markers, filename):
-    """Create density plots for worst performing markers"""
-    
-    n_markers = len(worst_markers)
-    fig, axes = plt.subplots(n_markers, 1, figsize=(12, 3*n_markers))
-    if n_markers == 1:
-        axes = [axes]
-    
-    for i, marker in enumerate(worst_markers):
-        # Find the actual column name
-        marker_col = next((col for col in df.columns if marker in col and 'Mean' in col), None)
-        if marker_col is None:
+    for group_name, group_cols in feature_groups.items():
+        if not group_cols:
             continue
             
-        # Create density plots
-        axes[i].hist(df[marker_col], bins=50, alpha=0.7, density=True, 
-                    label='Original', color='#CD7F32')
-        axes[i].hist(df_transformed[marker_col], bins=50, alpha=0.7, density=True, 
-                    label='Box-Cox Transformed', color='#50C878')
+        print(f"Processing {len(group_cols)} columns for {group_name} group...")
         
-        axes[i].set_title(f'{marker} Distribution Comparison', fontweight='bold')
-        axes[i].set_xlabel('Value')
-        axes[i].set_ylabel('Density')
-        axes[i].legend()
-        axes[i].grid(True, alpha=0.3)
+        # Store plot information for this group
+        plot_data = []
+        
+        # Create individual plots for each marker
+        for i, marker_col in enumerate(group_cols):
+            # Get lambda value from metrics
+            lambda_row = bxcxMetrics[bxcxMetrics['Feature'] == marker_col]
+            if not lambda_row.empty:
+                lambda_value = lambda_row.iloc[0]['Lambda']
+            else:
+                lambda_value = 'N/A'
+            
+            # Calculate correlation
+            # Align both Series by index and drop NaNs together
+            paired = pd.concat([df[marker_col], df_transformed[marker_col]], axis=1, join='inner').dropna()
+
+            if len(paired) > 0:
+                correlation, _ = pearsonr(paired.iloc[:, 0], paired.iloc[:, 1])
+            else:
+                correlation = 0
+            
+            # Create figure
+            fig, ax = plt.subplots(figsize=(6, 6))
+            
+            # Scatter plot
+            ax.scatter(df[marker_col], df_transformed[marker_col], alpha=0.6, s=1, color='blue')
+            
+            # Add diagonal reference line
+            max_orig = df[marker_col].max()
+            max_trans = df_transformed[marker_col].max()
+            ax.plot([0, max_orig], [0, max_trans], 'r--', alpha=0.7, linewidth=2, label='Identity Line')
+            
+            # Formatting
+            ax.set_title(f'{transformation_type} Transform: {marker_col}', fontweight='bold', fontsize=12)
+            ax.set_xlabel('Original Value', fontsize=10)
+            ax.set_ylabel('Transformed Value', fontsize=10)
+            ax.grid(True, alpha=0.3)
+            
+            # Add text box with stats
+            textstr = f'λ = {lambda_value}\nr = {correlation:.3f}'
+            props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+            ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=9,
+                    verticalalignment='top', bbox=props)
+            
+            plt.tight_layout()
+            
+            # Convert plot to base64 instead of saving to file
+            buf = BytesIO()
+            plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+            plt.close()
+            buf.seek(0)
+            img_b64 = base64.b64encode(buf.read()).decode('utf-8')
+            
+            # Store plot information
+            plot_data.append({
+                'marker_name': marker_col,
+                'img_b64': img_b64,
+                'lambda_value': lambda_value,
+                'correlation': correlation
+            })
+        
+        if plot_data:
+            # Count successful and failed transforms for this group
+            group_metrics = bxcxMetrics[bxcxMetrics['Feature'].isin(group_cols)]
+            successful = len(group_metrics[~group_metrics['Lambda'].isin(['Failed', 'SkippedEmpty'])])
+            failed = len(group_metrics[group_metrics['Lambda'].isin(['Failed', 'SkippedEmpty'])])
+            
+            all_metrics_data[group_name] = {
+                'plots': plot_data,
+                'successful': successful,
+                'failed': failed,
+                'total': len(group_cols)
+            }
     
-    plt.suptitle('Distribution Comparison: Worst Performing Markers', fontsize=16, fontweight='bold')
-    plt.tight_layout()
+    # Generate single HTML with dropdown
+    if all_metrics_data:
+        generate_combined_html(all_metrics_data, batchName, transformation_type)
     
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
+    return all_metrics_data
+
+def generate_combined_html(all_metrics_data, batchName, transformation_type):
+    """Generate a single HTML file with dropdown to switch between feature groups"""
     
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{transformation_type} Transformation - {batchName}</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }}
+        h1 {{
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }}
+        .controls {{
+            text-align: center;
+            margin: 20px 0;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        .metric-selector {{
+            padding: 10px 20px;
+            font-size: 16px;
+            border: 2px solid #2196F3;
+            border-radius: 5px;
+            background-color: white;
+            cursor: pointer;
+        }}
+        .metric-selector:hover {{
+            background-color: #f0f0f0;
+        }}
+        .metadata {{
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+        }}
+        .stats-summary {{
+            background-color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: none;
+        }}
+        .stats-summary.active {{
+            display: block;
+        }}
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }}
+        .stat-item {{
+            text-align: center;
+        }}
+        .stat-value {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #2196F3;
+        }}
+        .stat-label {{
+            font-size: 12px;
+            color: #666;
+        }}
+        .plots-container {{
+            display: none;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }}
+        .plots-container.active {{
+            display: grid;
+        }}
+        .plot-item {{
+            background-color: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        .plot-item h3 {{
+            margin-top: 0;
+            color: #333;
+            font-size: 14px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }}
+        .plot-item img {{
+            width: 100%;
+            height: auto;
+        }}
+        .plot-stats {{
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+            font-size: 12px;
+            color: #666;
+        }}
+        .good-correlation {{
+            color: #4CAF50;
+            font-weight: bold;
+        }}
+        .poor-correlation {{
+            color: #f44336;
+            font-weight: bold;
+        }}
+    </style>
+</head>
+<body>
+    <h1>{transformation_type} Transformation Results</h1>
+    <div class="metadata">
+        <p><strong>Batch:</strong> {batchName} | <strong>Generated:</strong> {time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+    </div>
+    
+    <div class="controls">
+        <label for="metricSelector" style="margin-right: 10px; font-weight: bold;">Select Feature Group:</label>
+        <select id="metricSelector" class="metric-selector" onchange="showMetric(this.value)">
+            <option value="">-- Select a Feature Group --</option>
+"""
+    
+    # Add options for each feature group
+    for group_name in all_metrics_data.keys():
+        html_content += f'            <option value="{group_name}">{group_name} ({all_metrics_data[group_name]["total"]} features)</option>\n'
+    
+    html_content += """        </select>
+    </div>
+"""
+    
+    # Add content for each feature group
+    for group_name, group_data in all_metrics_data.items():
+        html_content += f"""
+    <div class="stats-summary" id="stats-{group_name.replace(' ', '_')}">
+        <h2>{group_name} Transformation Summary</h2>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value">{group_data['total']}</div>
+                <div class="stat-label">Total Features</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{group_data['successful']}</div>
+                <div class="stat-label">Successful Transforms</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{group_data['failed']}</div>
+                <div class="stat-label">Failed Transforms</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="plots-container" id="plots-{group_name.replace(' ', '_')}">
+"""
+        
+        for plot in group_data['plots']:
+            correlation_class = ''
+            if plot['correlation'] > 0.8:
+                correlation_class = 'good-correlation'
+            elif plot['correlation'] < 0.5:
+                correlation_class = 'poor-correlation'
+            
+            html_content += f"""        <div class="plot-item">
+            <h3>{plot['marker_name']}</h3>
+            <img src="data:image/png;base64,{plot['img_b64']}" alt="{plot['marker_name']} transformation">
+            <div class="plot-stats">
+                <span>Lambda: {plot['lambda_value']}</span>
+                <span class="{correlation_class}">Correlation: {plot['correlation']:.3f}</span>
+            </div>
+        </div>
+"""
+        
+        html_content += "    </div>\n"
+    
+    # Add JavaScript for switching between groups
+    html_content += """
+    <script>
+        function showMetric(groupName) {
+            // Hide all stats and plots
+            const allStats = document.querySelectorAll('.stats-summary');
+            const allPlots = document.querySelectorAll('.plots-container');
+            
+            allStats.forEach(el => el.classList.remove('active'));
+            allPlots.forEach(el => el.classList.remove('active'));
+            
+            // Show selected group
+            if (groupName) {
+                const safeGroupName = groupName.replace(' ', '_');
+                const statsEl = document.getElementById('stats-' + safeGroupName);
+                const plotsEl = document.getElementById('plots-' + safeGroupName);
+                if (statsEl) statsEl.classList.add('active');
+                if (plotsEl) plotsEl.classList.add('active');
+            }
+        }
+        
+        // Show first group by default
+        window.onload = function() {
+            const selector = document.getElementById('metricSelector');
+            if (selector.options.length > 1) {
+                selector.selectedIndex = 1;
+                showMetric(selector.options[1].value);
+            }
+        }
+    </script>
+</body>
+</html>"""
+    
+    # Save HTML file
+    html_filename = f'boxcox_all_plots_{batchName}.html'
+    with open(html_filename, 'w') as f:
+        f.write(html_content)
+    
+    print(f"Combined HTML report generated: {html_filename}")
+
 def get_max_value(df):
     """Helper function from original code"""
     values = df.values.flatten()
@@ -191,10 +416,10 @@ def get_max_value(df):
         max_value = 65535
     return max_value
 
-def collect_and_transform(df, batchName, quantType, nucMark, plotFraction):
+def collect_and_transform(df, batchName, quantType, nucMark, plotFraction, targetFeature=None):
     """Main transformation and plotting function"""
     
-    # Clean image names (preserve original logic)
+    # Clean image names
     df['Image'] = df['Image'].str.replace('.ome.tiff', '', regex=False)
     
     # Apply Box-Cox transformation (preserve original logic)
@@ -230,25 +455,12 @@ def collect_and_transform(df, batchName, quantType, nucMark, plotFraction):
     # Get worst performing markers
     worst_markers = get_worst_performing_markers(cv_df, n_markers=5)
     
-    # Generate plots
-    results = {
-        'slide_boxplots': f'boxcox_slide_boxplots_{batchName}.png',
-        'cv_heatmap': f'boxcox_cv_improvement_heatmap_{batchName}.png',
-        'transformation_examples': f'boxcox_transformation_examples_{batchName}.png',
-        'distribution_comparison': f'boxcox_distribution_comparison_{batchName}.png'
-    }
-    
-    # 1. Slide boxplots
-    create_slide_boxplots(df, bcDf, results["slide_boxplots"], plotFraction)
-    
-    # 2. CV heatmap
-    create_cv_heatmap(cv_df, results["cv_heatmap"], plot_type='improvement')
-    
-    # 3. Transformation examples
-    create_transformation_examples(df, bcDf, results["transformation_examples"], nucMark)
-    
-    # 4. Distribution comparison
-    create_distribution_comparison(df, bcDf, worst_markers, results["distribution_comparison"])
+    # Create HTML with transformation plots for selected features
+    all_plot_data = create_all_transformation_plots_html(
+        df, bcDf, bxcxMetrics, batchName, 
+        target_features=targetFeature,
+        transformation_type='Box-Cox'
+    )
     
     # Save transformation results
     bcDf.to_csv(f"boxcox_transformed_{batchName}.tsv", sep="\t", index=False)
@@ -264,7 +476,7 @@ def collect_and_transform(df, batchName, quantType, nucMark, plotFraction):
         }
     }
     
-    results.update({
+    results = {
         'transformation_type': 'boxcox',
         'batch_name': batchName,
         'total_markers': len([col for col in df.columns if 'Mean' in col]),
@@ -278,8 +490,10 @@ def collect_and_transform(df, batchName, quantType, nucMark, plotFraction):
             'markers_improved': (cv_df['cv_improvement'] > 0).sum(),
             'markers_worsened': (cv_df['cv_improvement'] < 0).sum()
         },
+        'all_transformation_plots': all_plot_data,
+        'target_features': targetFeature,
         'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
-    })
+    }
     
     return results
 
@@ -290,14 +504,18 @@ if __name__ == "__main__":
     parser.add_argument('--quantType', required=True, help='QuPath object type (e.g., CellObject)')
     parser.add_argument('--nucMark', required=True, help='Nucleus marker name (e.g., DAPI)')
     parser.add_argument('--plotFraction', type=float, default=0.25, help='Fraction of data to plot for QC (default: 0.25)')
+    parser.add_argument('--target-feature', dest='targetFeature', default='Cell: Mean',
+                       help='Comma-separated list of column name patterns to plot (e.g., "Cell: Mean,Cell: Max")')
+    
     args = parser.parse_args()
     myData = pd.read_pickle(args.pickleTable)
     myFileIdx = args.batchID
     quantType = args.quantType
     nucMark = args.nucMark
     plotFraction = args.plotFraction
+    targetFeature = args.targetFeature
 
-    metrics = collect_and_transform(myData, myFileIdx, quantType, nucMark, plotFraction)
+    metrics = collect_and_transform(myData, myFileIdx, quantType, nucMark, plotFraction, targetFeature)
     # Save metrics to JSON
     with open(f'boxcox_results_{args.batchID}.json', 'w') as f:
         json.dump(metrics, f, indent=2, default=str)

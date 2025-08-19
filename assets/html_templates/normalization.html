@@ -22,19 +22,27 @@
             </div>
         </div>
         <div class="metric-card">
-        <div class="tooltip">
-            <div class="metric-value">{{ normalization_data.primary_method | default("N/A") }}</div>
-            {% if normalization_data.primary_method and normalization_data.primary_method != "N/A" %}
-                <div class="metric-label">Normalization Method</div>
+            <div class="tooltip">
+                <div class="metric-value">{{ normalization_data.total_markers | default("N/A") }}</div>
+                <div class="metric-label">Number of Markers</div>
                 <span class="tooltiptext">
-                    The primary normalization method applied to the dataset. Common methods include Box-Cox, 
-                    quantile normalization, log transformation, or min-max scaling.
+                    Total number of markers analyzed across all batches
                 </span>
-            {% else %}
-                <div class="metric-label">Method Status</div>
-                <div class="metric-description">No normalization applied. 
-                    Reports for all 4 methods are generated and summarized below for each batch</div>
-            {% endif %}
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">{{ normalization_data.primary_method_display | default("N/A") }}</div>
+                <div class="metric-label">Normalization Method{% if normalization_data.comparison_mode %}s{% endif %}</div>
+                <span class="tooltiptext">
+                    {% if normalization_data.comparison_mode %}
+                        Multiple normalization methods were applied for comparison: {{ normalization_data.normalization_methods | join(", ") | title }}
+                    {% elif normalization_data.primary_method %}
+                        The {{ normalization_data.primary_method }} transformation was applied to normalize the data
+                    {% else %}
+                        No normalization was applied to the data
+                    {% endif %}
+                </span>
             </div>
         </div>
     </div>
@@ -89,6 +97,22 @@
             display: block;
         }
 
+        .transformation-link {
+            display: inline-block;
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background-color: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        .transformation-link:hover {
+            background-color: #5568d3;
+            color: white;
+        }
+
         @media (max-width: 768px) {
             .batch-tabs {
                 flex-direction: column;
@@ -138,23 +162,18 @@
                         <td>{{ batch_result.data.total_cells | number_format }}</td>
                     </tr>
                     <tr>
-                        <td>
-                            <div class="tooltip">
-                                Number of Markers
-                                <span class="tooltiptext">Number of markers used in this batch</span>
-                            </div>
-                        </td>
-                        <td>{{ batch_result.data.total_markers | default("N/A") }}</td>
+                        <td>Number of Slides</td>
+                        <td>{{ batch_result.data.total_slides | default("N/A") }}</td>
                     </tr>
                     <tr>
-                        <td>Normalization Method</td>
+                        <td>Transformation Type</td>
                         <td>{{ batch_result.data.transformation_type | title }}</td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
-        <!-- Table 2: Box-Cox Transformation Metrics -->
+        <!-- Table 2: Transformation-specific Metrics -->
         {% if batch_result.data.transformation_type == "boxcox" and batch_result.data.boxcox_metrics %}
         <div class="table-container inline-third">
             <table>
@@ -209,13 +228,12 @@
                 </tbody>
             </table>
         </div>
-        {% else %}
-        <!-- Placeholder table when Box-Cox metrics aren't available -->
+        {% elif batch_result.data.transformation_type == "quantile" %}
         <div class="table-container inline-third">
             <table>
                 <thead>
                     <tr>
-                        <th colspan="2">Transformation Details</th>
+                        <th colspan="2">Quantile Transform Details</th>
                     </tr>
                     <tr>
                         <th>Parameter</th>
@@ -224,17 +242,76 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>Method</td>
-                        <td>{{ batch_result.data.transformation_type | title }}</td>
+                        <td>Quantile Splits</td>
+                        <td>{{ batch_result.data.quantile_splits | default("100") }}</td>
+                    </tr>
+                    <tr>
+                        <td>Distribution</td>
+                        <td>Uniform</td>
+                    </tr>
+                    <tr>
+                        <td>Features Transformed</td>
+                        <td>{{ batch_result.data.total_markers | default("All") }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% elif batch_result.data.transformation_type == "minmax" %}
+        <div class="table-container inline-third">
+            <table>
+                <thead>
+                    <tr>
+                        <th colspan="2">MinMax Scaling Details</th>
+                    </tr>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Feature Range</td>
+                        <td>(-2, 2)</td>
+                    </tr>
+                    <tr>
+                        <td>Features Scaled</td>
+                        <td>{{ batch_result.data.minmax_metrics.total_features_transformed | default("All") }}</td>
+                    </tr>
+                    <tr>
+                        <td>Min Value Achieved</td>
+                        <td>{{ "%.3f" | format(batch_result.data.minmax_metrics.scaling_stats.min_transformed_value) if batch_result.data.minmax_metrics else "N/A" }}</td>
+                    </tr>
+                    <tr>
+                        <td>Max Value Achieved</td>
+                        <td>{{ "%.3f" | format(batch_result.data.minmax_metrics.scaling_stats.max_transformed_value) if batch_result.data.minmax_metrics else "N/A" }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="table-container inline-third">
+            <table>
+                <thead>
+                    <tr>
+                        <th colspan="2">{{ batch_result.data.transformation_type | title }} Transform Details</th>
+                    </tr>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Transform Function</td>
+                        <td>log(x + 1)</td>
+                    </tr>
+                    <tr>
+                        <td>Features Transformed</td>
+                        <td>{{ batch_result.data.total_markers | default("All") }}</td>
                     </tr>
                     <tr>
                         <td>Status</td>
                         <td>Applied</td>
-                    </tr>
-                    <tr>
-                        <td colspan="2" style="text-align: center; font-style: italic; color: #6c757d;">
-                            Detailed metrics not available for this transformation method
-                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -329,10 +406,7 @@
         </div>
         {% endif %}
 
-        
-        
-
-        <!-- Visualization Plots -->
+        <!-- Visualization Plots and Link to Transformation Plots -->
         <div class="header-with-tooltip">
             <h4>Normalization Visualizations</h4>
             <div class="tooltip-container">
@@ -345,17 +419,39 @@
 
         <div style="display: flex; flex-direction: column; gap: 2rem;">
 
-        {% if batch_result.data.transformation_examples %}
+        {% if batch_result.data.slide_boxplots %}
         <div class="plot-container small">
-            <div class="plot-title">Transformation Examples</div>
-            <img src="{{ batch_result.data.transformation_examples }}" alt="Transformation Examples" class="embedded-image" />
+            <div class="plot-title">Slide-wise Distribution Comparison</div>
+            <img src="{{ batch_result.data.slide_boxplots }}" alt="Slide Boxplots" class="embedded-image" />
         </div>
         {% endif %}
 
-        {% if batch_result.data.distribution_comparison %}
-        <div class="plot-container large">
-            <div class="plot-title">Distribution Comparison</div>
-            <img src="{{ batch_result.data.distribution_comparison }}" alt="Distribution Comparison" class="embedded-image" />
+        {% if batch_result.data.cv_heatmap %}
+        <div class="plot-container small">
+            <div class="plot-title">CV Improvement Heatmap</div>
+            <img src="{{ batch_result.data.cv_heatmap }}" alt="CV Improvement Heatmap" class="embedded-image" />
+        </div>
+        {% endif %}
+
+        {% if batch_result.transformation_plots_html %}
+        <div style="text-align: center; margin: 2rem 0;">
+            <a href="{{ batch_result.transformation_plots_html }}" target="_blank" class="transformation-link">
+                View All Transformation Plots →
+            </a>
+            <p style="margin-top: 0.5rem; color: #6c757d; font-size: 0.9em;">
+                Interactive visualization of all marker transformations with detailed statistics
+            </p>
+        </div>
+        {% endif %}
+        
+        {% if batch_result.gmm_gating_report %}
+        <div style="text-align: center; margin: 1rem 0;">
+            <a href="{{ batch_result.gmm_gating_report }}" target="_blank" class="transformation-link" style="background-color: #28a745;">
+                View GMM Gating Report →
+            </a>
+            <p style="margin-top: 0.5rem; color: #6c757d; font-size: 0.9em;">
+                Gaussian Mixture Model gating analysis and threshold determination
+            </p>
         </div>
         {% endif %}
     </div>

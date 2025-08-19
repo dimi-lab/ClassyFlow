@@ -1,13 +1,15 @@
 // Produce Batch based normalization - boxcox
 process BOXCOX {
     tag { batchID }
+    publishDir "${params.output_dir}/final_reports/pages", pattern: "boxcox_*.html", mode: 'copy'
+    publishDir "${params.output_dir}/temp/", pattern: "boxcox_*.json", mode: 'copy'
     
     input:
     tuple val(batchID), path(pickleTable)
     
     output:
     tuple val(batchID), path("boxcox_transformed_${batchID}.tsv"), emit: norm_df
-    tuple val(batchID), path ("boxcox_results_${batchID}.json"), path("boxcox_*.png"), emit: boxcox_results
+    tuple val(batchID), path ("boxcox_results_${batchID}.json"), path("boxcox_all_plots_${batchID}.html"), emit: boxcox_results
     
     script:
     """
@@ -25,12 +27,15 @@ process BOXCOX {
 process QUANTILE {
     tag { batchID }
 
+    publishDir "${params.output_dir}/final_reports/pages", pattern: "quantile_*.html", mode: 'copy'
+    publishDir "${params.output_dir}/temp/", pattern: "quantile_*.json", mode: 'copy'
+
     input:
     tuple val(batchID), path(pickleTable)
 
     output:
     tuple val(batchID), path("quantile_transformed_${batchID}.tsv"), emit: norm_df
-    tuple val(batchID), path ("quantile_results_${batchID}.json"), path("quantile_*.png"), emit: quantile_results
+    tuple val(batchID), path ("quantile_results_${batchID}.json"), path("quantile_all_plots_${batchID}.html"), emit: quantile_results
 
     script:
     """
@@ -48,13 +53,16 @@ process QUANTILE {
 // Produce Batch based normalization - min/max scaling
 process MINMAX {
     tag { batchID }
+
+    publishDir "${params.output_dir}/final_reports/pages", pattern: "minmax_*.html", mode: 'copy'
+    publishDir "${params.output_dir}/temp/", pattern: "minmax_*.json", mode: 'copy'
     
     input:
     tuple val(batchID), path(pickleTable)
     
     output:
     tuple val(batchID), path("minmax_transformed_${batchID}.tsv"), emit: norm_df
-    tuple val(batchID), path ("minmax_results_${batchID}.json"), path("minmax_*.png"), emit: minmax_results
+    tuple val(batchID), path ("minmax_results_${batchID}.json"), path("minmax_all_plots_${batchID}.html"), emit: minmax_results
     
     script:
     """
@@ -70,13 +78,16 @@ process MINMAX {
 
 process LOGSCALE {
     tag { batchID }
+
+    publishDir "${params.output_dir}/final_reports/pages", pattern: "log_*.html", mode: 'copy'
+    publishDir "${params.output_dir}/temp/", pattern: "log_*.json", mode: 'copy'
     
     input:
     tuple val(batchID), path(pickleTable)
     
     output:
     tuple val(batchID), path("log_transformed_${batchID}.tsv"), emit: norm_df
-    tuple val(batchID), path ("log_results_${batchID}.json"), path("log_*.png"), emit: log_results
+    tuple val(batchID), path ("log_results_${batchID}.json"), path("log_all_plots_${batchID}.html"), emit: log_results
     
     script:
     """
@@ -142,23 +153,46 @@ process AUGMENT_WITH_LEIDEN_CLUSTERS{
 process GMM_GATING {
     tag { batchID }
     publishDir(
-        path: "${params.output_dir}/normalization",
+        path: "${params.output_dir}/final_reports/pages",
         pattern: "*.html",
         mode: "copy"
     )
     input:
     tuple val(batchID), path(norm_table)
+    val(target_feature)
 
     output:
     tuple val(batchID), path("gmm_gated_${batchID}.tsv"), emit: norm_df
-    path("gmm_gated_${batchID}.html")
+    tuple val(batchID), path("gmm_gated_${batchID}.html"), emit: gmm_html
     
     script:
     """
     gmm_gating.py \
         --input ${norm_table} \
         --output gmm_gated_${batchID}.tsv \
-        --html_report gmm_gated_${batchID}.html
+        --html_report gmm_gated_${batchID}.html \
+        --target-feature "${target_feature}" \
+        --batch-name "${batchID}"
+
+    """
+}
+
+process GENERATE_NORM_REPORT {
+    //publishDir "${params.output_dir}/final_reports/", pattern: "normalization_report.html", mode: 'copy'
+
+    input:
+    path(norm_files)
+    tuple val(batchIDs), path(html_files)
+    path(html_template)
+
+    output:
+    path("normalization_report.html"), emit: norm_html
+
+    script:
+    """
+    generate_normalization_report.py \
+            --output-file normalization_report.html \
+            --template-dir $html_template
     """
 }
 
@@ -170,66 +204,96 @@ workflow normalization_wf {
     batchPickleTable
 
     main:
-    // Declare variables for normalization results and channels
-    def best_ch
-    def bc
-    def lg
-    def qt
-    def mm
-    def mxchannels
-
+    // Initialize empty channels for conditional results
+    bc_results = Channel.empty()
+    qt_results = Channel.empty()
+    mm_results = Channel.empty()
+    lg_results = Channel.empty()
+    norm_outputs_list = []
+    
     // Step 1: Choose normalization method based on override parameter
     if (params.override_normalization == "boxcox") {
         // Use BoxCox normalization
-        bc = BOXCOX(batchPickleTable)
-        best_ch = bc.norm_df
+        bc_results = BOXCOX(batchPickleTable)
+        best_ch = bc_results.norm_df
+
+        norm_outputs_list.add(bc_results.boxcox_results.map { it -> it[1..-1] }.ifEmpty([]))
     }
     else if (params.override_normalization == "quantile") {
         // Use Quantile normalization
-        qt = QUANTILE(batchPickleTable)
-        best_ch = qt.norm_df
+        qt_results = QUANTILE(batchPickleTable)
+        best_ch = qt_results.norm_df
+
+        norm_outputs_list.add(qt_results.quantile_results.map { it -> it[1..-1] }.ifEmpty([]))
     }
     else if (params.override_normalization == "minmax") {
         // Use MinMax normalization
-        mm = MINMAX(batchPickleTable)
-        best_ch = mm.norm_df
+        mm_results = MINMAX(batchPickleTable)
+        best_ch = mm_results.norm_df
+
+        norm_outputs_list.add(mm_results.minmax_results.map { it -> it[1..-1] }.ifEmpty([]))
     }
     else if (params.override_normalization == "logscale") {
         // Use LogScale normalization
-        lg = LOGSCALE(batchPickleTable)
-        best_ch = lg.norm_df
+        lg_results = LOGSCALE(batchPickleTable)
+        best_ch = lg_results.norm_df
+
+        norm_outputs_list.add(lg_results.log_results.map { it -> it[1..-1] }.ifEmpty([]))
     }
     else {
-        // Run all normalization methods and group results for comparison
-        bc = BOXCOX(batchPickleTable).norm_df
-        qt = QUANTILE(batchPickleTable).norm_df
-        mm = MINMAX(batchPickleTable).norm_df
-        lg = LOGSCALE(batchPickleTable).norm_df
+        // Run all normalization methods and compare results
+        bc_results = BOXCOX(batchPickleTable)
+        qt_results = QUANTILE(batchPickleTable)
+        mm_results = MINMAX(batchPickleTable)
+        lg_results = LOGSCALE(batchPickleTable)
 
-        // Mix all normalization results and group them for best selection
-        mxchannels = batchPickleTable.mix(bc, qt, mm, lg).groupTuple()
+        // Mix all normalization results and group them for comparison
+        mxchannels = batchPickleTable
+            .mix(bc_results.norm_df,qt_results.norm_df, mm_results.norm_df, lg_results.norm_df)
+            .groupTuple()
+        
         mxchannels.dump(tag: 'debug_normalization_channels', pretty: true)
 
         // Identify the best normalization approach
-        def best = IDENTIFY_BEST(mxchannels)
+        best_selection = IDENTIFY_BEST(mxchannels)
+        best_ch = best_selection.norm_df
+
+        // All other values (including null/empty) - add all outputs
+        norm_outputs_list.add(bc_results.boxcox_results.map { it -> it[1..-1] }.ifEmpty([]))
+        norm_outputs_list.add(qt_results.quantile_results.map { it -> it[1..-1] }.ifEmpty([]))
+        norm_outputs_list.add(mm_results.minmax_results.map { it -> it[1..-1] }.ifEmpty([]))
+        norm_outputs_list.add(lg_results.log_results.map { it -> it[1..-1] }.ifEmpty([]))
     }
 
     // Step 2: Apply GMM gating to the normalized data
-    def gmm_gated = GMM_GATING(best_ch)
-    best_ch = gmm_gated.norm_df
+    gmm_gated = GMM_GATING(best_ch, params.plot_target_feature_suffix)
+    gated_ch = gmm_gated.norm_df
+    gated_html = gmm_gated.gmm_html.collect(flat: false)
+                        .map { it.transpose() }
 
     // Step 3: Optionally augment with Leiden clusters if enabled
     if (params.run_get_leiden_clusters) {
-        def leiden_augmented = AUGMENT_WITH_LEIDEN_CLUSTERS(best_ch)
-        best_ch = leiden_augmented.norm_df
+        leiden_augmented = AUGMENT_WITH_LEIDEN_CLUSTERS(gated_ch)
+        final_ch = leiden_augmented.norm_df
+    } else {
+        final_ch = gated_ch
     }
 
-    // Step 4: Emit final results and normalization outputs
+    // Collect normalization outputs for reporting
+    // Only mix channels that actually exist
+    if (norm_outputs_list.size() > 0) {
+        norm_outputs = Channel.empty()
+            .mix(*norm_outputs_list)
+            .flatten()
+            .collect()
+    } else {
+        norm_outputs = Channel.empty().collect()
+    }
+
+    norm_report = GENERATE_NORM_REPORT(norm_outputs, gated_html, params.html_template)
+
     emit:
-    normalized = best_ch
-    boxcox_results = bc ? bc.boxcox_results : Channel.empty()
-    quantile_results = qt ? qt.quantile_results : Channel.empty()
-    minmax_results = mm ? mm.minmax_results : Channel.empty()
-    log_results = lg ? lg.log_results : Channel.empty()
+    normalized = final_ch
+    report = norm_report.norm_html
 }
 
