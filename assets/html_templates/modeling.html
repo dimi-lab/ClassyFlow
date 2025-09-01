@@ -149,25 +149,7 @@
             </p>
         </div>
         {% endif %}
-    </div>
-
-    {% if modeling_data.model_comparison.parameter_summary_csv_path %}
-    <div class="header-with-tooltip">
-        <h5>Parameter Search Summary</h5>
-        <div class="tooltip-container">
-            <div class="tooltip-icon">i</div>
-            <div class="tooltip-popup">
-                Summary statistics for each parameter combination tested during hyperparameter optimization.
-            </div>
-        </div>
-    </div>
-    
-    <div class="alert alert-info">
-        <strong>Note:</strong> Detailed parameter search results are available in the supplementary data file: 
-        <a href="{{ modeling_data.model_comparison.parameter_summary_csv_path }}" target="_blank">Parameter Summary CSV</a>
-    </div>
-    {% endif %}
-    
+    </div>    
 </section>
 {% endif %}
 
