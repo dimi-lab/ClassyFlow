@@ -52,15 +52,15 @@ def create_train_holdout_comparison_plot(training_df, holdout_df, class_column, 
     chi2_stat, p_value, dof, expected = chi2_contingency(contingency_table.T)
     
     # Create side-by-side plot
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8), sharey=True)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8), sharey=True)
     
     # Training set plot
     colors1 = plt.cm.viridis(np.linspace(0.2, 0.9, len(all_classes)))
     bars1 = ax1.barh(all_classes, train_props, color=colors1, alpha=0.8, 
                      edgecolor='white', linewidth=1.5)
     
-    ax1.set_xlabel('Percentage of Total Samples', fontsize=14, fontweight='bold', color='#2c3e50')
-    ax1.set_title('Training Set Distribution', fontsize=16, fontweight='bold', color='#2c3e50', pad=20)
+    ax1.set_xlabel('Percentage of Total Samples', fontsize=12, fontweight='bold', color='#2c3e50')
+    ax1.set_title('Training Set Distribution', fontsize=14, fontweight='bold', color='#2c3e50', pad=20)
     ax1.grid(True, alpha=0.3, axis='x', linestyle='-', color='#bdc3c7')
     ax1.set_axisbelow(True)
     ax1.set_facecolor('#f8f9fa')
@@ -77,8 +77,8 @@ def create_train_holdout_comparison_plot(training_df, holdout_df, class_column, 
     bars2 = ax2.barh(all_classes, holdout_props, color=colors2, alpha=0.8, 
                      edgecolor='white', linewidth=1.5)
     
-    ax2.set_xlabel('Percentage of Total Samples', fontsize=14, fontweight='bold', color='#2c3e50')
-    ax2.set_title('Holdout Set Distribution', fontsize=16, fontweight='bold', color='#2c3e50', pad=20)
+    ax2.set_xlabel('Percentage of Total Samples', fontsize=12, fontweight='bold', color='#2c3e50')
+    ax2.set_title('Holdout Set Distribution', fontsize=14, fontweight='bold', color='#2c3e50', pad=20)
     ax2.grid(True, alpha=0.3, axis='x', linestyle='-', color='#bdc3c7')
     ax2.set_axisbelow(True)
     ax2.set_facecolor('#f8f9fa')
