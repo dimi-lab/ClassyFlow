@@ -264,8 +264,7 @@ process GENERATE_FINAL_REPORT {
     path(split_files, stageAs: "general/*")
     path(norm_html)
     path(fs_html) 
-    path(xgb_winners, stageAs: "modeling/*")
-    path(holdout_files, stageAs: "modeling/*")
+    path(model_html)
     path(abundance_results, stageAs: "general/*")
     path(classified_results), stageAs: "general/per_slide/*"
     path(template_dir)
@@ -291,14 +290,14 @@ process ZIP_PUBLISHED {
 
     input:
     val trigger
-    path("final_reports/")
+    path("final_reports")
 
     output:
     path "final_reports.zip"
 
     script:
     """
-    zip -r final_reports.zip final_reports/
+    zip -r final_reports.zip final_reports
     """
 }
 
@@ -361,14 +360,6 @@ workflow {
         missing_outputs = ADD_EMPTY_MARKER_NOISE.output.empty_marker_results.flatten().collect()
         split_outputs = labledDataFrames.training_holdout_results.flatten().collect()
 
-        xgb_winners = modeling_results.xgb_results
-            .flatten() 
-            .collect()
-            
-        holdout_evals = modeling_results.holdout_results
-            .flatten()
-            .collect()
-
         prediction_results = SUMMARIZE_PREDICTIONS.output.abundance_results
             .flatten()
             .collect()
@@ -383,8 +374,7 @@ workflow {
             split_outputs,
             normalized_output.report,
             feature_selection_results.report, 
-            xgb_winners,
-            holdout_evals,
+            modeling_results.report,
             prediction_results,
             classified_results,
             params.html_template,
@@ -392,9 +382,7 @@ workflow {
             params.config_file
         )
 
-        ZIP_PUBLISHED(final_report.map {"done"}, params.reports_dir)
-
-    	
+        ZIP_PUBLISHED(final_report.map {"done"}, "${params.output_dir}/final_reports")
     }
     
 }

@@ -15,7 +15,7 @@
         <div class="tooltip-container">
             <div class="tooltip-icon">i</div>
             <div class="tooltip-popup">
-                Summary of the final model's results. This is the model that is used to predict all the cell types
+                Summary of the final model's results. This is the model that is used to predict all the cell types.
             </div>
         </div>
     </div>
@@ -53,7 +53,7 @@
 
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ modeling_data.best_class | default("N/A") }}</div>
+                <div class="metric-value">{{ best_performing_class | default("N/A") }}</div>
                 <div class="metric-label">Best Performing Class</div>
                 <span class="tooltiptext">
                     The cell type with the best prediction performance based on the holdout dataset.
@@ -63,7 +63,7 @@
 
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ modeling_data.worst_class | default("N/A") }}</div>
+                <div class="metric-value">{{ worst_performing_class | default("N/A") }}</div>
                 <div class="metric-label">Worst Performing Class</div>
                 <span class="tooltiptext">
                     The cell type with the worst prediction performance based on the holdout dataset.
@@ -74,53 +74,102 @@
     </div>
 </section>
 
+<!-- Training vs Holdout Comparison -->
+{% if modeling_data.train_holdout_comparison %}
+<section class="page-section">
+    <div class="header-with-tooltip">
+        <h3>Training vs. Holdout Split Quality Assessment</h3>
+        <div class="tooltip-container">
+            <div class="tooltip-icon">i</div>
+            <div class="tooltip-popup">
+                Analysis comparing class distributions between training and holdout datasets to assess the quality of the data split and potential sampling bias.
+            </div>
+        </div>
+    </div>
+
+    <div class="plot-container full">
+        <div class="plot-title">
+            Class Distribution Comparison
+            <div class="tooltip-container" style="display: inline-block; margin-left: 8px;">
+                <div class="tooltip-icon">i</div>
+                <div class="tooltip-popup">
+                    Side-by-side comparison of class proportions in training vs. holdout sets. Statistical test indicates whether distributions are significantly different (p < 0.05).
+                </div>
+            </div>
+        </div>
+        <img src="{{ modeling_data.train_holdout_comparison.plot_path }}" alt="Training vs Holdout Comparison" class="embedded-image" />
+    </div>
+
+    {% if modeling_data.train_holdout_comparison.statistics.is_significantly_different %}
+    <div class="alert alert-warning">
+        <strong>Distribution Mismatch Detected:</strong> The training and holdout datasets have significantly different class distributions 
+        (p = {{ "%.4f" | format(modeling_data.train_holdout_comparison.statistics.p_value) }}). 
+        This may affect the reliability of model evaluation results.
+    </div>
+    {% else %}
+    <div class="alert alert-success">
+        <strong>Well-Balanced Split:</strong> No significant difference detected between training and holdout class distributions 
+        (p = {{ "%.4f" | format(modeling_data.train_holdout_comparison.statistics.p_value) }}). 
+        The split appears to be well-stratified.
+    </div>
+    {% endif %}
+</section>
+{% endif %}
+
 <!-- Model Comparison Summary -->
-<!-- {% if modeling_data.model_comparisons %}
-    <section class="page-section">
-        <div class="header-with-tooltip">
-            <h3>Model Comparison and Selection</h3>
-            <div class="tooltip-container">
-                <div class="tooltip-icon">i</div>
-                <div class="tooltip-popup">
-                    Results from model comparison and selection processes used to identify the best performing model.
-                </div>
+{% if modeling_data.model_comparison %}
+<section class="page-section">
+    <div class="header-with-tooltip">
+        <h3>Model Comparison and Selection</h3>
+        <div class="tooltip-container">
+            <div class="tooltip-icon">i</div>
+            <div class="tooltip-popup">
+                Results from model comparison and selection processes used to identify the best performing model configuration.
             </div>
         </div>
+    </div>
 
-        <div class="header-with-tooltip">
-            <h5>Model Comparison Visualizations</h5>
-            <div class="tooltip-container">
-                <div class="tooltip-icon">i</div>
-                <div class="tooltip-popup">
-                    Visual comparisons of different models and their parameter optimization results.
-                </div>
+    <div class="header-with-tooltip">
+        <h5>Parameter Search Results</h5>
+        <div class="tooltip-container">
+            <div class="tooltip-icon">i</div>
+            <div class="tooltip-popup">
+                Hyperparameter optimization results showing performance across different model configurations.
             </div>
         </div>
+    </div>
 
-        <div style="display: flex; flex-direction: column; gap: 2rem;">
-            {% if modeling_data.model_comparisons.class_distribution_plot_path %}
-            <div class="plot-container">
-                <div class="plot-title">Class Distribution Analysis</div>
-                <img src="{{ modeling_data.model_comparisons.class_distribution_plot_path }}" alt="Class Distribution Analysis" class="embedded-image" />
-                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
-                    Analysis of class distributions used in model comparison.
-                </p>
-            </div>
-            {% endif %}
-
-            {% if modeling_data.model_comparisons.parameter_search_plot_path %}
-            <div class="plot-container">
-                <div class="plot-title">Parameter Search Results</div>
-                <img src="{{ modeling_data.model_comparisons.parameter_search_plot_path }}" alt="Parameter Search" class="embedded-image" />
-                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
-                    Hyperparameter optimization results across different model configurations.
-                </p>
-            </div>
-            {% endif %}
+    <div style="display: flex; flex-direction: column; gap: 2rem;">
+        {% if modeling_data.model_comparison.parameter_search_plot_path %}
+        <div class="plot-container large">
+            <div class="plot-title">Parameter Search Analysis</div>
+            <img src="{{ modeling_data.model_comparison.parameter_search_plot_path }}" alt="Parameter Search Results" class="embedded-image" />
+            <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
+                Boxplot showing test accuracy distributions for different hyperparameter combinations. The best and second-best models are highlighted.
+            </p>
         </div>
-        
-    </section>
-    {% endif %} -->
+        {% endif %}
+    </div>
+
+    {% if modeling_data.model_comparison.parameter_summary_csv_path %}
+    <div class="header-with-tooltip">
+        <h5>Parameter Search Summary</h5>
+        <div class="tooltip-container">
+            <div class="tooltip-icon">i</div>
+            <div class="tooltip-popup">
+                Summary statistics for each parameter combination tested during hyperparameter optimization.
+            </div>
+        </div>
+    </div>
+    
+    <div class="alert alert-info">
+        <strong>Note:</strong> Detailed parameter search results are available in the supplementary data file: 
+        <a href="{{ modeling_data.model_comparison.parameter_summary_csv_path }}" target="_blank">Parameter Summary CSV</a>
+    </div>
+    {% endif %}
+    
+</section>
+{% endif %}
 
 {% if modeling_data.holdout_evaluations %}
 <!-- Model Evaluation Tabs -->
@@ -240,7 +289,7 @@
             {% elif 'Second' in model_eval.model_name %}
                 Second Model
             {% else %}
-                "N/A"
+                {{ model_eval.model_name }}
             {% endif %}
         </div>
         {% endfor %}
@@ -252,7 +301,11 @@
         
         <!-- Model Overview -->
         <div class="header-with-tooltip">
-            <h4>{{ model_eval.data.model_name }} Performance</h4>
+            <h4>{{ 
+                "First Model" if "First" in model_eval.model_name 
+                else "Second Model" if "Second" in model_eval.model_name 
+                else model_eval.model_name 
+            }} Performance</h4>
             <div class="tooltip-container">
                 <div class="tooltip-icon">i</div>
                 <div class="tooltip-popup">
@@ -285,7 +338,7 @@
             <div class="metric-card">
                 <div class="tooltip">
                     <div class="metric-value">{{ model_eval.data.total_samples | number_format }}</div>
-                    <div class="metric-label">Test sample size</div>
+                    <div class="metric-label">Test Sample Size</div>
                     <span class="tooltiptext">
                         Number of cells in the holdout test set used for evaluation.
                     </span>
@@ -430,31 +483,21 @@
 
         <div style="display: flex; flex-direction: column; gap: 2rem;">
             {% if model_eval.data.confusion_matrix_csv_path %}
-            <div class="plot-container large">
+            <div class="plot-container full">
                 <div class="plot-title">Confusion Matrix</div>
                 <img src="{{ model_eval.data.confusion_matrix_csv_path }}" alt="Confusion Matrix" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
-                    Matrix showing predicted vs. actual classifications for each cell type.
+                    Matrix showing predicted vs. actual classifications for each cell type. Darker colors indicate higher prediction counts.
                 </p>
             </div>
             {% endif %}
 
             {% if model_eval.data.roc_curves_plot_path %}
-            <div class="plot-container">
+            <div class="plot-container large">
                 <div class="plot-title">ROC Curves</div>
                 <img src="{{ model_eval.data.roc_curves_plot_path }}" alt="ROC Curves" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
-                    Receiver Operating Characteristic curves for each cell type classification.
-                </p>
-            </div>
-            {% endif %}
-
-            {% if model_eval.data.class_distribution_plot_path %}
-            <div class="plot-container">
-                <div class="plot-title">Class Distribution</div>
-                <img src="{{ model_eval.data.class_distribution_plot_path }}" alt="Class Distribution" class="embedded-image" />
-                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
-                    Distribution of cell types in the test dataset highlighting class imbalance.
+                    Receiver Operating Characteristic curves for each cell type classification. Classes are ordered by AUC score.
                 </p>
             </div>
             {% endif %}

@@ -183,80 +183,6 @@ def read_normalization_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     
     return replace_png_with_base64(norm_template, "./norm")
 
-def read_modeling_data(pipeline_output_dir: Path) -> Dict[str, Any]:
-    """Read modeling results from modeling directory."""
-    modeling_dir = Path(pipeline_output_dir, "modeling")
-    modeling_data = {
-        'holdout_evaluations': [],
-        'model_comparisons': [],
-        'training_classes': 0,
-        'holdout_accuracy': 0.0,
-        'f1_score': 0.0,
-        'class_imbalance': '',
-        'best_class': '',
-        'worst_class': ''
-
-    }
-    
-    if not modeling_dir.exists():
-        logger.error(f"Modeling directory not found: {modeling_dir}")
-    
-    # Read holdout evaluation files
-    holdout_files = glob.glob(str(modeling_dir / "holdoutEval*.json"))
-
-    for file_path in holdout_files:
-        try:
-            with open(file_path, 'r') as f:
-                eval_result = json.load(f)
-            
-            model_name = file_path.split('_Model_')[1].split('_results')[0]
-            
-            modeling_data['holdout_evaluations'].append({
-                'model_name': model_name,
-                'data': eval_result
-            })
-
-            if model_name == "First":
-                modeling_data.update({
-                    'training_classes': eval_result.get("n_classes"),
-                    'holdout_accuracy': eval_result.get("accuracy"),
-                    'f1_score': eval_result.get("f1_score"),
-                    'class_imbalance': eval_result.get("class_imbalance_detected"),
-                    'best_class': eval_result["max_auc"]["class_name"],
-                    'worst_class': eval_result["min_auc"]["class_name"]
-                })
-                
-            
-            logger.info(f"Loaded modeling evaluation from {file_path}")
-            
-        except Exception as e:
-            logger.error(f"Error reading modeling file {file_path}: {e}")
-    
-    # Read model comparison files (xgbWinners, etc.)
-    try:
-        with open(str(modeling_dir / "xgbWinners_results.json"), 'r') as f:
-            comparison_result = json.load(f)
-        
-        modeling_data['model_comparisons'].append(comparison_result)
-        
-        logger.info(f"Loaded model comparison from {file_path}")
-        
-    except Exception as e:
-        logger.error(f"Error reading model comparison file {file_path}: {e}")
-
-
-    def sort_models(model_eval):
-        model_name = model_eval['model_name']
-        if 'First' in model_name:
-            return 0  # First priority
-        elif 'Second' in model_name:
-            return 1  # Second priority
-        else:
-            return 2  # Everything else last
-    
-    modeling_data['holdout_evaluations'].sort(key=sort_models)
-    
-    return replace_png_with_base64(modeling_data, "./modeling")
 
 def read_general_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     general_dir = Path(pipeline_output_dir, "general")
@@ -309,15 +235,12 @@ def collect_all_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     """Collect all data from pipeline outputs."""
     logger.info("Collecting general metrics...")
     general_data = read_general_data(pipeline_output_dir)
-    
-    logger.info("Collecting modeling data...")
-    modeling_data = read_modeling_data(pipeline_output_dir)
-    
+        
     all_jsons = {
         'general': general_data,
         'normalization_report': "normalization_report.html",
         'feature_selection_data': "feature_selection_report.html",
-        'modeling_data': modeling_data
+        'modeling_data': "model_report.html"
         }
 
     with open(f'all_jsons.json', 'w') as f:
@@ -369,17 +292,18 @@ def generate_report(all_data: Dict[str, Any],
         with open('feature_selection_report.html', 'r', encoding='utf-8') as f:
             feature_selection_html = f.read()
 
+        with open('model_report.html', 'r', encoding='utf-8') as f:
+            model_html = f.read()
+
         template_data = {
             'pipeline_version': pipeline_version,
             'generation_date': datetime.now().strftime("%B %d, %Y"),
             'total_cells': all_data['general']['total_cells'], 
             'total_labels': all_data['general']["total_annotated_cells"],
-            'training_classes': all_data['modeling_data']["training_classes"],
-            'holdout_accuracy': all_data['modeling_data']["holdout_accuracy"],
-            'f1_score': all_data['modeling_data']["f1_score"],
             'letterhead': encode_image_to_base64(letterhead) if letterhead else None,
             'normalization_html_content': normalization_html,
-            'feature_selection_html_content': feature_selection_html
+            'feature_selection_html_content': feature_selection_html,
+            'model_html_content': model_html
         }
 
         template_data.update(all_data)
