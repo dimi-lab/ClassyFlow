@@ -20,76 +20,153 @@ import xgboost as xgb
 ############################ PLOT AND TABLE GENERATION ############################
 
 def create_class_distribution_plot(unique_names, counts, output_path):
-    """Create class distribution bar chart and save to file"""
-    fig, ax = plt.subplots(figsize=(10, 6))
+    """Create improved class distribution bar chart and save to file"""
+    # Sort by counts (descending order)
+    sorted_indices = np.argsort(counts)[::-1]
+    sorted_names = unique_names[sorted_indices]
+    sorted_counts = counts[sorted_indices]
     
-    # Create horizontal bar chart
-    bars = ax.barh(unique_names, counts, color='steelblue', alpha=0.7)
-    ax.set_xlabel('Number of Samples')
-    ax.set_title('Class Distribution in Holdout Dataset')
-    ax.grid(True, alpha=0.3, axis='x')
+    # Create figure with better styling
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Create horizontal bar chart with gradient colors
+    colors = plt.cm.viridis(np.linspace(0.2, 0.9, len(sorted_names)))
+    bars = ax.barh(sorted_names, sorted_counts, color=colors, alpha=0.8, edgecolor='white', linewidth=1.5)
+    
+    # Styling to match theme
+    ax.set_xlabel('Number of Samples', fontsize=14, fontweight='bold', color='#2c3e50')
+    ax.set_ylabel('Cell Types', fontsize=14, fontweight='bold', color='#2c3e50')
+    ax.set_title('Class Distribution in Holdout Dataset', fontsize=16, fontweight='bold', 
+                 color='#2c3e50', pad=20)
+    
+    # Grid styling
+    ax.grid(True, alpha=0.3, axis='x', linestyle='-', color='#bdc3c7')
+    ax.set_axisbelow(True)
     
     # Add value labels on bars
-    for bar, count in zip(bars, counts):
+    for bar, count in zip(bars, sorted_counts):
         width = bar.get_width()
-        ax.text(width + max(counts)*0.01, bar.get_y() + bar.get_height()/2, 
-               f'{count}', ha='left', va='center', fontweight='bold')
+        ax.text(width + max(sorted_counts)*0.01, bar.get_y() + bar.get_height()/2, 
+               f'{count:,}', ha='left', va='center', fontweight='bold', 
+               fontsize=11, color='#2c3e50')
+    
+    # Style the axes
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color('#bdc3c7')
+    ax.spines['bottom'].set_color('#bdc3c7')
+    
+    # Background color
+    fig.patch.set_facecolor('white')
+    ax.set_facecolor('#f8f9fa')
     
     plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.close(fig)
     print(f"Class distribution plot saved: {output_path}")
 
 def create_confusion_matrix_plot(cm_df, class_names, output_path):
-    """Create confusion matrix heatmap and save to file"""
-    fig, ax = plt.subplots(figsize=(10, 8))
+    """Create larger, improved confusion matrix heatmap and save to file"""
+    # Calculate figure size based on number of classes
+    base_size = 2.5
+    n_classes = len(class_names)
+    figsize = (max(12, base_size * n_classes), max(10, base_size * n_classes))
     
-    # Create heatmap
-    sns.heatmap(cm_df, annot=True, fmt='d', cmap='Blues', 
-               xticklabels=class_names, yticklabels=class_names,
-               ax=ax, cbar_kws={'label': 'Number of Predictions'})
+    fig, ax = plt.subplots(figsize=figsize)
     
-    ax.set_xlabel('Predicted Class')
-    ax.set_ylabel('Actual Class')
-    ax.set_title('Confusion Matrix')
+    # Create custom colormap for better contrast
+    cmap = plt.cm.Blues
+    
+    # Create heatmap with improved styling
+    sns.heatmap(cm_df, annot=True, fmt='d', cmap=cmap, 
+                xticklabels=class_names, yticklabels=class_names,
+                ax=ax, cbar_kws={'label': 'Number of Predictions', 'shrink': 0.8},
+                square=True, linewidths=0.5, linecolor='white',
+                annot_kws={'fontsize': max(12, 18 - n_classes//3), 'fontweight': 'bold'})
+    
+    # Styling
+    ax.set_xlabel('Predicted Class', fontsize=16, fontweight='bold', color='#2c3e50')
+    ax.set_ylabel('Actual Class', fontsize=16, fontweight='bold', color='#2c3e50')
+    ax.set_title('Confusion Matrix', fontsize=18, fontweight='bold', 
+                 color='#2c3e50', pad=25)
+    
+    # Rotate labels if needed
+    if n_classes > 8:
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+        ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
+    else:
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=0)
+        ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
+    
+    # Style ticks
+    ax.tick_params(axis='both', which='major', labelsize=12, colors='#2c3e50')
+    
+    # Background
+    fig.patch.set_facecolor('white')
     
     plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.close(fig)
     print(f"Confusion matrix plot saved: {output_path}")
 
 def create_roc_curves_plot(y_true_binarized, y_pred_scores, label_hash, n_classes, auc_scores, output_path):
-    """Create ROC curves for all classes and save to file"""
-    fig, ax = plt.subplots(figsize=(10, 8))
+    """Create improved ROC curves for all classes and save to file"""
+    fig, ax = plt.subplots(figsize=(12, 10))
     
     if len(auc_scores) == 0:
         ax.text(0.5, 0.5, 'No ROC curves available\nCheck class distribution', 
-                ha='center', va='center', transform=ax.transAxes, fontsize=12)
+                ha='center', va='center', transform=ax.transAxes, fontsize=14,
+                bbox=dict(boxstyle='round,pad=0.5', facecolor='#f8f9fa', edgecolor='#bdc3c7'))
     else:
         # Sort by AUC score (descending)
         sorted_auc_scores = sorted(auc_scores.items(), key=lambda x: x[1], reverse=True)
         
-        # Use distinct colors for all classes
-        colors = plt.cm.tab10(np.linspace(0, 1, len(sorted_auc_scores)))
+        # Use better color palette
+        colors = plt.cm.tab10(np.linspace(0, 1, min(10, len(sorted_auc_scores))))
+        if len(sorted_auc_scores) > 10:
+            # Use viridis for more classes
+            colors = plt.cm.viridis(np.linspace(0.1, 0.9, len(sorted_auc_scores)))
         
         for (class_index, roc_auc), color in zip(sorted_auc_scores, colors):
             if class_index in label_hash:
                 fpr, tpr, _ = roc_curve(y_true_binarized[:, class_index], y_pred_scores[:, class_index])
-                ax.plot(fpr, tpr, color=color, lw=2, 
+                ax.plot(fpr, tpr, color=color, lw=2.5, 
                        label=f'{label_hash[class_index]} (AUC = {roc_auc:.3f})')
     
     # Add reference line
-    ax.plot([0, 1], [0, 1], 'k--', lw=2, alpha=0.5, label='Random Classifier')
+    ax.plot([0, 1], [0, 1], 'k--', lw=2, alpha=0.6, label='Random Classifier')
+    
+    # Styling
     ax.set_xlim([0.0, 1.0])
     ax.set_ylim([0.0, 1.05])
-    ax.set_xlabel('False Positive Rate')
-    ax.set_ylabel('True Positive Rate')
-    ax.set_title('Receiver Operating Characteristic (ROC) Curves')
-    ax.legend(loc="lower right", fontsize=9)
-    ax.grid(True, alpha=0.3)
+    ax.set_xlabel('False Positive Rate', fontsize=14, fontweight='bold', color='#2c3e50')
+    ax.set_ylabel('True Positive Rate', fontsize=14, fontweight='bold', color='#2c3e50')
+    ax.set_title('Receiver Operating Characteristic (ROC) Curves', 
+                 fontsize=16, fontweight='bold', color='#2c3e50', pad=20)
+    
+    # Grid and legend
+    ax.grid(True, alpha=0.3, linestyle='-', color='#bdc3c7')
+    ax.set_axisbelow(True)
+    
+    # Improved legend
+    legend = ax.legend(loc="lower right", fontsize=10, frameon=True, 
+                      fancybox=True, shadow=True, framealpha=0.9)
+    legend.get_frame().set_facecolor('#f8f9fa')
+    legend.get_frame().set_edgecolor('#bdc3c7')
+    
+    # Style axes
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color('#bdc3c7')
+    ax.spines['bottom'].set_color('#bdc3c7')
+    ax.tick_params(axis='both', which='major', labelsize=12, colors='#2c3e50')
+    
+    # Background
+    fig.patch.set_facecolor('white')
+    ax.set_facecolor('#f8f9fa')
     
     plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.close(fig)
     print(f"ROC curves plot saved: {output_path}")
 

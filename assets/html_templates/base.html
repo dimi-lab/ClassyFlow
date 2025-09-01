@@ -795,7 +795,7 @@
         {% include 'summary.html' %}
         {{ normalization_html_content | safe }}
         {{ feature_selection_html_content | safe }}
-        {% include 'modeling.html' %}
+        {{ model_html_content | safe }}
         {% include 'predictions.html' %}
     </div>
 

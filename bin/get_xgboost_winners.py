@@ -14,50 +14,117 @@ import json
 import os
 
 def plot_parameter_search(df, output_path):
-    """Create parameter search boxplot and save to file"""
+    """Create improved parameter search boxplot and save to file"""
     df['combination'] = df.apply(lambda row: f"max_depth={row['max_depth']}, eta={row['eta']}", axis=1)
     mean_values = df.groupby('combination')['testf'].mean()
     max_comb = mean_values.idxmax()
     second_max_comb = mean_values.nlargest(2).idxmin()
     unique_combs = df['combination'].unique().tolist()
-    color_palette = ['grey'] * len(unique_combs)
-    color_palette[unique_combs.index(max_comb)] = 'red'
-    color_palette[unique_combs.index(second_max_comb)] = 'orange'
+    
+    # Create better color palette
+    color_palette = ['#bdc3c7'] * len(unique_combs)  # Light gray for others
+    color_palette[unique_combs.index(max_comb)] = '#e74c3c'  # Red for best
+    color_palette[unique_combs.index(second_max_comb)] = '#f39c12'  # Orange for second
 
-    plt.figure(figsize=(12, 6))
-    sns.boxplot(
+    fig, ax = plt.subplots(figsize=(14, 8))
+    
+    # Create boxplot with improved styling
+    box_plot = sns.boxplot(
         x='combination', y='testf', hue='combination', data=df,
-        palette=color_palette, legend=False, flierprops={'markerfacecolor':'grey'}
+        palette=color_palette, legend=False, 
+        flierprops={'markerfacecolor':'#95a5a6', 'markeredgecolor':'#7f8c8d', 'markersize': 6},
+        boxprops={'alpha': 0.8, 'linewidth': 1.5},
+        whiskerprops={'linewidth': 1.5, 'color': '#2c3e50'},
+        capprops={'linewidth': 1.5, 'color': '#2c3e50'},
+        medianprops={'linewidth': 2, 'color': '#2c3e50'},
+        ax=ax
     )
-    plt.ylim(df['testf'].min() - 0.01, df['testf'].max() + 0.01)
-    yticks = plt.gca().get_yticks()
-    plt.gca().set_yticks(yticks)
-    plt.gca().set_yticklabels(['{:.0f}%'.format(y * 100) for y in yticks])
-    plt.xlabel('Combinations of Parameters')
-    plt.ylabel('Test Accuracy')
-    plt.title('Boxplot of XGB Training')
-    plt.xticks(rotation=35, ha='right')
+    
+    # Styling
+    ax.set_ylim(df['testf'].min() - 0.01, df['testf'].max() + 0.01)
+    yticks = ax.get_yticks()
+    ax.set_yticklabels(['{:.0f}%'.format(y * 100) for y in yticks])
+    
+    ax.set_xlabel('Parameter Combinations', fontsize=14, fontweight='bold', color='#2c3e50')
+    ax.set_ylabel('Test Accuracy', fontsize=14, fontweight='bold', color='#2c3e50')
+    ax.set_title('XGBoost Parameter Search Results', fontsize=16, fontweight='bold', 
+                 color='#2c3e50', pad=20)
+    
+    # Grid and axis styling
+    ax.grid(True, alpha=0.3, axis='y', linestyle='-', color='#bdc3c7')
+    ax.set_axisbelow(True)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color('#bdc3c7')
+    ax.spines['bottom'].set_color('#bdc3c7')
+    
+    # Rotate x-axis labels
+    plt.xticks(rotation=35, ha='right', fontsize=11, color='#2c3e50')
+    ax.tick_params(axis='y', which='major', labelsize=12, colors='#2c3e50')
+    
+    # Background styling
+    fig.patch.set_facecolor('white')
+    ax.set_facecolor('#f8f9fa')
+    
+    # Add legend for color coding
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor='#e74c3c', alpha=0.8, label='Best Model'),
+        Patch(facecolor='#f39c12', alpha=0.8, label='Second Best Model'),
+        Patch(facecolor='#bdc3c7', alpha=0.8, label='Other Models')
+    ]
+    ax.legend(handles=legend_elements, loc='upper left', frameon=True, 
+              fancybox=True, shadow=True, framealpha=0.9)
+    
     plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.close()
     print(f"Parameter search plot saved: {output_path}")
 
 def plot_class_distribution(unique, counts, output_path):
-    """Create class distribution plot and save to file"""
-    plt.figure(figsize=(8, 6))
-    plt.barh(unique, counts, color='steelblue', alpha=0.7)
-    plt.xlabel('Number of Samples')
-    plt.ylabel('Class Labels')
-    plt.title('Class Distribution in Training Data')
-    plt.grid(True, alpha=0.3, axis='x')
+    """Create improved class distribution plot and save to file"""
+    # Sort by counts (descending order)
+    sorted_indices = np.argsort(counts)[::-1]
+    sorted_unique = [unique[i] for i in sorted_indices]
+    sorted_counts = counts[sorted_indices]
+    
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Create horizontal bar chart with gradient colors
+    colors = plt.cm.viridis(np.linspace(0.2, 0.9, len(sorted_unique)))
+    bars = ax.barh(sorted_unique, sorted_counts, color=colors, alpha=0.8, 
+                   edgecolor='white', linewidth=1.5)
+    
+    # Styling to match theme
+    ax.set_xlabel('Number of Samples', fontsize=14, fontweight='bold', color='#2c3e50')
+    ax.set_ylabel('Cell Types', fontsize=14, fontweight='bold', color='#2c3e50')
+    ax.set_title('Class Distribution in Training Data', fontsize=16, fontweight='bold', 
+                 color='#2c3e50', pad=20)
+    
+    # Grid styling
+    ax.grid(True, alpha=0.3, axis='x', linestyle='-', color='#bdc3c7')
+    ax.set_axisbelow(True)
     
     # Add value labels on bars
-    for i, count in enumerate(counts):
-        plt.text(count + max(counts)*0.01, i, f'{count}', 
-                ha='left', va='center', fontweight='bold')
+    for bar, count in zip(bars, sorted_counts):
+        width = bar.get_width()
+        ax.text(width + max(sorted_counts)*0.01, bar.get_y() + bar.get_height()/2, 
+               f'{count:,}', ha='left', va='center', fontweight='bold', 
+               fontsize=11, color='#2c3e50')
+    
+    # Style the axes
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color('#bdc3c7')
+    ax.spines['bottom'].set_color('#bdc3c7')
+    ax.tick_params(axis='both', which='major', labelsize=12, colors='#2c3e50')
+    
+    # Background color
+    fig.patch.set_facecolor('white')
+    ax.set_facecolor('#f8f9fa')
     
     plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.close()
     print(f"Class distribution plot saved: {output_path}")
 
