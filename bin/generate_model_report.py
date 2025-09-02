@@ -465,7 +465,7 @@ def main():
     train_df = pd.read_pickle(args.training_dataframe)
     holdout_df = pd.read_pickle(args.holdout_dataframe)
     
-    comparison_plot_path = "plots/train_holdout_comparison.png"
+    comparison_plot_path = "train_holdout_comparison.png"
     os.makedirs("plots", exist_ok=True)
     
     stats_results = create_train_holdout_comparison_plot(
@@ -474,7 +474,7 @@ def main():
     
     # Add to modeling_data
     modeling_data['train_holdout_comparison'] = {
-        'plot_path': comparison_plot_path,
+        'plot_path': f"plots/{comparison_plot_path}",
         'statistics': stats_results
     }
     
