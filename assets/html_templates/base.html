@@ -79,7 +79,7 @@
         .letterhead img {
             max-width: 100%;
             height: auto;
-            max-height: 80px;
+            max-height: 180px;
             object-fit: contain;
         }
 
@@ -96,7 +96,7 @@
             height: auto;
             display: block;
             object-fit: contain;
-            max-height: 100px;
+            max-height: 180px;
         }
 
         .header-text-center {
@@ -233,31 +233,46 @@
 
         .page-section {
             background: white;
-            border-radius: 12px;
-            padding: 2rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border-radius: 8px;
+            padding: 1.8rem;
+            margin-bottom: 1.2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             border: 1px solid #e9ecef;
+            transition: box-shadow 0.2s ease;
         }
 
-        /* Typography */
+        .page-section:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+
+        /* Typography - Enhanced hierarchy */
         h1, h2, h3, h4, h5, h6 {
             font-weight: 600;
             margin-bottom: 1rem;
             color: #2c3e50;
+            line-height: 1.3;
         }
 
         h2 {
-            font-size: 1.8rem;
-            border-bottom: 3px solid #667eea;
-            padding-bottom: 0.5rem;
-            margin-bottom: 1.5rem;
+            font-size: 1.6rem;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 0.4rem;
+            margin-bottom: 1.2rem;
+            margin-top: 2rem;
         }
 
         h3 {
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             color: #495057;
-            margin-top: 2rem;
+            margin-top: 1.8rem;
+            margin-bottom: 0.8rem;
+        }
+
+        h4 {
+            font-size: 1.1rem;
+            color: #6c757d;
+            margin-top: 1.5rem;
+            margin-bottom: 0.6rem;
         }
 
         p {
@@ -268,59 +283,63 @@
         /* Cards and metrics */
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
-            margin: 2rem 0;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.2rem;
+            margin: 1.5rem 0;
         }
 
         .metric-card {
             background: white;
-            padding: 1.8rem;
-            border-radius: 12px;
-            border-left: 5px solid #667eea;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.12);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            padding: 1.2rem;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
             position: relative;
         }
 
         .metric-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.18);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
 
         .metric-value {
-            font-size: 2.2rem;
+            font-size: 1.8rem;
             font-weight: 700;
             color: #667eea;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.3rem;
         }
 
         .metric-label {
-            font-size: 0.95rem;
+            font-size: 0.85rem;
             color: #6c757d;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
             font-weight: 600;
+            margin-bottom: 0.2rem;
         }
 
         .metric-description {
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             color: #868e96;
-            margin-top: 0.5rem;
+            margin-top: 0.3rem;
+            line-height: 1.3;
         }
 
-        /* Tables */
+        /* Tables - Enhanced styling */
         .table-container {
             overflow-x: auto;
-            margin: 2rem 0;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+            margin: 1.5rem 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid #e9ecef;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
             background: white;
+            font-size: 0.9rem;
         }
 
         /* Table width control classes */
@@ -373,9 +392,10 @@
         }
 
         th, td {
-            padding: 1rem 1.2rem;
+            padding: 0.8rem 1rem;
             text-align: left;
             border-bottom: 1px solid #e9ecef;
+            vertical-align: middle;
         }
 
         th {
@@ -383,8 +403,11 @@
             font-weight: 600;
             color: #495057;
             text-transform: uppercase;
-            font-size: 0.9rem;
-            letter-spacing: 0.5px;
+            font-size: 0.8rem;
+            letter-spacing: 0.3px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         tr:hover {
@@ -413,17 +436,17 @@
             text-align: center;
             margin: 2rem 0;
             background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             max-width: 100%;
         }
 
         .plot-container img {
-            max-width: 85%;
-            max-height: 500px;
+            max-width: 95%;
+            max-height: 600px;
             height: auto;
-            border-radius: 8px;
+            border-radius: 6px;
             object-fit: contain;
         }
 
@@ -519,20 +542,22 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 22px;
-            height: 22px;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
-            background-color: #007acc;
+            background-color: #667eea;
             color: white;
-            font-size: 12px;
-            font-weight: bold;
+            font-size: 10px;
+            font-weight: 600;
             cursor: help;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
+            margin-left: 0.3rem;
         }
 
         .tooltip-icon:hover {
-            background-color: #0056b3;
+            background-color: #5a6fd8;
             transform: scale(1.1);
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
         }
 
         .tooltip-popup {
@@ -652,84 +677,7 @@
             border-radius: 8px 8px 0 0;
         }
 
-        /* Responsive design */
-        @media (max-width: 768px) {
-            body {
-                max-width: 95%;
-            }
-
-            .container {
-                padding: 1rem;
-            }
-
-            .header-content {
-                padding: 0 1rem;
-                flex-direction: column;
-                text-align: center;
-            }
-
-            .header-text {
-                max-width: 100%;
-            }
-
-            .header-logo {
-                margin-left: 0;
-                margin-top: 1rem;
-                max-height: 50px;
-            }
-
-            .header-image {
-                width: 150px;
-                opacity: 0.1;
-            }
-
-            .header h1 {
-                font-size: 1.8rem;
-            }
-
-            .nav-content {
-                padding: 0 1rem;
-            }
-
-            .nav ul {
-                flex-direction: column;
-            }
-
-            .nav a {
-                padding: 1rem 0;
-                border-bottom: none;
-                border-left: 4px solid transparent;
-                text-align: center;
-            }
-
-            .nav a:hover,
-            .nav a.active {
-                border-left-color: #667eea;
-                border-bottom-color: transparent;
-            }
-
-            .metrics-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .table-container.small,
-            .table-container.inline,
-            .table-container.inline-third {
-                width: 100%;
-                margin: 1rem 0;
-            }
-
-            .plot-container img,
-            .embedded-image {
-                max-width: 95%;
-            }
-
-            .tooltip .tooltiptext,
-            .tooltip-popup {
-                width: 250px;
-                margin-left: -125px;
-            }
-        }
+        /* Desktop-optimized design - no mobile support needed */
 
         /* Print styles */
         @media print {

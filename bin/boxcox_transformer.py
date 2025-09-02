@@ -127,8 +127,14 @@ def create_all_transformation_plots_html(df, df_transformed, bxcxMetrics, batchN
             else:
                 correlation = 0
             
-            # Create figure
-            fig, ax = plt.subplots(figsize=(6, 6))
+            # Create standardized figure
+            plt.style.use('default')
+            fig, ax = plt.subplots(figsize=(8, 5))
+            plt.rcParams.update({
+                'font.size': 10,
+                'font.family': 'sans-serif',
+                'axes.linewidth': 1
+            })
             
             # Scatter plot
             ax.scatter(df[marker_col], df_transformed[marker_col], alpha=0.6, s=1, color='blue')
@@ -138,8 +144,8 @@ def create_all_transformation_plots_html(df, df_transformed, bxcxMetrics, batchN
             max_trans = df_transformed[marker_col].max()
             ax.plot([0, max_orig], [0, max_trans], 'r--', alpha=0.7, linewidth=2, label='Identity Line')
             
-            # Formatting
-            ax.set_title(f'{transformation_type} Transform: {marker_col}', fontweight='bold', fontsize=12)
+            # Standardized formatting
+            ax.set_title(f'{transformation_type} Transform: {marker_col}', fontweight='bold', fontsize=11)
             ax.set_xlabel('Original Value', fontsize=10)
             ax.set_ylabel('Transformed Value', fontsize=10)
             ax.grid(True, alpha=0.3)
@@ -154,7 +160,7 @@ def create_all_transformation_plots_html(df, df_transformed, bxcxMetrics, batchN
             
             # Convert plot to base64 instead of saving to file
             buf = BytesIO()
-            plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+            plt.savefig(buf, format='png', dpi=300, bbox_inches='tight')
             plt.close()
             buf.seek(0)
             img_b64 = base64.b64encode(buf.read()).decode('utf-8')
