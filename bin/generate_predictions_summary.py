@@ -85,9 +85,9 @@ def create_abundance_plot(df, output_file):
     n_samples = df['Sample'].nunique()
     n_cell_types = df['CellTypePrediction'].nunique()
     
-    # Simple dynamic sizing
-    plot_width = max(10, min(20, 8 + n_samples * 0.5))
-    plot_height = max(6, min(12, 6 + n_cell_types * 0.2))
+    # Enhanced dynamic sizing for large datasets
+    plot_width = max(12, min(30, 10 + n_samples * 0.4))
+    plot_height = max(8, min(12, 7 + n_cell_types * 0.15))
     
     # Calculate proportions and pivot
     proportions_list = []
@@ -111,8 +111,14 @@ def create_abundance_plot(df, output_file):
     # Reorder columns to match abundance order
     pivot_df = pivot_df.reindex(columns=cell_type_order, fill_value=0)
     
-    # Create plot
+    # Create plot with standardized styling
+    plt.style.use('default')
     fig, ax = plt.subplots(figsize=(plot_width, plot_height), dpi=300)
+    plt.rcParams.update({
+        'font.size': 11,
+        'font.family': 'sans-serif',
+        'axes.linewidth': 1
+    })
     
     # Generate colors
     colors = sns.color_palette("Set2", n_cell_types)
@@ -132,15 +138,23 @@ def create_abundance_plot(df, output_file):
         )
         bottom += pivot_df[cell_type]
         
-    # Styling
-    ax.set_title('Predicted Cell Type Composition by Sample', fontsize=16, fontweight='bold', pad=20)
-    ax.set_xlabel('Sample', fontsize=12, fontweight='bold')
-    ax.set_ylabel('Percentage of Cells (%)', fontsize=12, fontweight='bold')
+    # Standardized styling
+    ax.set_title('Predicted Cell Type Composition by Sample', fontsize=13, fontweight='bold', pad=15)
+    ax.set_xlabel('Sample', fontsize=11, fontweight='bold')
+    ax.set_ylabel('Percentage of Cells (%)', fontsize=11, fontweight='bold')
     
-    # X-axis labels
+    # X-axis labels - dynamic rotation based on sample count
     ax.set_xticks(range(len(pivot_df)))
-    rotation = 45 if n_samples <= 15 else 70
-    ax.set_xticklabels(pivot_df.index, rotation=rotation, ha='right')
+    if n_samples <= 10:
+        rotation = 30
+        fontsize = 10
+    elif n_samples <= 25:
+        rotation = 45
+        fontsize = 9
+    else:
+        rotation = 70
+        fontsize = 8
+    ax.set_xticklabels(pivot_df.index, rotation=rotation, ha='right', fontsize=fontsize)
     
     # Y-axis
     ax.set_ylim(0, 100)
