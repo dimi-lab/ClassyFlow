@@ -49,6 +49,25 @@ def get_color_map(cell_types):
             color_map[k] = v
     return color_map
 
+def calculate_roi_summary_stats(df):
+    """Calculate summary statistics for the ROI table"""
+    cell_type_counts = df['CellTypePrediction'].value_counts()
+    cell_type_percentages = df['CellTypePrediction'].value_counts(normalize=True) * 100
+    
+    # Get most common and second most common classes
+    most_common_classes = cell_type_counts.head(2)
+    
+    summary_stats = {
+        'total_cells': len(df),
+        'unique_classes': df['CellTypePrediction'].nunique(),
+        'most_common_class': most_common_classes.index[0] if len(most_common_classes) > 0 else None,
+        'most_common_percentage': cell_type_percentages.iloc[0] if len(cell_type_percentages) > 0 else 0,
+        'second_common_class': most_common_classes.index[1] if len(most_common_classes) > 1 else None,
+        'second_common_percentage': cell_type_percentages.iloc[1] if len(cell_type_percentages) > 1 else 0
+    }
+    
+    return summary_stats
+
 def plot_spatial(df, color_map, slide_name, output_file):
     mx = df["Centroid Y µm"].max() + 1
     df["invertY"] = mx - df["Centroid Y µm"]
@@ -179,11 +198,17 @@ def main():
     slide_name = os.path.basename(args.input_tsv).split(".")[0]
     color_map = get_color_map(df["CellTypePrediction"].unique())
 
+    # Calculate summary statistics for the ROI table
+    summary_stats = calculate_roi_summary_stats(df)
+
     results = {
         'sample_name': slide_name, 
         'celltype_barplot': f"{slide_name}_celltype_barplot.png",
         'spatial_plot': f"{slide_name}_spatial_plot.html"
     }
+    
+    # Add summary statistics to results
+    results.update(summary_stats)
 
     # Generate plots
     spatial_html = plot_spatial(df, color_map, slide_name, results["spatial_plot"])
@@ -191,10 +216,9 @@ def main():
     dendro_html = plot_dendrogram(df)
     create_cell_type_bar_plot(df, slide_name, results["celltype_barplot"])
 
-    #Save json
+    #Save json with summary statistics
     with open(f"{slide_name}_classified.json", 'w') as f:
         json.dump(results, f, indent=2, default=str)
-
 
     # Compose HTML report
     html_template = """
@@ -211,6 +235,13 @@ def main():
     </head>
     <body>
         <h1>Cell Type Classification Report: {{ slide_name }}</h1>
+        <h2>Summary Statistics</h2>
+        <ul>
+            <li>Total Cells: {{ total_cells }}</li>
+            <li>Unique Classes: {{ unique_classes }}</li>
+            <li>Most Common Class: {{ most_common_class }} ({{ most_common_percentage }}%)</li>
+            <li>Second Most Common: {{ second_common_class }} ({{ second_common_percentage }}%)</li>
+        </ul>
         <h2>Spatial Cell Type Prediction</h2>
         {{ spatial_html|safe }}
         <h2>UMAP of Quantification Data</h2>
@@ -223,6 +254,12 @@ def main():
     template = Template(html_template)
     html = template.render(
         slide_name=slide_name,
+        total_cells=summary_stats['total_cells'],
+        unique_classes=summary_stats['unique_classes'],
+        most_common_class=summary_stats['most_common_class'],
+        most_common_percentage=f"{summary_stats['most_common_percentage']:.1f}" if summary_stats['most_common_percentage'] else "N/A",
+        second_common_class=summary_stats['second_common_class'],
+        second_common_percentage=f"{summary_stats['second_common_percentage']:.1f}" if summary_stats['second_common_percentage'] else "N/A",
         spatial_html=spatial_html,
         umap_html=umap_html,
         dendro_html=dendro_html
@@ -232,4 +269,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

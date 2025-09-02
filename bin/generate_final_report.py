@@ -190,46 +190,69 @@ def read_general_data(pipeline_output_dir: Path) -> Dict[str, Any]:
 
     if not general_dir.exists():
         logger.error(f"General Metrics directory not found: {general_dir}")
+        return results
 
+    # Read main abundance metrics file
+    abundance_file = general_dir / "abundance_metrics.json"
+    if abundance_file.exists():
+        try:
+            with open(abundance_file, 'r') as f:
+                abundance_data = json.load(f)
+            results.update(abundance_data)
+            logger.info(f"Loaded abundance metrics from {abundance_file}")
+        except Exception as e:
+            logger.error(f"Error reading abundance metrics: {e}")
     
+    # Read other general JSON files
     json_files = glob.glob(str(general_dir / "*.json"))
-
     for file_path in json_files:
+        if Path(file_path).name == "abundance_metrics.json":
+            continue  # Already processed above
+            
         try:
             with open(file_path, 'r') as f:
                 json_results = json.load(f)
             
             conflicting_keys = set(results.keys()) & set(json_results.keys())
             if conflicting_keys:
-                logger.error(f"Overwriting existing keys from {file_path}: {conflicting_keys}")
+                logger.warning(f"Overwriting existing keys from {file_path}: {conflicting_keys}")
 
             results.update(json_results)
-            
             logger.info(f"Loaded metrics from {file_path}")
             
         except Exception as e:
             logger.error(f"Error reading metrics file {file_path}: {e}")
 
+    # Read per-slide classification results
+    per_slide_dir = general_dir / "per_slide"
+    if per_slide_dir.exists():
+        json_files = glob.glob(str(per_slide_dir / "*_classified.json"))
+        for file_path in json_files:
+            try:
+                with open(file_path, 'r') as f:
+                    json_results = json.load(f)
+                
+                results["per_slide"].append({
+                    'sample': json_results["sample_name"],
+                    'data': json_results
+                })
+                
+                logger.info(f"Loaded per-slide metrics from {file_path}")
+                
+            except Exception as e:
+                logger.error(f"Error reading per-slide metrics file {file_path}: {e}")
     
-    json_files = glob.glob(str(general_dir / "per_slide" / "*.json"))
-
-    for file_path in json_files:
-        try:
-            with open(file_path, 'r') as f:
-                json_results = json.load(f)
-            
+    # If we have per_sample_statistics in abundance data, use that for per_slide if per_slide is empty
+    if not results["per_slide"] and "per_sample_statistics" in results:
+        for sample_stat in results["per_sample_statistics"]:
             results["per_slide"].append({
-                'sample': json_results["sample_name"],
-                'data': json_results
+                'sample': sample_stat["sample_name"],
+                'data': sample_stat
             })
-            
-            logger.info(f"Loaded metrics from {file_path}")
-            
-        except Exception as e:
-            logger.error(f"Error reading metrics file {file_path}: {e}")
+        logger.info(f"Used per_sample_statistics for per_slide data ({len(results['per_slide'])} samples)")
     
-    print(results)
-    return replace_png_with_base64(results, "./general")
+    print(f"Loaded general data with {len(results['per_slide'])} per-slide entries")
+    return replace_png_with_base64(results, str(general_dir))
 
 def collect_all_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     """Collect all data from pipeline outputs."""
