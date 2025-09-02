@@ -246,7 +246,7 @@ process SUMMARIZE_PREDICTIONS {
     path(prediction_files)
 
     output:
-    tuple path("abundance_metrics.json"), path("prediction_abundance_plot.png"), emit: abundance_results
+    tuple path("abundance_metrics.json"), path("prediction_abundance_plot.png"), path("*_summary_stats.json"), emit: abundance_results
 
     script:
     """
