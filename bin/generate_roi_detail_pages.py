@@ -376,7 +376,7 @@ def generate_roi_html_template() -> str:
             <h2 class="section-title">ROI Overview</h2>
             <div class="metrics-grid">
                 <div class="metric-card">
-                    <div class="metric-value">{{ total_cells | number_format }}</div>
+                    <div class="metric-value">{{ number_format(total_cells) }}</div>
                     <div class="metric-label">Total Cells</div>
                 </div>
                 <div class="metric-card">
@@ -412,7 +412,7 @@ def generate_roi_html_template() -> str:
                 {% for cell_type, count in cell_type_distribution.items() %}
                 <div class="celltype-card">
                     <div class="celltype-name">{{ cell_type }}</div>
-                    <div class="celltype-count">{{ count | number_format }}</div>
+                    <div class="celltype-count">{{ number_format(count) }}</div>
                     <div class="celltype-percentage">{{ "%.1f" | format(percentage_distribution[cell_type]) }}%</div>
                 </div>
                 {% endfor %}
