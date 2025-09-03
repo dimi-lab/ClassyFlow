@@ -357,6 +357,15 @@ def main():
     json_output_path = args.output_file.parent / "normalization_results.json"
     export_normalization_json(norm_data, json_output_path)
     
+    # Save summary metrics for final report
+    normalization_summary = {
+        'num_batches': norm_data.get('total_batches', 0) if norm_data.get('total_batches', 0) > 0 else None
+    }
+    
+    with open('normalization_summary.json', 'w') as f:
+        json.dump(normalization_summary, f, indent=2)
+    print("Saved normalization summary to normalization_summary.json")
+    
     # Print summary
     print("\n" + "="*60)
     print("NORMALIZATION REPORT GENERATION COMPLETE")

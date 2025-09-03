@@ -194,6 +194,24 @@ def generate_abundance_results(df):
     # Calculate per-sample statistics
     per_sample_stats = calculate_per_sample_stats(df)
     
+    # Get cell type counts and percentages
+    cell_type_counts = df['CellTypePrediction'].value_counts()
+    cell_type_percentages = (cell_type_counts / len(df) * 100).round(1)
+    
+    # Most abundant types (top 5)
+    most_abundant = []
+    for cell_type, percentage in cell_type_percentages.head(5).items():
+        most_abundant.append({
+            "name": str(cell_type),
+            "percentage": float(percentage)
+        })
+    
+    # Rarest cell type
+    rarest_type = {
+        "name": str(cell_type_percentages.index[-1]),
+        "percentage": float(cell_type_percentages.iloc[-1])
+    }
+    
     # Overall results
     results = {
         'total_predicted_cells': len(df),
@@ -202,6 +220,14 @@ def generate_abundance_results(df):
         'most_rare_prediction': df['CellTypePrediction'].value_counts().index[-1],
         'abundance_plot': "prediction_abundance_plot.png",
         'per_sample_statistics': per_sample_stats
+    }
+    
+    # Summary metrics for final report
+    summary_metrics = {
+        'identified_cell_types': df['CellTypePrediction'].nunique(),
+        'most_abundant_types': most_abundant,
+        'rarest_cell_type': rarest_type,
+        'composition_chart': "prediction_abundance_plot.png"
     }
     
     # Add low density cells if available
@@ -215,6 +241,11 @@ def generate_abundance_results(df):
     # Save overall results
     with open("abundance_metrics.json", 'w') as f:
         json.dump(results, f, indent=2, default=str)
+    
+    # Save summary metrics for final report
+    with open("summary_metrics.json", 'w') as f:
+        json.dump(summary_metrics, f, indent=2, default=str)
+    print("Saved summary metrics to summary_metrics.json")
     
     # Save individual per-sample JSON files for template processing
     for sample_stats in per_sample_stats:

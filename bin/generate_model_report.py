@@ -394,6 +394,16 @@ def generate_section_report(modeling_data: Dict[str, Any],
         
         logger.info(f"Modeling section generated: {output_file}")
         
+        # Save summary metrics for final report
+        model_summary = {
+            'model_accuracy': round(summary.get('best_accuracy', 0) * 100, 1) if summary.get('best_accuracy', 0) > 0 else None,
+            'training_cell_types': summary.get('training_classes', 0) if summary.get('training_classes', 0) > 0 else None
+        }
+        
+        with open('model_summary.json', 'w') as f:
+            json.dump(model_summary, f, indent=2)
+        logger.info("Saved model summary metrics to model_summary.json")
+        
     except Exception as e:
         logger.error(f"Error generating section report: {e}")
         raise

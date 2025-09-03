@@ -1,53 +1,100 @@
 <div class="tab-content" id="summary">
 
 <section class="page-section">
-    <h2>Pipeline Summary</h2>
+    <h2>Analysis Summary</h2>
     
     <div class="alert alert-info">
-        <strong>Report Overview:</strong> This comprehensive analysis presents automated cell type classification 
-        results for your multiplexed immunofluorescence data using advanced machine learning methods.
+        <strong>Overview:</strong> This report presents automated cell type classification results for your multiplexed immunofluorescence data.
+    </div>
+
+    <!-- Input Data Overview -->
+    <h3>Dataset Overview</h3>
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-value">{{ total_cells | default("--") | number_format }}</div>
+            <div class="metric-label">Total Cells</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-value">{{ general.per_slide | length if general.per_slide else "--" }}</div>
+            <div class="metric-label">ROIs Analyzed</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-value">{{ total_labels | default("--") | number_format }}</div>
+            <div class="metric-label">Labeled Training Data</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-value">{{ training_cell_types | default("--") }}</div>
+            <div class="metric-label">Cell Types in Training</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-value">{{ num_batches | default("--") }}</div>
+            <div class="metric-label">Batches Processed</div>
+        </div>
     </div>
 </section>
 
-<!-- Pipeline Description -->
+<!-- Classification Results -->
 <section class="page-section">
-    <h2>ClassyFlow Analysis Platform</h2>
-    
-    <p>
-        ClassyFlow is a state-of-the-art cell type classification system that analyzes multiplexed immunofluorescence data 
-        to provide accurate, reproducible cell type identification. The platform leverages machine learning algorithms 
-        to interpret complex protein expression patterns and deliver reliable classification results.
-    </p>
+    <h3>Classification Results</h3>
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-value">{{ identified_cell_types | default("--") }}</div>
+            <div class="metric-label">Cell Types Identified</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-value">{{ model_accuracy | default("--") }}{% if model_accuracy %}%{% endif %}</div>
+            <div class="metric-label">Model Accuracy</div>
+        </div>
+    </div>
 
-    <h3>Analysis Workflow</h3>
-    
+    {% if most_abundant_types %}
+    <h4>Most Abundant Cell Types</h4>
     <div style="margin-left: 1rem; color: #495057;">
-        <p><strong>Data Normalization</strong> - Multiple normalization approaches are evaluated to optimize data quality and ensure consistent measurements across experimental batches.</p>
-        
-        <p><strong>Feature Selection</strong> - Statistical methods identify the most informative protein markers, focusing the analysis on biologically relevant features.</p>
-        
-        <p><strong>Model Development</strong> - Advanced machine learning models are trained and rigorously validated to achieve optimal classification performance.</p>
-        
-        <p><strong>Cell Classification</strong> - The validated model classifies all cells with associated confidence metrics, providing reliable predictions for downstream analysis.</p>
+        {% for cell_type in most_abundant_types[:3] %}
+        <p><strong>{{ cell_type.name }}:</strong> {{ cell_type.percentage }}% of total cells</p>
+        {% endfor %}
     </div>
+    {% endif %}
+
+    {% if rarest_cell_type %}
+    <h4>Rarest Cell Type Detected</h4>
+    <div style="margin-left: 1rem; color: #495057;">
+        <p><strong>{{ rarest_cell_type.name }}:</strong> {{ rarest_cell_type.percentage }}% of total cells</p>
+    </div>
+    {% endif %}
+
+    <!-- Cell Type Composition Chart -->
+    {% if composition_chart %}
+    <h4>Overall Cell Type Composition</h4>
+    <div class="plot-container">
+        <img src="{{ composition_chart }}" alt="Cell Type Composition" />
+    </div>
+    {% endif %}
 </section>
 
-<!-- Report Navigation -->
+<!-- Next Steps -->
 <section class="page-section">
-    <h2>Report Contents</h2>
+    <h2>Next Steps</h2>
     
-    <div style="color: #495057;">
-        <p><strong>Normalization</strong> - Data preprocessing results and optimization of normalization methods for your dataset.</p>
+    <p>Explore the detailed results in each section of this report:</p>
+    
+    <div style="color: #495057; margin-left: 1rem;">
+        <p><strong>Normalization</strong> - Review data preprocessing methods and batch correction approaches used for your dataset.</p>
         
-        <p><strong>Feature Selection</strong> - Analysis of protein marker importance and feature optimization for classification accuracy.</p>
+        <p><strong>Feature Selection</strong> - See which protein markers were most important for distinguishing between cell types.</p>
         
-        <p><strong>Model Evaluation</strong> - Comprehensive performance assessment and validation of the selected classification model.</p>
+        <p><strong>Model Evaluation</strong> - Examine detailed performance metrics and validation results for the classification model.</p>
         
-        <p><strong>Predictions</strong> - Final cell type classifications with confidence scores and tissue composition analysis.</p>
+        <p><strong>Predictions</strong> - Access your detailed cell type results, download classified data, and explore tissue composition by sample.</p>
     </div>
 
     <div style="margin-top: 1.5rem; padding: 1rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
-        If you have any questions, contact your Bioinformatics team.
+        If you have questions about these results, contact your bioinformatics team.
     </div>
 </section>
 

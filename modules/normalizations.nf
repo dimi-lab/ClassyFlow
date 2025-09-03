@@ -188,6 +188,7 @@ process GENERATE_NORM_REPORT {
 
     output:
     path("normalization_report.html"), emit: norm_html
+    path("normalization_summary.json"), emit: norm_summary
 
     script:
     """
@@ -296,5 +297,6 @@ workflow normalization_wf {
     emit:
     normalized = final_ch
     report = norm_report.norm_html
+    norm_summary = norm_report.norm_summary
 }
 
