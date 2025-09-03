@@ -149,7 +149,7 @@ def create_cell_type_bar_plot(df, sample_name, output_file):
     cell_percentages = df['CellTypePrediction'].value_counts(normalize=True) * 100
     
     # Create figure
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(16, 10))
     
     # Create horizontal bar plot
     y_pos = np.arange(len(cell_counts))

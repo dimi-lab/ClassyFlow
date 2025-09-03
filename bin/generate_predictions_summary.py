@@ -138,8 +138,8 @@ def create_abundance_plot(df, output_file):
         )
         bottom += pivot_df[cell_type]
         
-    # Standardized styling
-    ax.set_title('Predicted Cell Type Composition by Sample', fontsize=13, fontweight='bold', pad=15)
+    # Enhanced title with better positioning
+    ax.set_title('Predicted Cell Type Composition by Sample', fontsize=15, fontweight='bold', pad=25)
     ax.set_xlabel('Sample', fontsize=11, fontweight='bold')
     ax.set_ylabel('Percentage of Cells (%)', fontsize=11, fontweight='bold')
     
@@ -159,11 +159,13 @@ def create_abundance_plot(df, output_file):
     # Y-axis
     ax.set_ylim(0, 100)
     
-    # Add sample counts above bars
+    # Add sample counts above bars with improved rotation and positioning
     sample_counts = df.groupby('Sample').size()
+    count_rotation = 0 if n_samples <= 15 else 30 if n_samples <= 30 else 45
     for i, sample in enumerate(pivot_df.index):
-        ax.text(i, 102, f'n={sample_counts[sample]:,}', 
-                ha='center', va='bottom', fontsize=9, fontweight='bold')
+        ax.text(i, 104, f'n={sample_counts[sample]:,}', 
+                ha='center', va='bottom', fontsize=10, fontweight='bold',
+                rotation=count_rotation)
     
     # Legend (matching bar order - bottom to top)
     handles, labels = ax.get_legend_handles_labels()

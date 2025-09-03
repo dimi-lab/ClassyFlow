@@ -27,7 +27,7 @@ def create_class_distribution_plot(unique_names, counts, output_path):
     sorted_counts = counts[sorted_indices]
     
     # Create figure with better styling
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(16, 10))
     
     # Create horizontal bar chart with gradient colors
     colors = plt.cm.viridis(np.linspace(0.2, 0.9, len(sorted_names)))
@@ -67,22 +67,24 @@ def create_class_distribution_plot(unique_names, counts, output_path):
 
 def create_confusion_matrix_plot(cm_df, class_names, output_path):
     """Create larger, improved confusion matrix heatmap and save to file"""
-    # Calculate figure size based on number of classes
-    base_size = 2.5
+    # Enhanced figure size for better page utilization
+    base_size = 3.0
     n_classes = len(class_names)
-    figsize = (max(12, base_size * n_classes), max(10, base_size * n_classes))
+    figsize = (max(16, base_size * n_classes), max(12, base_size * n_classes))
     
     fig, ax = plt.subplots(figsize=figsize)
     
-    # Create custom colormap for better contrast
-    cmap = plt.cm.Blues
+    # Create 3-color gradient colormap for better contrast
+    from matplotlib.colors import LinearSegmentedColormap
+    colors = ['#ffffff', '#6ba6cd', '#1f77b4']  # white -> light blue -> dark blue
+    cmap = LinearSegmentedColormap.from_list('custom_blues', colors, N=256)
     
     # Create heatmap with improved styling
     sns.heatmap(cm_df, annot=True, fmt='d', cmap=cmap, 
                 xticklabels=class_names, yticklabels=class_names,
                 ax=ax, cbar_kws={'label': 'Number of Predictions', 'shrink': 0.8},
                 square=True, linewidths=0.5, linecolor='white',
-                annot_kws={'fontsize': max(12, 18 - n_classes//3), 'fontweight': 'bold'})
+                annot_kws={'fontsize': max(10, 16 - n_classes//2), 'fontweight': 'bold', 'color': '#2c3e50'})
     
     # Styling
     ax.set_xlabel('Predicted Class', fontsize=16, fontweight='bold', color='#2c3e50')
@@ -98,8 +100,9 @@ def create_confusion_matrix_plot(cm_df, class_names, output_path):
         ax.set_xticklabels(ax.get_xticklabels(), rotation=0)
         ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
     
-    # Style ticks
-    ax.tick_params(axis='both', which='major', labelsize=12, colors='#2c3e50')
+    # Enhanced tick styling with better font sizes
+    tick_fontsize = max(10, 14 - n_classes//4)
+    ax.tick_params(axis='both', which='major', labelsize=tick_fontsize, colors='#2c3e50')
     
     # Background
     fig.patch.set_facecolor('white')
@@ -111,7 +114,7 @@ def create_confusion_matrix_plot(cm_df, class_names, output_path):
 
 def create_roc_curves_plot(y_true_binarized, y_pred_scores, label_hash, n_classes, auc_scores, output_path):
     """Create improved ROC curves for all classes and save to file"""
-    fig, ax = plt.subplots(figsize=(12, 10))
+    fig, ax = plt.subplots(figsize=(16, 12))
     
     if len(auc_scores) == 0:
         ax.text(0.5, 0.5, 'No ROC curves available\nCheck class distribution', 
@@ -272,7 +275,7 @@ def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
     sorted_auc_scores = sorted(auc_scores.items(), key=lambda x: x[1], reverse=True)
 
     def export_roc_plot(y_true_bin, y_pred_bin, label_hash, n_classes, auc_scores, output_path):
-        plt.figure(figsize=(10, 8))
+        plt.figure(figsize=(14, 10))
         colors = plt.cm.tab10(np.linspace(0, 1, n_classes))
         for i, color in zip(range(n_classes), colors):
             fpr, tpr, _ = roc_curve(y_true_bin[:, i], y_pred_bin[:, i])

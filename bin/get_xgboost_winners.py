@@ -26,7 +26,7 @@ def plot_parameter_search(df, output_path):
     color_palette[unique_combs.index(max_comb)] = '#e74c3c'  # Red for best
     color_palette[unique_combs.index(second_max_comb)] = '#f39c12'  # Orange for second
 
-    fig, ax = plt.subplots(figsize=(14, 8))
+    fig, ax = plt.subplots(figsize=(18, 10))
     
     # Create boxplot with improved styling
     box_plot = sns.boxplot(
@@ -88,7 +88,7 @@ def plot_class_distribution(unique, counts, output_path):
     sorted_unique = [unique[i] for i in sorted_indices]
     sorted_counts = counts[sorted_indices]
     
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(16, 10))
     
     # Create horizontal bar chart with gradient colors
     colors = plt.cm.viridis(np.linspace(0.2, 0.9, len(sorted_unique)))
