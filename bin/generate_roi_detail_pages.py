@@ -541,14 +541,23 @@ def main():
         logger.warning("No ROI data found. No pages will be generated.")
         return
     
-    # Generate pages for each ROI
+    # Generate pages for each ROI and collect filename mapping
+    roi_filename_mapping = {}
     for roi_name, roi_info in roi_data.items():
         try:
             generate_roi_page(roi_name, roi_info, args.output_dir)
+            # Store the mapping of ROI name to generated filename
+            roi_filename_mapping[roi_name] = f"{roi_name}_detail.html"
         except Exception as e:
             logger.error(f"Error generating page for {roi_name}: {e}")
     
+    # Save the filename mapping as JSON for the template system
+    mapping_file = os.path.join(args.output_dir, "roi_filename_mapping.json")
+    with open(mapping_file, 'w', encoding='utf-8') as f:
+        json.dump(roi_filename_mapping, f, indent=2)
+    
     logger.info(f"Generated {len(roi_data)} ROI detail pages in {args.output_dir}")
+    logger.info(f"Saved ROI filename mapping to {mapping_file}")
 
 if __name__ == "__main__":
     main()

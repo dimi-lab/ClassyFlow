@@ -219,6 +219,7 @@ def generate_abundance_results(df):
     # Overall results
     results = {
         'total_predicted_cells': len(df),
+        'total_cells': len(df),  # Add total_cells field for template compatibility
         'total_samples': df['Sample'].nunique(),
         'most_common_prediction': df['CellTypePrediction'].value_counts().index[0],
         'most_rare_prediction': df['CellTypePrediction'].value_counts().index[-1],
