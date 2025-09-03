@@ -254,13 +254,47 @@ def read_general_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     print(f"Loaded general data with {len(results['per_slide'])} per-slide entries")
     return replace_png_with_base64(results, str(general_dir))
 
+def read_summary_jsons(base_dir: Path = Path(".")) -> Dict[str, Any]:
+    """Read summary JSON files from various pipeline stages."""
+    summary_data = {}
+    
+    # Try to read each summary JSON file
+    summary_files = {
+        'summary_metrics': 'summary_metrics.json',
+        'model_summary': 'model_summary.json', 
+        'normalization_summary': 'normalization_summary.json'
+    }
+    
+    for key, filename in summary_files.items():
+        file_path = base_dir / filename
+        if file_path.exists():
+            try:
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                summary_data[key] = data
+                logger.info(f"Loaded {filename}")
+            except Exception as e:
+                logger.warning(f"Error reading {filename}: {e}")
+                summary_data[key] = {}
+        else:
+            logger.warning(f"Summary file not found: {filename}")
+            summary_data[key] = {}
+    
+    return summary_data
+
 def collect_all_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     """Collect all data from pipeline outputs."""
     logger.info("Collecting general metrics...")
     general_data = read_general_data(pipeline_output_dir)
+    
+    logger.info("Collecting summary metrics...")
+    summary_data = read_summary_jsons(Path("."))
         
     all_jsons = {
         'general': general_data,
+        'summary_metrics': summary_data.get('summary_metrics', {}),
+        'model_summary': summary_data.get('model_summary', {}),
+        'normalization_summary': summary_data.get('normalization_summary', {}),
         'normalization_report': "normalization_report.html",
         'feature_selection_data': "feature_selection_report.html",
         'modeling_data': "model_report.html"
@@ -318,15 +352,28 @@ def generate_report(all_data: Dict[str, Any],
         with open('model_report.html', 'r', encoding='utf-8') as f:
             model_html = f.read()
 
+        # Extract summary metrics from collected data
+        summary_metrics = all_data.get('summary_metrics', {})
+        model_summary = all_data.get('model_summary', {})
+        norm_summary = all_data.get('normalization_summary', {})
+        
         template_data = {
             'pipeline_version': pipeline_version,
             'generation_date': datetime.now().strftime("%B %d, %Y"),
-            'total_cells': all_data['general']['total_cells'], 
-            'total_labels': all_data['general']["total_annotated_cells"],
+            'total_cells': all_data['general'].get('total_cells'), 
+            'total_labels': all_data['general'].get("total_annotated_cells"),
             'letterhead': encode_image_to_base64(letterhead) if letterhead else None,
             'normalization_html_content': normalization_html,
             'feature_selection_html_content': feature_selection_html,
-            'model_html_content': model_html
+            'model_html_content': model_html,
+            # Summary metrics from JSON files
+            'training_cell_types': model_summary.get('training_cell_types'),
+            'num_batches': norm_summary.get('num_batches'),
+            'identified_cell_types': summary_metrics.get('identified_cell_types'),
+            'model_accuracy': model_summary.get('model_accuracy'),
+            'most_abundant_types': summary_metrics.get('most_abundant_types'),
+            'rarest_cell_type': summary_metrics.get('rarest_cell_type'),
+            'composition_chart': encode_image_to_base64(summary_metrics.get('composition_chart')) if summary_metrics.get('composition_chart') else None
         }
 
         template_data.update(all_data)

@@ -208,6 +208,7 @@ process GENERATE_MODEL_REPORT {
     output:
     path("model_report.html"), emit: model_html
     path("train_holdout_comparison.png")
+    path("model_summary.json"), emit: model_summary
 
     script:
     """
@@ -289,4 +290,5 @@ workflow modelling_wf {
     emit:
     best_model_results = best_model_info
     report = model_report.model_html
+    model_summary = model_report.model_summary
 }

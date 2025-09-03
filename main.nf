@@ -247,6 +247,7 @@ process SUMMARIZE_PREDICTIONS {
 
     output:
     tuple path("abundance_metrics.json"), path("prediction_abundance_plot.png"), path("*_summary_stats.json"), emit: abundance_results
+    path("summary_metrics.json"), emit: summary_metrics
 
     script:
     """
@@ -267,6 +268,9 @@ process GENERATE_FINAL_REPORT {
     path(model_html)
     path(abundance_results, stageAs: "general/*")
     path(classified_results), stageAs: "general/per_slide/*"
+    path(summary_json, stageAs: "summary_metrics.json")
+    path(model_summary_json, stageAs: "model_summary.json") 
+    path(norm_summary_json, stageAs: "normalization_summary.json")
     path(template_dir)
     path(letterhead_file)
     path(nf_config, stageAs: "nextflow.config")
@@ -368,7 +372,7 @@ workflow {
             .flatten()
             .collect()
 
-        // Pass all to reporting
+        // Pass all to reporting including summary JSONs
         final_report = GENERATE_FINAL_REPORT(
             missing_outputs,
             split_outputs,
@@ -377,6 +381,9 @@ workflow {
             modeling_results.report,
             prediction_results,
             classified_results,
+            SUMMARIZE_PREDICTIONS.output.summary_metrics,
+            modeling_results.model_summary,
+            normalized_output.norm_summary,
             params.html_template,
             params.letterhead,
             params.config_file
