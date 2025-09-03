@@ -53,7 +53,7 @@ def create_train_holdout_comparison_plot(training_df, holdout_df, class_column, 
     
     # Create side-by-side plot with standardized size
     plt.style.use('default')
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8), sharey=True)
     plt.rcParams.update({
         'font.size': 11,
         'font.family': 'sans-serif',
