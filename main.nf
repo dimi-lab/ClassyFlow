@@ -256,6 +256,22 @@ process SUMMARIZE_PREDICTIONS {
     """
 }
 
+process GENERATE_ROI_DETAIL_PAGES {
+    publishDir "${params.output_dir}/final_reports/pages", pattern: "*_detail.html", mode: 'copy', overwrite: true
+    
+    input:
+    path(abundance_results, stageAs: "abundance/*")
+    path(classified_results, stageAs: "classified/*")
+    
+    output:
+    path("*_detail.html"), emit: roi_pages
+    
+    script:
+    """
+    generate_roi_detail_pages.py --abundance_dir abundance/ --classified_dir classified/ --output_dir ./
+    """
+}
+
 process GENERATE_FINAL_REPORT {
     publishDir "${params.output_dir}/final_reports", pattern: "*.html", mode: 'copy', overwrite: true
     publishDir "${params.output_dir}/final_reports/pages/", pattern: "nextflow.config", mode: 'copy', overwrite: true
@@ -371,6 +387,12 @@ workflow {
         classified_results = CLASSIFIED_REPORT_PER_SLIDE.output.slide_results
             .flatten()
             .collect()
+
+        // Generate individual ROI detail pages
+        GENERATE_ROI_DETAIL_PAGES(
+            SUMMARIZE_PREDICTIONS.output.abundance_results.flatten().collect(),
+            classified_results
+        )
 
         // Pass all to reporting including summary JSONs
         final_report = GENERATE_FINAL_REPORT(

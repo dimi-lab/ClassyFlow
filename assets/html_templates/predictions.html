@@ -153,103 +153,7 @@
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
         }
 
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            backdrop-filter: blur(4px);
-        }
 
-        .modal-content {
-            background-color: white;
-            margin: 2% auto;
-            padding: 0;
-            border-radius: 10px;
-            width: 95%;
-            max-width: 1200px;
-            height: 90vh;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .modal-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1.5rem;
-            border-radius: 10px 10px 0 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin: 0;
-        }
-
-        .close {
-            color: white;
-            font-size: 2rem;
-            font-weight: bold;
-            cursor: pointer;
-            line-height: 1;
-            transition: opacity 0.3s ease;
-        }
-
-        .close:hover {
-            opacity: 0.7;
-        }
-
-        .modal-body {
-            padding: 2rem;
-            flex: 1;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-        }
-
-        .plot-section {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .plot-section h4 {
-            color: #495057;
-            font-weight: 600;
-            margin: 0;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid #e9ecef;
-        }
-
-        .barplot-container img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        .spatial-plot-container {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        .spatial-plot-container object {
-            width: 100%;
-            height: 500px;
-        }
 
         /* Search and filter styles */
         .table-controls {
@@ -311,7 +215,7 @@
 
     <h3>ROI Summary</h3>
     <p style="color: #6c757d; margin-bottom: 1.5rem;">
-        Click on any ROI row to view detailed plots including cell type distribution and spatial visualization.
+        Click on any ROI row or "View Details" button to open a detailed analysis page in a new tab, including cell type distribution plots and spatial visualization.
     </p>
 
     <div class="table-controls">
@@ -330,12 +234,13 @@
                     <th>Unique Classes</th>
                     <th>Most Common Class</th>
                     <th>Second Most Common</th>
+                    <th>Least Common Class</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for thissample in general.per_slide %}
-                <tr onclick="openROIModal('{{ thissample.sample }}', {{ loop.index0 }})">
+                <tr onclick="window.open('pages/{{ thissample.sample }}_detail.html', '_blank')">
                     <td class="roi-name">{{ thissample.sample }}</td>
                     <td class="cell-count" data-cell-count="{{ thissample.data.total_cells if thissample.data.total_cells else 'N/A' }}">
                         {{ "{:,}".format(thissample.data.total_cells) if thissample.data.total_cells else "N/A" }}
@@ -356,8 +261,14 @@
                         </div>
                     </td>
                     <td>
-                        <button class="view-plots-btn" onclick="event.stopPropagation(); openROIModal('{{ thissample.sample }}', {{ loop.index0 }})">
-                            View Plots
+                        <div class="class-info">
+                            <div class="secondary-class">{{ thissample.data.least_common_class if thissample.data.least_common_class else "N/A" }}</div>
+                            <div class="percentage">{{ "{:.1f}%".format(thissample.data.least_common_percentage) if thissample.data.least_common_percentage else "N/A" }}</div>
+                        </div>
+                    </td>
+                    <td>
+                        <button class="view-plots-btn" onclick="event.stopPropagation(); window.open('pages/{{ thissample.sample }}_detail.html', '_blank')">
+                            View Details
                         </button>
                     </td>
                 </tr>
@@ -367,102 +278,25 @@
     </div>
 </section>
 
-<!-- Modal for ROI Details -->
-<div id="roiModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 class="modal-title" id="modalTitle">ROI Details</h2>
-            <span class="close" onclick="closeROIModal()">&times;</span>
-        </div>
-        <div class="modal-body" id="modalBody">
-            <!-- Content will be populated dynamically -->
-        </div>
-    </div>
-</div>
 
 <script>
-// ROI data for JavaScript access
+// ROI data for JavaScript access (simplified for search functionality)
 const roiData = [
     {% for thissample in general.per_slide %}
     {
         sample: "{{ thissample.sample }}",
-        celltype_barplot: "{{ thissample.data.celltype_barplot if thissample.data.celltype_barplot else '' }}",
-        spatial_plot: "{{ thissample.data.spatial_plot if thissample.data.spatial_plot else '' }}",
         total_cells: {{ thissample.data.total_cells if thissample.data.total_cells else 0 }},
         unique_classes: {{ thissample.data.unique_classes if thissample.data.unique_classes else 0 }},
         most_common_class: "{{ thissample.data.most_common_class if thissample.data.most_common_class else 'N/A' }}",
         most_common_percentage: {{ thissample.data.most_common_percentage if thissample.data.most_common_percentage else 0 }},
         second_common_class: "{{ thissample.data.second_common_class if thissample.data.second_common_class else 'N/A' }}",
-        second_common_percentage: {{ thissample.data.second_common_percentage if thissample.data.second_common_percentage else 0 }}
+        second_common_percentage: {{ thissample.data.second_common_percentage if thissample.data.second_common_percentage else 0 }},
+        least_common_class: "{{ thissample.data.least_common_class if thissample.data.least_common_class else 'N/A' }}",
+        least_common_percentage: {{ thissample.data.least_common_percentage if thissample.data.least_common_percentage else 0 }}
     }{% if not loop.last %},{% endif %}
     {% endfor %}
 ];
 
-function openROIModal(sampleName, index) {
-    const modal = document.getElementById('roiModal');
-    const modalTitle = document.getElementById('modalTitle');
-    const modalBody = document.getElementById('modalBody');
-    
-    const roi = roiData[index];
-    
-    modalTitle.textContent = `${sampleName} - Detailed Analysis`;
-    
-    let content = `
-        <div class="roi-summary" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
-            <h4 style="color: #495057; margin-bottom: 1rem;">ROI Summary</h4>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                <div><strong>Total Cells:</strong> ${roi.total_cells.toLocaleString()}</div>
-                <div><strong>Unique Classes:</strong> ${roi.unique_classes}</div>
-                <div><strong>Most Common:</strong> ${roi.most_common_class} (${roi.most_common_percentage.toFixed(1)}%)</div>
-                <div><strong>Second Most Common:</strong> ${roi.second_common_class} (${roi.second_common_percentage.toFixed(1)}%)</div>
-            </div>
-        </div>
-    `;
-    
-    if (roi.celltype_barplot) {
-        content += `
-            <div class="plot-section">
-                <h4>Cell Type Distribution</h4>
-                <div class="barplot-container">
-                    <img src="plots/${roi.celltype_barplot}" alt="Cell Type Distribution" />
-                </div>
-            </div>
-        `;
-    }
-    
-    if (roi.spatial_plot) {
-        content += `
-            <div class="plot-section">
-                <h4>Spatial Distribution</h4>
-                <div class="spatial-plot-container">
-                    <object data="plots/${roi.spatial_plot}" type="text/html" width="100%" height="500px" style="border: none;">
-                        <p>Unable to load spatial plot. <a href="plots/${roi.spatial_plot}" target="_blank">Open in new window</a></p>
-                    </object>
-                </div>
-            </div>
-        `;
-    }
-    
-    if (!roi.celltype_barplot && !roi.spatial_plot) {
-        content += `
-            <div class="alert alert-warning">
-                <p>No plots available for this ROI.</p>
-            </div>
-        `;
-    }
-    
-    modalBody.innerHTML = content;
-    modal.style.display = 'block';
-    
-    // Prevent body scrolling when modal is open
-    document.body.style.overflow = 'hidden';
-}
-
-function closeROIModal() {
-    const modal = document.getElementById('roiModal');
-    modal.style.display = 'none';
-    document.body.style.overflow = 'auto';
-}
 
 function filterROITable() {
     const input = document.getElementById('roiSearch');
@@ -486,21 +320,6 @@ function filterROITable() {
     
     document.getElementById('roiCount').textContent = `${visibleCount} of ${roiData.length}`;
 }
-
-// Close modal when clicking outside of it
-window.onclick = function(event) {
-    const modal = document.getElementById('roiModal');
-    if (event.target === modal) {
-        closeROIModal();
-    }
-}
-
-// Close modal with Escape key
-document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape') {
-        closeROIModal();
-    }
-});
 </script>
 {% endif %}
 
