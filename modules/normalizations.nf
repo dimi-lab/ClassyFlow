@@ -18,7 +18,8 @@ process BOXCOX {
         --batchID ${batchID} \
         --quantType ${params.qupath_object_type} \
         --nucMark ${params.nucleus_marker} \
-        --plotFraction ${params.plot_fraction}
+        --plotFraction ${params.plot_fraction} \
+        --target-feature ${params.plot_target_feature_suffix}
     """
 }
     
