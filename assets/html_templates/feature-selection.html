@@ -176,16 +176,6 @@
         <div class="metrics-grid">
             <div class="metric-card">
                 <div class="tooltip">
-                    <div class="metric-value">{{ celltype_result.data.feature_selection_summary.original_features }}</div>
-                    <div class="metric-label">Original Features</div>
-                    <span class="tooltiptext">
-                        Number of features available before feature selection for this cell type.
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="tooltip">
                     <div class="metric-value">{{ celltype_result.data.feature_selection_summary.non_variant_removed | default("N/A") }}</div>
                     <div class="metric-label">Non-Variant Removed</div>
                     <span class="tooltiptext">

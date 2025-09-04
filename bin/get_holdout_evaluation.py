@@ -13,6 +13,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn import preprocessing
 from sklearn.preprocessing import label_binarize
 from datetime import datetime
+from matplotlib.colors import LinearSegmentedColormap
 
 import pickle
 import xgboost as xgb
@@ -66,32 +67,56 @@ def create_class_distribution_plot(unique_names, counts, output_path):
     print(f"Class distribution plot saved: {output_path}")
 
 def create_confusion_matrix_plot(cm_df, class_names, output_path):
-    """Create larger, improved confusion matrix heatmap and save to file"""
+    """Create larger, improved confusion matrix heatmap and save to file with percentile-based color scaling"""
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from matplotlib.colors import LinearSegmentedColormap, Normalize
+
     # Enhanced figure size for better page utilization
     base_size = 3.0
     n_classes = len(class_names)
     figsize = (max(16, base_size * n_classes), max(12, base_size * n_classes))
-    
+
     fig, ax = plt.subplots(figsize=figsize)
-    
-    # Create 3-color gradient colormap for better contrast
-    from matplotlib.colors import LinearSegmentedColormap
-    colors = ['#ffffff', '#6ba6cd', '#1f77b4']  # white -> light blue -> dark blue
-    cmap = LinearSegmentedColormap.from_list('custom_blues', colors, N=256)
-    
-    # Create heatmap with improved styling
-    sns.heatmap(cm_df, annot=True, fmt='d', cmap=cmap, 
-                xticklabels=class_names, yticklabels=class_names,
-                ax=ax, cbar_kws={'label': 'Number of Predictions', 'shrink': 0.8},
-                square=True, linewidths=0.5, linecolor='white',
-                annot_kws={'fontsize': max(10, 16 - n_classes//2), 'fontweight': 'bold', 'color': '#2c3e50'})
-    
-    # Styling
+
+
+    colors = ['#ffffff', '#9ecae1', '#08519c']  # white → light blue → dark blue
+    cmap = LinearSegmentedColormap.from_list('white_to_blue', colors, N=256)
+
+    # Compute vmax as the 90th percentile of the matrix
+    vmax = np.percentile(cm_df.values, 90)
+    norm = Normalize(vmin=0, vmax=vmax)
+
+    # Determine annotation font size dynamically
+    annot_font = max(10, 16 - n_classes // 2)
+
+    # Create heatmap
+    sns.heatmap(
+        cm_df,
+        annot=True,
+        fmt='d',
+        cmap=cmap,
+        norm=norm,  # <- Use normalization
+        xticklabels=class_names,
+        yticklabels=class_names,
+        ax=ax,
+        cbar_kws={'label': 'Number of Predictions', 'shrink': 0.8},
+        square=True,
+        linewidths=0.5,
+        linecolor='white',
+        annot_kws={
+            'fontsize': annot_font,
+            'fontweight': 'bold',
+            'color': '#2c3e50'
+        }
+    )
+
+    # Labels and title
     ax.set_xlabel('Predicted Class', fontsize=16, fontweight='bold', color='#2c3e50')
     ax.set_ylabel('Actual Class', fontsize=16, fontweight='bold', color='#2c3e50')
-    ax.set_title('Confusion Matrix', fontsize=18, fontweight='bold', 
-                 color='#2c3e50', pad=25)
-    
+    ax.set_title('Confusion Matrix', fontsize=18, fontweight='bold', color='#2c3e50', pad=25)
+
     # Rotate labels if needed
     if n_classes > 8:
         ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
@@ -99,18 +124,21 @@ def create_confusion_matrix_plot(cm_df, class_names, output_path):
     else:
         ax.set_xticklabels(ax.get_xticklabels(), rotation=0)
         ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
-    
-    # Enhanced tick styling with better font sizes
-    tick_fontsize = max(10, 14 - n_classes//4)
+
+    # Tick styling
+    tick_fontsize = max(10, 14 - n_classes // 4)
     ax.tick_params(axis='both', which='major', labelsize=tick_fontsize, colors='#2c3e50')
-    
-    # Background
+
+    # Background and layout
     fig.patch.set_facecolor('white')
-    
     plt.tight_layout()
+
+    # Save
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.close(fig)
     print(f"Confusion matrix plot saved: {output_path}")
+
+
 
 def create_roc_curves_plot(y_true_binarized, y_pred_scores, label_hash, n_classes, auc_scores, output_path):
     """Create improved ROC curves for all classes and save to file"""
