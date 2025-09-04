@@ -67,7 +67,7 @@ def calculate_per_sample_stats(df):
             'most_common_percentage': cell_type_percentages.iloc[0] if len(cell_type_percentages) > 0 else 0,
             'second_common_class': most_common_classes.index[1] if len(most_common_classes) > 1 else None,
             'second_common_percentage': cell_type_percentages.iloc[1] if len(cell_type_percentages) > 1 else 0,
-            'least_common_class': cell_type_counts.index[-1] if len(cell_type_counts) > 0 else None,
+            'least_common_class': cell_type_counts.iloc[-1] if len(cell_type_counts) > 0 else None,
             'least_common_percentage': cell_type_percentages.iloc[-1] if len(cell_type_percentages) > 0 else 0,
             'cell_type_distribution': dict(cell_type_counts),
             'percentage_distribution': dict(cell_type_percentages)
@@ -141,7 +141,7 @@ def create_abundance_plot(df, output_file):
         bottom += pivot_df[cell_type]
         
     # Enhanced title with better positioning
-    ax.set_title('Predicted Cell Type Composition by Sample', fontsize=15, fontweight='bold', pad=25)
+    fig.suptitle('Predicted Cell Type Composition by Sample', fontsize=15, fontweight='bold', y=1.02)
     ax.set_xlabel('Sample', fontsize=11, fontweight='bold')
     ax.set_ylabel('Percentage of Cells (%)', fontsize=11, fontweight='bold')
     
