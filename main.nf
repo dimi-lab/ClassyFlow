@@ -258,6 +258,7 @@ process SUMMARIZE_PREDICTIONS {
 
 process GENERATE_ROI_DETAIL_PAGES {
     publishDir "${params.output_dir}/final_reports/pages", pattern: "*_detail.html", mode: 'copy', overwrite: true
+    publishDir "${params.output_dir}/final_reports/pages", pattern: "roi_filename_mapping.json", mode: 'copy', overwrite: true
     
     input:
     path(abundance_results, stageAs: "abundance/*")
@@ -265,6 +266,7 @@ process GENERATE_ROI_DETAIL_PAGES {
     
     output:
     path("*_detail.html"), emit: roi_pages
+    path("roi_filename_mapping.json"), emit: roi_mapping
     
     script:
     """
@@ -290,6 +292,7 @@ process GENERATE_FINAL_REPORT {
     path(template_dir)
     path(letterhead_file)
     path(nf_config, stageAs: "nextflow.config")
+    path(roi_mapping, stageAs: "roi_filename_mapping.json")
 
     output:
     path("classyflow_report.html")
@@ -299,7 +302,8 @@ process GENERATE_FINAL_REPORT {
     generate_final_report.py --template-dir ${template_dir} \
                             --report-name classyflow_report.html \
                             --letterhead ${letterhead_file} \
-                            --version ${params.pipeline_version} 
+                            --version ${params.pipeline_version} \
+                            --roi-mapping roi_filename_mapping.json
     """
 
 }
@@ -408,7 +412,8 @@ workflow {
             normalized_output.norm_summary,
             params.html_template,
             params.letterhead,
-            params.config_file
+            params.config_file,
+            GENERATE_ROI_DETAIL_PAGES.output.roi_mapping
         )
 
         ZIP_PUBLISHED(final_report.map {"done"}, "${params.output_dir}/final_reports")
