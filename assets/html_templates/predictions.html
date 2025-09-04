@@ -240,7 +240,8 @@
             </thead>
             <tbody>
                 {% for thissample in general.per_slide %}
-                <tr onclick="window.open('pages/{{ thissample.sample }}_detail.html', '_blank')">
+                {% set roi_filename = roi_mapping.get(thissample.sample, thissample.sample + '_detail.html') %}
+                <tr onclick="window.open('pages/{{ roi_filename }}', '_blank')">
                     <td class="roi-name">{{ thissample.sample }}</td>
                     <td class="cell-count" data-cell-count="{{ thissample.data.total_cells if thissample.data.total_cells else 'N/A' }}">
                         {{ "{:,}".format(thissample.data.total_cells) if thissample.data.total_cells else "N/A" }}
@@ -267,7 +268,7 @@
                         </div>
                     </td>
                     <td>
-                        <button class="view-plots-btn" onclick="event.stopPropagation(); window.open('pages/{{ thissample.sample }}_detail.html', '_blank')">
+                        <button class="view-plots-btn" onclick="event.stopPropagation(); window.open('pages/{{ roi_filename }}', '_blank')">
                             View Details
                         </button>
                     </td>

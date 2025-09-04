@@ -325,7 +325,8 @@ def generate_report(all_data: Dict[str, Any],
                    jinja_env, 
                    template_name: str = "base.html",
                    letterhead: Optional[str] = None,
-                   pipeline_version: Optional[str] = None):
+                   pipeline_version: Optional[str] = None,
+                   roi_mapping: Optional[Dict[str, str]] = None):
     """
     Generate the HTML report with embedded images.
     
@@ -373,7 +374,8 @@ def generate_report(all_data: Dict[str, Any],
             'model_accuracy': model_summary.get('model_accuracy'),
             'most_abundant_types': summary_metrics.get('most_abundant_types'),
             'rarest_cell_type': summary_metrics.get('rarest_cell_type'),
-            'composition_chart': encode_image_to_base64(summary_metrics.get('composition_chart')) if summary_metrics.get('composition_chart') else None
+            'composition_chart': encode_image_to_base64(summary_metrics.get('composition_chart')) if summary_metrics.get('composition_chart') else None,
+            'roi_mapping': roi_mapping or {}
         }
 
         template_data.update(all_data)
@@ -434,6 +436,10 @@ def main():
         action='store_true',
         help='Enable debug logging'
     )
+    parser.add_argument(
+        '--roi-mapping',
+        help='Path to ROI filename mapping JSON file'
+    )
     
     args = parser.parse_args()
     
@@ -446,6 +452,16 @@ def main():
     # Collect all data
     all_data = collect_all_data(args.input_dir)
     
+    # Load ROI mapping if provided
+    roi_mapping = {}
+    if args.roi_mapping and Path(args.roi_mapping).exists():
+        try:
+            with open(args.roi_mapping, 'r') as f:
+                roi_mapping = json.load(f)
+            logger.info(f"Loaded ROI filename mapping from {args.roi_mapping}")
+        except Exception as e:
+            logger.error(f"Error loading ROI mapping: {e}")
+    
     # Generate main report
     output_file = Path(args.report_dir) / args.report_name
     generate_report(
@@ -453,7 +469,8 @@ def main():
         output_file=output_file, 
         jinja_env=jinja_env, 
         letterhead=args.letterhead,
-        pipeline_version=args.version
+        pipeline_version=args.version,
+        roi_mapping=roi_mapping
     )
     
     print(f"Main report generated: {output_file}")
