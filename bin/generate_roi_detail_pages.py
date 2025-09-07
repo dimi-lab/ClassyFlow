@@ -465,7 +465,7 @@ def generate_roi_html_template() -> str:
 </html>
 """
 
-def generate_roi_page(roi_name: str, roi_info: Dict, output_dir: str):
+def generate_roi_page(roi_name: str, roi_info: Dict, output_dir: str, roi_file_name: str):
     """Generate individual ROI detail page."""
     from jinja2 import Template
     
@@ -516,7 +516,7 @@ def generate_roi_page(roi_name: str, roi_info: Dict, output_dir: str):
     html_content = template.render(**template_data)
     
     # Save the file
-    output_file = os.path.join(output_dir, f"{roi_name}_detail.html")
+    output_file = os.path.join(output_dir, roi_file_name)
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(html_content)
     
@@ -545,9 +545,9 @@ def main():
     roi_filename_mapping = {}
     for roi_name, roi_info in roi_data.items():
         try:
-            generate_roi_page(roi_name, roi_info, args.output_dir)
-            # Store the mapping of ROI name to generated filename
             roi_filename_mapping[roi_name] = f"{roi_name}_detail.html"
+            generate_roi_page(roi_name, roi_info, args.output_dir, roi_filename_mapping[roi_name])
+            
         except Exception as e:
             logger.error(f"Error generating page for {roi_name}: {e}")
     
