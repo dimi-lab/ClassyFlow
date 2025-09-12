@@ -17,21 +17,6 @@
     <div class="metrics-grid">
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ normalization_data.total_batches | default("N/A") }}</div>
-                <div class="metric-label">Number of Batches</div>
-            </div>
-        </div>
-        <div class="metric-card">
-            <div class="tooltip">
-                <div class="metric-value">{{ normalization_data.total_markers | default("N/A") }}</div>
-                <div class="metric-label">Number of Markers</div>
-                <span class="tooltiptext">
-                    Total number of markers analyzed across all batches
-                </span>
-            </div>
-        </div>
-        <div class="metric-card">
-            <div class="tooltip">
                 <div class="metric-value">{{ normalization_data.primary_method_display | default("N/A") }}</div>
                 <div class="metric-label">Normalization Method{% if normalization_data.comparison_mode %}s{% endif %}</div>
                 <span class="tooltiptext">
@@ -162,7 +147,7 @@
                         <td>{{ batch_result.data.total_cells | number_format }}</td>
                     </tr>
                     <tr>
-                        <td>Number of Slides</td>
+                        <td>Number of ROIs</td>
                         <td>{{ batch_result.data.total_slides | default("N/A") }}</td>
                     </tr>
                     <tr>

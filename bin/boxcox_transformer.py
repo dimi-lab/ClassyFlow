@@ -18,12 +18,12 @@ from io import BytesIO
 plt.style.use('default')
 sns.set_palette("husl")
 
-def calculate_cv_metrics(df, df_transformed, batchName):
+def calculate_cv_metrics(df, df_transformed, batchName, targetFeature):
     """Calculate coefficient of variation for each marker by slide"""
     cv_data = []
     
     # Get mean columns
-    mean_cols = [col for col in df.columns if 'Mean' in col]
+    mean_cols = [col for col in df.columns if targetFeature in col]
     
     for col in mean_cols:
         for slide in df['Slide'].unique():
@@ -35,7 +35,7 @@ def calculate_cv_metrics(df, df_transformed, batchName):
             cv_trans = slide_data_trans.std() / slide_data_trans.mean() if slide_data_trans.mean() > 0 else np.nan
             
             cv_data.append({
-                'marker': col.replace('Cell: ', '').replace(': Mean', ''),
+                'marker': col.replace(targetFeature, ''),
                 'slide': slide,
                 'cv_original': cv_orig,
                 'cv_transformed': cv_trans,
@@ -312,7 +312,7 @@ def generate_combined_html(all_metrics_data, batchName, transformation_type):
 <body>
     <h1>{transformation_type} Transformation Results</h1>
     <div class="metadata">
-        <p><strong>Batch:</strong> {batchName} | <strong>Generated:</strong> {time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+        <p><strong>Batch:</strong> {batchName} | <strong>Generated:</strong> {time.strftime("%Y-%m-%d %H:%M")}</p>
     </div>
     
     <div class="controls">
@@ -456,7 +456,7 @@ def collect_and_transform(df, batchName, quantType, nucMark, plotFraction, targe
     bxcxMetrics.to_csv(f"BoxCoxRecord_{myFileIdx}.csv", index=False)
 
     # Calculate CV metrics
-    cv_df = calculate_cv_metrics(df, bcDf, batchName)
+    cv_df = calculate_cv_metrics(df, bcDf, batchName, targetFeature)
     
     # Get worst performing markers
     worst_markers = get_worst_performing_markers(cv_df, n_markers=5)

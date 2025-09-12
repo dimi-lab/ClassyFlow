@@ -144,7 +144,6 @@ process GENERATE_TRAINING_N_HOLDOUT{
     path("holdout_dataframe.pkl"), emit: holdout
     path("training_dataframe.pkl"), emit: training
 	path("celltypes.csv"), emit: lableFile
-	path("annotation_report.html")
     tuple path("training_split_report.json"), path("cell_count_table.csv"), emit: training_holdout_results
 
     script:
@@ -154,8 +153,7 @@ process GENERATE_TRAINING_N_HOLDOUT{
         --holdoutFraction ${params.holdout_fraction} \
         --cellTypeNegative "${params.filter_out_junk_celltype_labels}" \
         --minimunHoldoutThreshold ${params.minimum_label_count} \
-        --pickle_files "${norms_pkl_collected}" \
-        --letterhead "${letterhead_file}"
+        --pickle_files "${norms_pkl_collected}"
     """
 
 }
