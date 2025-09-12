@@ -37,6 +37,34 @@
     </div>
 </section>
 
+<!-- Training Data Composition -->
+{% if cell_count_table.rows %}
+<section class="page-section">
+    <h3>Training Data Composition</h3>
+    
+    <div class="table-container medium">
+        <table>
+            <thead>
+                <tr>
+                    {% for header in cell_count_table.headers %}
+                    <th>{{ header }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in cell_count_table.rows %}
+                <tr {% if "Not Used" in row.values() %}style="background-color: #f8d7da; color: #721c24;"{% endif %}>
+                    {% for header in cell_count_table.headers %}
+                    <td>{{ row[header] }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+
 <!-- Classification Results -->
 <section class="page-section">
     <h3>Classification Results</h3>

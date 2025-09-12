@@ -282,6 +282,20 @@ def read_summary_jsons(base_dir: Path = Path(".")) -> Dict[str, Any]:
     
     return summary_data
 
+
+def read_cell_count_table(file_path: str = "cell_count_table.csv") -> Dict[str, Any]:
+    """Read cell count table from CSV file."""
+    try:
+        df = pd.read_csv(file_path)
+        return {
+            'headers': df.columns.tolist(),
+            'rows': df.to_dict('records')
+        }
+    except Exception as e:
+        logger.warning(f"Could not load cell count table: {e}")
+        return {'headers': [], 'rows': []}
+
+
 def collect_all_data(pipeline_output_dir: Path) -> Dict[str, Any]:
     """Collect all data from pipeline outputs."""
     logger.info("Collecting general metrics...")
@@ -297,7 +311,8 @@ def collect_all_data(pipeline_output_dir: Path) -> Dict[str, Any]:
         'normalization_summary': summary_data.get('normalization_summary', {}),
         'normalization_report': "normalization_report.html",
         'feature_selection_data': "feature_selection_report.html",
-        'modeling_data': "model_report.html"
+        'modeling_data': "model_report.html",
+        'cell_count_table': read_cell_count_table()
         }
 
     with open(f'all_jsons.json', 'w') as f:
