@@ -1,103 +1,24 @@
 // Produce Batch based normalization - boxcox
-process BOXCOX {
+process NORMALIZATION {
     tag { batchID }
-    publishDir "${params.output_dir}/final_reports/pages", pattern: "boxcox_*.html", mode: 'copy'
-    publishDir "${params.output_dir}/temp/", pattern: "boxcox_*.json", mode: 'copy'
+
+    publishDir "${params.output_dir}/final_reports/pages", pattern: "*.html", mode: 'copy'
     
     input:
     tuple val(batchID), path(pickleTable)
     
     output:
-    tuple val(batchID), path("boxcox_transformed_${batchID}.tsv"), emit: norm_df
-    tuple val(batchID), path ("boxcox_results_${batchID}.json"), path("boxcox_all_plots_${batchID}.html"), emit: boxcox_results
+    tuple val(batchID), path("*_transformed_${batchID}.tsv"), emit: norm_df
+    tuple val(batchID), path ("*_results_${batchID}.json"), path("*_all_plots_${batchID}.html"), emit: norm_results
     
     script:
     """
-    boxcox_transformer.py \
+    quant_transformer.py \
+        --method ${params.override_normalization} \
         --pickleTable ${pickleTable} \
         --batchID ${batchID} \
-        --quantType ${params.qupath_object_type} \
-        --nucMark ${params.nucleus_marker} \
-        --plotFraction ${params.plot_fraction} \
+        --quantileSplit ${params.quantile_split} \
         --target-feature ${params.plot_target_feature_suffix}
-    """
-}
-    
-    
-// Produce Batch based normalization - quantile
-process QUANTILE {
-    tag { batchID }
-
-    publishDir "${params.output_dir}/final_reports/pages", pattern: "quantile_*.html", mode: 'copy'
-    publishDir "${params.output_dir}/temp/", pattern: "quantile_*.json", mode: 'copy'
-
-    input:
-    tuple val(batchID), path(pickleTable)
-
-    output:
-    tuple val(batchID), path("quantile_transformed_${batchID}.tsv"), emit: norm_df
-    tuple val(batchID), path ("quantile_results_${batchID}.json"), path("quantile_all_plots_${batchID}.html"), emit: quantile_results
-
-    script:
-    """
-    quantile_transformer.py \
-        --pickleTable ${pickleTable} \
-        --batchID ${batchID} \
-        --quantType ${params.qupath_object_type} \
-        --nucMark ${params.nucleus_marker} \
-        --plotFraction ${params.plot_fraction} \
-        --quantileSplit ${params.quantile_split}
-    """
-}
-
-
-// Produce Batch based normalization - min/max scaling
-process MINMAX {
-    tag { batchID }
-
-    publishDir "${params.output_dir}/final_reports/pages", pattern: "minmax_*.html", mode: 'copy'
-    publishDir "${params.output_dir}/temp/", pattern: "minmax_*.json", mode: 'copy'
-    
-    input:
-    tuple val(batchID), path(pickleTable)
-    
-    output:
-    tuple val(batchID), path("minmax_transformed_${batchID}.tsv"), emit: norm_df
-    tuple val(batchID), path ("minmax_results_${batchID}.json"), path("minmax_all_plots_${batchID}.html"), emit: minmax_results
-    
-    script:
-    """
-    minmax_transformer.py \
-        --pickleTable ${pickleTable} \
-        --batchID ${batchID} \
-        --quantType ${params.qupath_object_type} \
-        --nucMark ${params.nucleus_marker} \
-        --plotFraction ${params.plot_fraction}
-    """
-
-}
-
-process LOGSCALE {
-    tag { batchID }
-
-    publishDir "${params.output_dir}/final_reports/pages", pattern: "log_*.html", mode: 'copy'
-    publishDir "${params.output_dir}/temp/", pattern: "log_*.json", mode: 'copy'
-    
-    input:
-    tuple val(batchID), path(pickleTable)
-    
-    output:
-    tuple val(batchID), path("log_transformed_${batchID}.tsv"), emit: norm_df
-    tuple val(batchID), path ("log_results_${batchID}.json"), path("log_all_plots_${batchID}.html"), emit: log_results
-    
-    script:
-    """
-    log_transformer.py \
-        --pickleTable ${pickleTable} \
-        --batchID ${batchID} \
-        --quantType ${params.qupath_object_type} \
-        --nucMark ${params.nucleus_marker} \
-        --plotFraction ${params.plot_fraction}
     """
 }
 
@@ -211,36 +132,16 @@ workflow normalization_wf {
     qt_results = Channel.empty()
     mm_results = Channel.empty()
     lg_results = Channel.empty()
+    norm_results = Channel.empty()
     norm_outputs_list = []
     
     // Step 1: Choose normalization method based on override parameter
-    if (params.override_normalization == "boxcox") {
+    if (params.override_normalization in ["boxcox", "quantile", "minmax", "logscale"]) {
         // Use BoxCox normalization
-        bc_results = BOXCOX(batchPickleTable)
-        best_ch = bc_results.norm_df
+        norm_results = NORMALIZATION(batchPickleTable)
+        best_ch = norm_results.norm_df
 
-        norm_outputs_list.add(bc_results.boxcox_results.map { it -> it[1..-1] }.ifEmpty([]))
-    }
-    else if (params.override_normalization == "quantile") {
-        // Use Quantile normalization
-        qt_results = QUANTILE(batchPickleTable)
-        best_ch = qt_results.norm_df
-
-        norm_outputs_list.add(qt_results.quantile_results.map { it -> it[1..-1] }.ifEmpty([]))
-    }
-    else if (params.override_normalization == "minmax") {
-        // Use MinMax normalization
-        mm_results = MINMAX(batchPickleTable)
-        best_ch = mm_results.norm_df
-
-        norm_outputs_list.add(mm_results.minmax_results.map { it -> it[1..-1] }.ifEmpty([]))
-    }
-    else if (params.override_normalization == "logscale") {
-        // Use LogScale normalization
-        lg_results = LOGSCALE(batchPickleTable)
-        best_ch = lg_results.norm_df
-
-        norm_outputs_list.add(lg_results.log_results.map { it -> it[1..-1] }.ifEmpty([]))
+        norm_outputs_list.add(norm_results.norm_results.map { it -> it[1..-1] }.ifEmpty([]))
     }
     else {
         // Run all normalization methods and compare results
