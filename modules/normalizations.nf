@@ -5,16 +5,16 @@ process NORMALIZATION {
     publishDir "${params.output_dir}/final_reports/pages", pattern: "*.html", mode: 'copy'
     
     input:
-    tuple val(batchID), path(pickleTable)
+    tuple val(batchID), path(pickleTable), val(method)
     
     output:
     tuple val(batchID), path("*_transformed_${batchID}.tsv"), emit: norm_df
-    tuple val(batchID), path ("*_results_${batchID}.json"), path("*_all_plots_${batchID}.html"), emit: norm_results
+    tuple val(batchID), path ("*_results_${batchID}.json"), path("*_all_plots_${batchID}.html"), optional: true, emit: norm_results
     
     script:
     """
     quant_transformer.py \
-        --method ${params.override_normalization} \
+        --method ${method} \
         --pickleTable ${pickleTable} \
         --batchID ${batchID} \
         --quantileSplit ${params.quantile_split} \
@@ -25,22 +25,22 @@ process NORMALIZATION {
 
 // Look at all of the normalizations within a batch and attempt to idendity the best approach
 process IDENTIFY_BEST{
-    publishDir(
-        path: "${params.output_dir}/normalization",
-        pattern: "*.pdf",
-        mode: "copy"
-    )
+    publishDir "${params.output_dir}/norm_reports", pattern: "*.html", mode: 'copy'
+    publishDir "${params.output_dir}/norm_reports", pattern: "*.csv", mode: 'copy'
+    publishDir "${params.output_dir}/norm_reports", pattern: "*.png", mode: 'copy'
 
     input:
-    tuple val(batchID), path(all_possible_tables)
+    val(batchIDs)
+    path(files)
     
     output:
-    tuple val(batchID), path("normalized_${batchID}.pkl"), emit: norm_df
-    path("multinormalize_report_${batchID}.pdf")
-    path("normalized_*_${batchID}.tsv")
+    path("*.csv")
+    path("*.png")
 
     script:
-    template 'characterize_normalization.py'
+    """
+    characterize_normalization.py --batch-ids ${batchIDs.join(',')} --target-features ${params.plot_target_feature_suffix}
+    """
 }
 
 
@@ -114,8 +114,9 @@ process GENERATE_NORM_REPORT {
     script:
     """
     generate_normalization_report.py \
+            ${params.override_normalization == 'none' ? '--no-normalization' : ''}
             --output-file normalization_report.html \
-            --template-dir $html_template
+            --template-dir ${html_template}
     """
 }
 
@@ -128,76 +129,68 @@ workflow normalization_wf {
 
     main:
     // Initialize empty channels for conditional results
-    bc_results = Channel.empty()
-    qt_results = Channel.empty()
-    mm_results = Channel.empty()
-    lg_results = Channel.empty()
     norm_results = Channel.empty()
     norm_outputs_list = []
     
     // Step 1: Choose normalization method based on override parameter
-    if (params.override_normalization in ["boxcox", "quantile", "minmax", "logscale"]) {
+    if (params.override_normalization == "all") {
+        // Run all normalization methods and compare results
+        all_methods = Channel.of("boxcox", "quantile", "minmax", "log", "none")
+
+        combined_ch = batchPickleTable
+                        .combine(all_methods)
+        
+        norm_results = NORMALIZATION(combined_ch)
+        
+        // Mix all normalization results and group them for comparison
+        batch_ch = norm_results.norm_df.map { batchID, file -> batchID }.collect()
+        files_ch = norm_results.norm_df.map { batchID, file -> file }.collect()
+
+        mxchannels = batch_ch.combine(files_ch)
+
+        // Identify the best normalization approach
+        best_selection = IDENTIFY_BEST(batch_ch, files_ch)
+
+        return
+
+    } else if (params.override_normalization in ["boxcox", "quantile", "minmax", "log", "none"]) {
         // Use BoxCox normalization
-        norm_results = NORMALIZATION(batchPickleTable)
+        norm_results = NORMALIZATION(batchPickleTable, params.override_normalization)
         best_ch = norm_results.norm_df
 
         norm_outputs_list.add(norm_results.norm_results.map { it -> it[1..-1] }.ifEmpty([]))
+
+        // Step 2: Apply GMM gating to the normalized data
+        gmm_gated = GMM_GATING(best_ch, params.plot_target_feature_suffix)
+        gated_ch = gmm_gated.norm_df
+        gated_html = gmm_gated.gmm_html.collect(flat: false)
+                            .map { it.transpose() }
+
+        // Step 3: Optionally augment with Leiden clusters if enabled
+        if (params.run_get_leiden_clusters) {
+            leiden_augmented = AUGMENT_WITH_LEIDEN_CLUSTERS(gated_ch)
+            final_ch = leiden_augmented.norm_df
+        } else {
+            final_ch = gated_ch
+        }
+
+        // Collect normalization outputs for reporting
+        // Only mix channels that actually exist
+        if (norm_outputs_list.size() > 0) {
+            norm_outputs = Channel.empty()
+                .mix(*norm_outputs_list)
+                .flatten()
+                .collect()
+        } else {
+            norm_outputs = Channel.empty().collect()
+        }
+
+        norm_report = GENERATE_NORM_REPORT(norm_outputs, gated_html, params.html_template)
+
+        emit:
+        normalized = final_ch
+        report = norm_report.norm_html
+        norm_summary = norm_report.norm_summary
     }
-    else {
-        // Run all normalization methods and compare results
-        bc_results = BOXCOX(batchPickleTable)
-        qt_results = QUANTILE(batchPickleTable)
-        mm_results = MINMAX(batchPickleTable)
-        lg_results = LOGSCALE(batchPickleTable)
-
-        // Mix all normalization results and group them for comparison
-        mxchannels = batchPickleTable
-            .mix(bc_results.norm_df,qt_results.norm_df, mm_results.norm_df, lg_results.norm_df)
-            .groupTuple()
-        
-        mxchannels.dump(tag: 'debug_normalization_channels', pretty: true)
-
-        // Identify the best normalization approach
-        best_selection = IDENTIFY_BEST(mxchannels)
-        best_ch = best_selection.norm_df
-
-        // All other values (including null/empty) - add all outputs
-        norm_outputs_list.add(bc_results.boxcox_results.map { it -> it[1..-1] }.ifEmpty([]))
-        norm_outputs_list.add(qt_results.quantile_results.map { it -> it[1..-1] }.ifEmpty([]))
-        norm_outputs_list.add(mm_results.minmax_results.map { it -> it[1..-1] }.ifEmpty([]))
-        norm_outputs_list.add(lg_results.log_results.map { it -> it[1..-1] }.ifEmpty([]))
-    }
-
-    // Step 2: Apply GMM gating to the normalized data
-    gmm_gated = GMM_GATING(best_ch, params.plot_target_feature_suffix)
-    gated_ch = gmm_gated.norm_df
-    gated_html = gmm_gated.gmm_html.collect(flat: false)
-                        .map { it.transpose() }
-
-    // Step 3: Optionally augment with Leiden clusters if enabled
-    if (params.run_get_leiden_clusters) {
-        leiden_augmented = AUGMENT_WITH_LEIDEN_CLUSTERS(gated_ch)
-        final_ch = leiden_augmented.norm_df
-    } else {
-        final_ch = gated_ch
-    }
-
-    // Collect normalization outputs for reporting
-    // Only mix channels that actually exist
-    if (norm_outputs_list.size() > 0) {
-        norm_outputs = Channel.empty()
-            .mix(*norm_outputs_list)
-            .flatten()
-            .collect()
-    } else {
-        norm_outputs = Channel.empty().collect()
-    }
-
-    norm_report = GENERATE_NORM_REPORT(norm_outputs, gated_html, params.html_template)
-
-    emit:
-    normalized = final_ch
-    report = norm_report.norm_html
-    norm_summary = norm_report.norm_summary
 }
 
