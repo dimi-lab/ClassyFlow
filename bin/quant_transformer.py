@@ -148,9 +148,6 @@ def calculate_cv_metrics(df_original, df_transformed, target_cols):
     cv_data = []
     
     for col in target_cols:
-        if col not in df_original.columns or col not in df_transformed.columns:
-            continue
-            
         for slide in df_original['Slide'].unique():
             slide_data_orig = df_original[df_original['Slide'] == slide][col]
             slide_data_trans = df_transformed[df_transformed['Slide'] == slide][col]
@@ -353,14 +350,13 @@ def save_results(df_transformed, results, batch_name, method):
 
 def apply_log_transform(df, batch_name, target_feature):
     """Apply log transformation"""
-    df = clean_image_names(df)
     target_cols = get_target_columns(df, target_feature)
     
     # Apply log transformation
-    df_transformed = df.copy()
-    for col in target_cols:
-        if col in df_transformed.columns:
-            df_transformed[col] = np.log(df_transformed[col] + 1)
+    df_transformed = df.copy(deep=True)
+    numeric_cols = df_transformed.select_dtypes(include=[np.number]).columns
+    numeric_cols = [x for x in numeric_cols if "Centroid" not in x]
+    df_transformed[numeric_cols] = df_transformed[numeric_cols].apply(lambda x: np.log(x + 1))
     
     # Create plots
     param_info_func = lambda col: {'name': 'Transform', 'value': 'log(x+1)'}
@@ -394,18 +390,15 @@ def apply_log_transform(df, batch_name, target_feature):
 
 def apply_quantile_transform(df, batch_name, target_feature, quantile_split):
     """Apply quantile transformation"""
-    df = clean_image_names(df)
     target_cols = get_target_columns(df, target_feature)
     
     # Apply quantile transformation
     scaler = QuantileTransformer(n_quantiles=quantile_split, random_state=0)
-    df_features = df[target_cols]
-    df_transformed_features = pd.DataFrame(scaler.fit_transform(df_features), columns=df_features.columns)
-    
-    # Combine with non-transformed columns
-    df_other = df.drop(columns=target_cols)
-    df_transformed = pd.concat([df_other.reset_index(drop=True), df_transformed_features], axis=1).fillna(0)
-    
+    imgMets = df.filter(regex='(Min|Max|Median|Mean|Std*|Variance|Area)', axis=1)
+    df_norm = pd.DataFrame(scaler.fit_transform(imgMets), columns=imgMets.columns)
+    df_a = df[df.columns.difference(imgMets.columns)]
+    df_transformed = pd.concat([df_a.reset_index(drop=True), df_norm], axis=1).fillna(0)
+        
     # Create plots
     param_info_func = lambda col: {'name': 'Quantiles', 'value': str(quantile_split)}
     all_plot_data = create_all_plots(df, df_transformed, target_cols, 'Quantile', param_info_func)
@@ -439,17 +432,14 @@ def apply_quantile_transform(df, batch_name, target_feature, quantile_split):
 
 def apply_minmax_transform(df, batch_name, target_feature):
     """Apply MinMax transformation"""
-    df = clean_image_names(df)
     target_cols = get_target_columns(df, target_feature)
     
     # Apply MinMax transformation
     scaler = MinMaxScaler(feature_range=(-2, 2))
-    df_features = df[target_cols]
-    df_transformed_features = pd.DataFrame(scaler.fit_transform(df_features), columns=df_features.columns)
-    
-    # Combine with non-transformed columns
-    df_other = df.drop(columns=target_cols)
-    df_transformed = pd.concat([df_other.reset_index(drop=True), df_transformed_features], axis=1).fillna(0)
+    imgMets = df.filter(regex='(Min|Max|Median|Mean|StdDev)', axis=1)
+    df_norm = pd.DataFrame(scaler.fit_transform(imgMets), columns=imgMets.columns)
+    df_a = df[df.columns.difference(imgMets.columns)]
+    df_transformed = pd.concat([df_a.reset_index(drop=True), df_norm], axis=1).fillna(0)
     
     # Create plots
     param_info_func = lambda col: {'name': 'Range', 'value': '(-2, 2)'}
@@ -483,18 +473,15 @@ def apply_minmax_transform(df, batch_name, target_feature):
 
 def apply_boxcox_transform(df, batch_name, target_feature):
     """Apply Box-Cox transformation"""
-    df = clean_image_names(df)
     target_cols = get_target_columns(df, target_feature)
     
     # Apply Box-Cox transformation
     metrics = []
     df_transformed = df.fillna(0).copy()
     lambda_values = {}
+    stat_cols = list(df_transformed.filter(regex='(Min|Max|Median|Mean|Std*|Variance|Area)'))
     
-    for col in target_cols:
-        if col not in df_transformed.columns:
-            continue
-            
+    for col in stat_cols:
         col_values = df_transformed[col].dropna()
         if col_values.empty:
             df_transformed[col] = np.nan
@@ -591,6 +578,7 @@ def main():
     # Load data
     print(f"Loading data from {args.pickleTable}...")
     df = pd.read_pickle(args.pickleTable)
+    df = clean_image_names(df)
     
     # Apply transformation
     print(f"Applying {args.method} transformation...")

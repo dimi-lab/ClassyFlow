@@ -9,6 +9,7 @@ process NORMALIZATION {
     
     output:
     tuple val(batchID), path("*_transformed_${batchID}.tsv"), emit: norm_df
+    tuple val(batchID), val(method), path("*_transformed_${batchID}.tsv"), emit: method_norm_df
     tuple val(batchID), path ("*_results_${batchID}.json"), path("*_all_plots_${batchID}.html"), optional: true, emit: norm_results
     
     script:
@@ -18,28 +19,42 @@ process NORMALIZATION {
         --pickleTable ${pickleTable} \
         --batchID ${batchID} \
         --quantileSplit ${params.quantile_split} \
-        --target-feature ${params.plot_target_feature_suffix}
+        --target-feature "${params.plot_target_feature_suffix}"
     """
 }
 
 
-// Look at all of the normalizations within a batch and attempt to idendity the best approach
-process IDENTIFY_BEST{
-    publishDir "${params.output_dir}/norm_reports", pattern: "*.html", mode: 'copy'
+process EVALUATE_NORMALIZATION{
     publishDir "${params.output_dir}/norm_reports", pattern: "*.csv", mode: 'copy'
     publishDir "${params.output_dir}/norm_reports", pattern: "*.png", mode: 'copy'
 
     input:
-    val(batchIDs)
+    tuple val(batchID), val(method), path(files)
+    
+    output:
+    tuple path("*.csv"), path("*.png"), path("*.json")
+
+    script:
+    """
+    characterize_batch_normalization.py --batch-id ${batchID} --target-features "${params.plot_target_feature_suffix}" --method ${method}
+    """
+}
+
+// Look at all of the normalizations within a batch and attempt to idendity the best approach
+process IDENTIFY_BEST{
+    publishDir "${params.output_dir}/norm_reports", pattern: "*.html", mode: 'copy'
+
+    input:
     path(files)
     
     output:
     path("*.csv")
     path("*.png")
+    path("*.html")
 
     script:
     """
-    characterize_normalization.py --batch-ids ${batchIDs.join(',')} --target-features ${params.plot_target_feature_suffix}
+    characterize_normalization.py
     """
 }
 
@@ -141,15 +156,11 @@ workflow normalization_wf {
                         .combine(all_methods)
         
         norm_results = NORMALIZATION(combined_ch)
+
+        norm_eval = EVALUATE_NORMALIZATION(norm_results.method_norm_df)
         
-        // Mix all normalization results and group them for comparison
-        batch_ch = norm_results.norm_df.map { batchID, file -> batchID }.collect()
-        files_ch = norm_results.norm_df.map { batchID, file -> file }.collect()
-
-        mxchannels = batch_ch.combine(files_ch)
-
         // Identify the best normalization approach
-        best_selection = IDENTIFY_BEST(batch_ch, files_ch)
+        best_selection = IDENTIFY_BEST(norm_eval.collect(flat: true))
 
         return
 
