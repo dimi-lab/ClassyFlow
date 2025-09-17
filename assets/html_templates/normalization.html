@@ -3,6 +3,52 @@
 <section class="page-section">
     <h2>Data Normalization Results</h2>
     
+    {% if normalization_data.no_normalization_applied %}
+    <!-- No Normalization Applied Section -->
+    <div class="alert alert-info">
+        <strong>No Normalization Applied:</strong> No data normalization was performed on this dataset. 
+        The original feature distributions were preserved without any transformations.
+        {% if normalization_data.no_normalization_reason %}
+        <br><br><em>{{ normalization_data.no_normalization_reason }}</em>
+        {% endif %}
+    </div>
+
+    <div class="header-with-tooltip">
+        <h3>Processing Summary</h3>
+    </div>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">None</div>
+                <div class="metric-label">Normalization Method</div>
+                <span class="tooltiptext">
+                    No normalization transformations were applied to the data. Features retain their original scales and distributions.
+                </span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="tooltip">
+                <div class="metric-value">Original</div>
+                <div class="metric-label">Data State</div>
+                <span class="tooltiptext">
+                    Data remains in its original, untransformed state. No scaling, transformation, or normalization has been applied.
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-top: 2rem; padding: 1.5rem; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #6c757d;">
+        <h4 style="margin-top: 0; color: #495057;">Analysis Notes</h4>
+        <p style="margin-bottom: 0; color: #6c757d;">
+            The data will be used in its original form for downstream analysis. Consider whether normalization 
+            might be beneficial for your specific use case, particularly if features have different scales or 
+            distributions that could impact model performance.
+        </p>
+    </div>
+    
+    {% else %}
+    <!-- Standard Normalization Applied Section -->
     <div class="alert alert-info">
         <strong>Normalization Overview:</strong> This section presents the results of data normalization applied to 
         standardize feature distributions within batches and improve model performance. The normalization process 
@@ -31,9 +77,10 @@
             </div>
         </div>
     </div>
+    {% endif %}
 </section>
 
-{% if normalization_data.normalization_results %}
+{% if not normalization_data.no_normalization_applied and normalization_data.normalization_results %}
 <!-- Batch Tabs Navigation -->
 <section class="page-section">
     <div class="header-with-description">
@@ -130,150 +177,6 @@
         <!-- Three Tables Side by Side -->
 
         <!-- Table 1: Batch Overview -->
-        <div class="table-container inline-third">
-            <table>
-                <thead>
-                    <tr>
-                        <th colspan="2">Batch Overview</th>
-                    </tr>
-                    <tr>
-                        <th>Metric</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Cells in Batch</td>
-                        <td>{{ batch_result.data.total_cells | number_format }}</td>
-                    </tr>
-                    <tr>
-                        <td>Number of ROIs</td>
-                        <td>{{ batch_result.data.total_slides | default("N/A") }}</td>
-                    </tr>
-                    <tr>
-                        <td>Transformation Type</td>
-                        <td>{{ batch_result.data.transformation_type | title }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Table 2: Transformation-specific Metrics -->
-        {% if batch_result.data.transformation_type == "boxcox" and batch_result.data.boxcox_metrics %}
-        <div class="table-container inline-third">
-            <table>
-                <thead>
-                    <tr>
-                        <th colspan="2">
-                            Box-Cox Metrics
-                        </th>
-                    </tr>
-                    <tr>
-                        <th>Parameter</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>
-                            <div class="tooltip">
-                                Successful Transforms
-                                <span class="tooltiptext">Number of features that were successfully transformed using Box-Cox normalization.</span>
-                            </div>
-                        </td>
-                        <td>{{ batch_result.data.boxcox_metrics.successful_transforms }}/{{ batch_result.data.boxcox_metrics.total_features }}</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="tooltip">
-                                Failed Transforms
-                                <span class="tooltiptext">Number of features where Box-Cox transformation failed, typically due to negative values or other data issues.</span>
-                            </div>
-                        </td>
-                        <td>{{ batch_result.data.boxcox_metrics.failed_transforms }}</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="tooltip">
-                                Mean Lambda
-                                <span class="tooltiptext">Average lambda parameter used in the Box-Cox transformation across all features.</span>
-                            </div>
-                        </td>
-                        <td>{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.mean_lambda) if batch_result.data.boxcox_metrics.lambda_stats.mean_lambda else "N/A" }}</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="tooltip">
-                                Median Lambda
-                                <span class="tooltiptext">Median lambda parameter, providing a robust measure of the typical transformation applied.</span>
-                            </div>
-                        </td>
-                        <td>{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.median_lambda) if batch_result.data.boxcox_metrics.lambda_stats.median_lambda else "N/A" }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        {% elif batch_result.data.transformation_type == "quantile" %}
-        <div class="table-container inline-third">
-            <table>
-                <thead>
-                    <tr>
-                        <th colspan="2">Quantile Transform Details</th>
-                    </tr>
-                    <tr>
-                        <th>Parameter</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Quantile Splits</td>
-                        <td>{{ batch_result.data.quantile_splits | default("100") }}</td>
-                    </tr>
-                    <tr>
-                        <td>Distribution</td>
-                        <td>Uniform</td>
-                    </tr>
-                    <tr>
-                        <td>Features Transformed</td>
-                        <td>{{ batch_result.data.total_markers | default("All") }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        {% elif batch_result.data.transformation_type == "minmax" %}
-        <div class="table-container inline-third">
-            <table>
-                <thead>
-                    <tr>
-                        <th colspan="2">MinMax Scaling Details</th>
-                    </tr>
-                    <tr>
-                        <th>Parameter</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Feature Range</td>
-                        <td>(-2, 2)</td>
-                    </tr>
-                    <tr>
-                        <td>Features Scaled</td>
-                        <td>{{ batch_result.data.minmax_metrics.total_features_transformed | default("All") }}</td>
-                    </tr>
-                    <tr>
-                        <td>Min Value Achieved</td>
-                        <td>{{ "%.3f" | format(batch_result.data.minmax_metrics.scaling_stats.min_transformed_value) if batch_result.data.minmax_metrics else "N/A" }}</td>
-                    </tr>
-                    <tr>
-                        <td>Max Value Achieved</td>
-                        <td>{{ "%.3f" | format(batch_result.data.minmax_metrics.scaling_stats.max_transformed_value) if batch_result.data.minmax_metrics else "N/A" }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        {% else %}
         <div class="table-container inline-third">
             <table>
                 <thead>
@@ -481,7 +384,7 @@ function showBatch(batchId) {
 }
 </script>
 
-{% else %}
+{% elif not normalization_data.no_normalization_applied %}
 <section class="page-section">
     <div class="alert alert-warning">
         <strong>No Normalization Data Available:</strong> No normalization results were found. This may indicate 
@@ -490,4 +393,148 @@ function showBatch(batchId) {
 </section>
 {% endif %}
 
-</div>
+</div>>
+                        <th colspan="2">Batch Overview</th>
+                    </tr>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Cells in Batch</td>
+                        <td>{{ batch_result.data.total_cells | number_format }}</td>
+                    </tr>
+                    <tr>
+                        <td>Number of ROIs</td>
+                        <td>{{ batch_result.data.total_slides | default("N/A") }}</td>
+                    </tr>
+                    <tr>
+                        <td>Transformation Type</td>
+                        <td>{{ batch_result.data.transformation_type | title }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Table 2: Transformation-specific Metrics -->
+        {% if batch_result.data.transformation_type == "boxcox" and batch_result.data.boxcox_metrics %}
+        <div class="table-container inline-third">
+            <table>
+                <thead>
+                    <tr>
+                        <th colspan="2">
+                            Box-Cox Metrics
+                        </th>
+                    </tr>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                Successful Transforms
+                                <span class="tooltiptext">Number of features that were successfully transformed using Box-Cox normalization.</span>
+                            </div>
+                        </td>
+                        <td>{{ batch_result.data.boxcox_metrics.successful_transforms }}/{{ batch_result.data.boxcox_metrics.total_features }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                Failed Transforms
+                                <span class="tooltiptext">Number of features where Box-Cox transformation failed, typically due to negative values or other data issues.</span>
+                            </div>
+                        </td>
+                        <td>{{ batch_result.data.boxcox_metrics.failed_transforms }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                Mean Lambda
+                                <span class="tooltiptext">Average lambda parameter used in the Box-Cox transformation across all features.</span>
+                            </div>
+                        </td>
+                        <td>{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.mean_lambda) if batch_result.data.boxcox_metrics.lambda_stats.mean_lambda else "N/A" }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                Median Lambda
+                                <span class="tooltiptext">Median lambda parameter, providing a robust measure of the typical transformation applied.</span>
+                            </div>
+                        </td>
+                        <td>{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.median_lambda) if batch_result.data.boxcox_metrics.lambda_stats.median_lambda else "N/A" }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% elif batch_result.data.transformation_type == "quantile" %}
+        <div class="table-container inline-third">
+            <table>
+                <thead>
+                    <tr>
+                        <th colspan="2">Quantile Transform Details</th>
+                    </tr>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Quantile Splits</td>
+                        <td>{{ batch_result.data.quantile_splits | default("100") }}</td>
+                    </tr>
+                    <tr>
+                        <td>Distribution</td>
+                        <td>Uniform</td>
+                    </tr>
+                    <tr>
+                        <td>Features Transformed</td>
+                        <td>{{ batch_result.data.total_markers | default("All") }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% elif batch_result.data.transformation_type == "minmax" %}
+        <div class="table-container inline-third">
+            <table>
+                <thead>
+                    <tr>
+                        <th colspan="2">MinMax Scaling Details</th>
+                    </tr>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Feature Range</td>
+                        <td>(-2, 2)</td>
+                    </tr>
+                    <tr>
+                        <td>Features Scaled</td>
+                        <td>{{ batch_result.data.minmax_metrics.total_features_transformed | default("All") }}</td>
+                    </tr>
+                    <tr>
+                        <td>Min Value Achieved</td>
+                        <td>{{ "%.3f" | format(batch_result.data.minmax_metrics.scaling_stats.min_transformed_value) if batch_result.data.minmax_metrics else "N/A" }}</td>
+                    </tr>
+                    <tr>
+                        <td>Max Value Achieved</td>
+                        <td>{{ "%.3f" | format(batch_result.data.minmax_metrics.scaling_stats.max_transformed_value) if batch_result.data.minmax_metrics else "N/A" }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="table-container inline-third">
+            <table>
+                <thead>
+                    <tr

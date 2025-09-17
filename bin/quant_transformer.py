@@ -341,11 +341,11 @@ def save_results(df_transformed, results, batch_name, method):
     df_transformed.to_csv(output_file, sep="\t", index=False)
     
     # Save results JSON
-    json_file = f'{method}_results_{batch_name}.json'
-    with open(json_file, 'w') as f:
-        json.dump(results, f, indent=2, default=str)
-    
-    return output_file, json_file
+    if results is not None:
+        json_file = f'{method}_results_{batch_name}.json'
+        with open(json_file, 'w') as f:
+            json.dump(results, f, indent=2, default=str)
+
 
 # =============================================================================
 # TRANSFORMATION METHODS
@@ -573,7 +573,7 @@ def main():
     # Common arguments for all methods
     parser.add_argument('--pickleTable', required=True, help='Input pickle file')
     parser.add_argument('--batchID', required=True, help='Batch ID for output file naming')
-    parser.add_argument('--method', required=True, choices=['log', 'quantile', 'minmax', 'boxcox'],
+    parser.add_argument('--method', required=True, choices=['log', 'quantile', 'minmax', 'boxcox', 'none'],
                        help='Transformation method to apply')
     parser.add_argument('--target-feature', dest='targetFeature', default='Cell: Mean',
                        help='Comma-separated list of column name patterns to target (required for all methods)')
@@ -603,18 +603,13 @@ def main():
         df_transformed, results = apply_minmax_transform(df, args.batchID, args.targetFeature)
     elif args.method == 'boxcox':
         df_transformed, results = apply_boxcox_transform(df, args.batchID, args.targetFeature)
+    elif args.method == 'none':
+        df_transformed = df
+        results = None   
     else:
         raise ValueError(f"Unknown method: {args.method}")
     
     # Save results
-    output_tsv, output_json = save_results(df_transformed, results, args.batchID, args.method)
-    
-    print(f"\nTransformation complete!")
-    print(f"- Transformed data: {output_tsv}")
-    print(f"- Metrics: {output_json}")
-    print(f"- HTML report: {results['html_report']}")
-    if args.method == 'boxcox':
-        print(f"- Box-Cox record: BoxCoxRecord_{args.batchID}.csv")
-
+    save_results(df_transformed, results, args.batchID, args.method)
 if __name__ == "__main__":
     main()
