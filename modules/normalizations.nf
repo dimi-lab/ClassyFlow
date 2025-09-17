@@ -5,59 +5,22 @@ process NORMALIZATION {
     publishDir "${params.output_dir}/final_reports/pages", pattern: "*.html", mode: 'copy'
     
     input:
-    tuple val(batchID), path(pickleTable), val(method)
+    tuple val(batchID), path(pickleTable)
     
     output:
     tuple val(batchID), path("*_transformed_${batchID}.tsv"), emit: norm_df
-    tuple val(batchID), val(method), path("*_transformed_${batchID}.tsv"), emit: method_norm_df
-    tuple val(batchID), path ("*_results_${batchID}.json"), path("*_all_plots_${batchID}.html"), optional: true, emit: norm_results
+    tuple val(batchID), path ("*_results_${batchID}.json"), optional: true, emit: norm_results
     
     script:
     """
     quant_transformer.py \
-        --method ${method} \
+        --method ${params.override_normalization} \
         --pickleTable ${pickleTable} \
         --batchID ${batchID} \
         --quantileSplit ${params.quantile_split} \
         --target-feature "${params.plot_target_feature_suffix}"
     """
 }
-
-
-process EVALUATE_NORMALIZATION{
-    publishDir "${params.output_dir}/norm_reports", pattern: "*.csv", mode: 'copy'
-    publishDir "${params.output_dir}/norm_reports", pattern: "*.png", mode: 'copy'
-
-    input:
-    tuple val(batchID), val(method), path(files)
-    
-    output:
-    tuple path("*.csv"), path("*.png"), path("*.json")
-
-    script:
-    """
-    characterize_batch_normalization.py --batch-id ${batchID} --target-features "${params.plot_target_feature_suffix}" --method ${method}
-    """
-}
-
-// Look at all of the normalizations within a batch and attempt to idendity the best approach
-process IDENTIFY_BEST{
-    publishDir "${params.output_dir}/norm_reports", pattern: "*.html", mode: 'copy'
-
-    input:
-    path(files)
-    
-    output:
-    path("*.csv")
-    path("*.png")
-    path("*.html")
-
-    script:
-    """
-    characterize_normalization.py
-    """
-}
-
 
 process AUGMENT_WITH_LEIDEN_CLUSTERS{
     publishDir(
@@ -96,7 +59,6 @@ process GMM_GATING {
     )
     input:
     tuple val(batchID), path(norm_table)
-    val(target_feature)
 
     output:
     tuple val(batchID), path("gmm_gated_${batchID}.tsv"), emit: norm_df
@@ -108,7 +70,7 @@ process GMM_GATING {
         --input ${norm_table} \
         --output gmm_gated_${batchID}.tsv \
         --html_report gmm_gated_${batchID}.html \
-        --target-feature "${target_feature}" \
+        --target-feature "${params.plot_target_feature_suffix}" \
         --batch-name "${batchID}"
 
     """
@@ -118,8 +80,7 @@ process GENERATE_NORM_REPORT {
     //publishDir "${params.output_dir}/final_reports/", pattern: "normalization_report.html", mode: 'copy'
 
     input:
-    path(norm_files)
-    tuple val(batchIDs), path(html_files)
+    tuple val(batchID), path(json_files)
     path(html_template)
 
     output:
@@ -142,66 +103,31 @@ workflow normalization_wf {
     take:
     batchPickleTable
 
-    main:
-    // Initialize empty channels for conditional results
-    norm_results = Channel.empty()
-    norm_outputs_list = []
-    
+    main:    
     // Step 1: Choose normalization method based on override parameter
-    if (params.override_normalization == "all") {
-        // Run all normalization methods and compare results
-        all_methods = Channel.of("boxcox", "quantile", "minmax", "log", "none")
+    //if (params.override_normalization in ["boxcox", "quantile", "minmax", "log", "none"]) 
 
-        combined_ch = batchPickleTable
-                        .combine(all_methods)
-        
-        norm_results = NORMALIZATION(combined_ch)
+    norm_results = NORMALIZATION(batchPickleTable)
 
-        norm_eval = EVALUATE_NORMALIZATION(norm_results.method_norm_df)
-        
-        // Identify the best normalization approach
-        best_selection = IDENTIFY_BEST(norm_eval.collect(flat: true))
+    // Step 2: Apply GMM gating to the normalized data
+    gmm_gated = GMM_GATING(norm_results.norm_df)
+    gated_ch = gmm_gated.norm_df
 
-        return
-
-    } else if (params.override_normalization in ["boxcox", "quantile", "minmax", "log", "none"]) {
-        // Use BoxCox normalization
-        norm_results = NORMALIZATION(batchPickleTable, params.override_normalization)
-        best_ch = norm_results.norm_df
-
-        norm_outputs_list.add(norm_results.norm_results.map { it -> it[1..-1] }.ifEmpty([]))
-
-        // Step 2: Apply GMM gating to the normalized data
-        gmm_gated = GMM_GATING(best_ch, params.plot_target_feature_suffix)
-        gated_ch = gmm_gated.norm_df
-        gated_html = gmm_gated.gmm_html.collect(flat: false)
-                            .map { it.transpose() }
-
-        // Step 3: Optionally augment with Leiden clusters if enabled
-        if (params.run_get_leiden_clusters) {
-            leiden_augmented = AUGMENT_WITH_LEIDEN_CLUSTERS(gated_ch)
-            final_ch = leiden_augmented.norm_df
-        } else {
-            final_ch = gated_ch
-        }
-
-        // Collect normalization outputs for reporting
-        // Only mix channels that actually exist
-        if (norm_outputs_list.size() > 0) {
-            norm_outputs = Channel.empty()
-                .mix(*norm_outputs_list)
-                .flatten()
-                .collect()
-        } else {
-            norm_outputs = Channel.empty().collect()
-        }
-
-        norm_report = GENERATE_NORM_REPORT(norm_outputs, gated_html, params.html_template)
-
-        emit:
-        normalized = final_ch
-        report = norm_report.norm_html
-        norm_summary = norm_report.norm_summary
+    // Step 3: Optionally augment with Leiden clusters if enabled
+    if (params.run_get_leiden_clusters) {
+        leiden_augmented = AUGMENT_WITH_LEIDEN_CLUSTERS(gated_ch)
+        final_ch = leiden_augmented.norm_df
+    } else {
+        final_ch = gated_ch
     }
+
+    norm_outputs = norm_results.norm_results.collect()
+
+    norm_report = GENERATE_NORM_REPORT(norm_outputs, params.html_template)
+
+    emit:
+    normalized = final_ch
+    report = norm_report.norm_html
+    norm_summary = norm_report.norm_summary
 }
 

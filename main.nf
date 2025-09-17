@@ -349,76 +349,72 @@ workflow {
          * - Subworkflow to handle all Normalization/Standardization Tasks - 
          */ 
         normalized_output = normalization_wf(ADD_EMPTY_MARKER_NOISE.output.modbatchtables)
-
-        if (params.override_normalization != "all") {
+        normalizedDataFrames = normalized_output.normalized
         
-            normalizedDataFrames = normalized_output.normalized
-            
-            labledDataFrames = GENERATE_TRAINING_N_HOLDOUT(normalizedDataFrames.map{ it[1] }.collect(), params.letterhead)
-            
-            /*
-            * - Subworkflow to examine Cell Type Specific interpetability & Feature Selections - 
-            */ 
-            feature_selection_results = featureselection_wf(labledDataFrames.training, labledDataFrames.lableFile)
-            selectFeatures = feature_selection_results.mas_results
-            
-            /*
-            * - Subworkflow to generate models and then check them against the holdout - 
-            */ 
-            modeling_results = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures, labledDataFrames.lableFile)
-            bestModel = modeling_results.best_model_results
-            
-            // Run the best model on the full input batches/files 
-            PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
-
-            QC_DENSITY(PREDICT_ALL_CELLS_XGB.output.predictions.flatten())
-            // Overwrite predictions with QC-augmented files for downstream steps
-            predictions_for_report = QC_DENSITY.output.qc_predictions.flatten()
+        labledDataFrames = GENERATE_TRAINING_N_HOLDOUT(normalizedDataFrames.map{ it[1] }.collect(), params.letterhead)
         
-            // Generate a comprehensive HTML report for each prediction file
-            CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
+        /*
+        * - Subworkflow to examine Cell Type Specific interpetability & Feature Selections - 
+        */ 
+        feature_selection_results = featureselection_wf(labledDataFrames.training, labledDataFrames.lableFile)
+        selectFeatures = feature_selection_results.mas_results
+        
+        /*
+        * - Subworkflow to generate models and then check them against the holdout - 
+        */ 
+        modeling_results = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures, labledDataFrames.lableFile)
+        bestModel = modeling_results.best_model_results
+        
+        // Run the best model on the full input batches/files 
+        PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
 
-            // Generate summary statistics and plots for all predictions
-            SUMMARIZE_PREDICTIONS(predictions_for_report.collect())
+        QC_DENSITY(PREDICT_ALL_CELLS_XGB.output.predictions.flatten())
+        // Overwrite predictions with QC-augmented files for downstream steps
+        predictions_for_report = QC_DENSITY.output.qc_predictions.flatten()
+    
+        // Generate a comprehensive HTML report for each prediction file
+        CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
 
-            // Generate final HTML report for the whole run
-            missing_outputs = ADD_EMPTY_MARKER_NOISE.output.empty_marker_results.flatten().collect()
-            split_outputs = labledDataFrames.training_holdout_results.flatten().collect()
+        // Generate summary statistics and plots for all predictions
+        SUMMARIZE_PREDICTIONS(predictions_for_report.collect())
 
-            prediction_results = SUMMARIZE_PREDICTIONS.output.abundance_results
-                .flatten()
-                .collect()
-            
-            classified_results = CLASSIFIED_REPORT_PER_SLIDE.output.slide_results
-                .flatten()
-                .collect()
+        // Generate final HTML report for the whole run
+        missing_outputs = ADD_EMPTY_MARKER_NOISE.output.empty_marker_results.flatten().collect()
+        split_outputs = labledDataFrames.training_holdout_results.flatten().collect()
 
-            // Generate individual ROI detail pages
-            GENERATE_ROI_DETAIL_PAGES(
-                SUMMARIZE_PREDICTIONS.output.abundance_results.flatten().collect(),
-                classified_results
-            )
+        prediction_results = SUMMARIZE_PREDICTIONS.output.abundance_results
+            .flatten()
+            .collect()
+        
+        classified_results = CLASSIFIED_REPORT_PER_SLIDE.output.slide_results
+            .flatten()
+            .collect()
 
-            // Pass all to reporting including summary JSONs
-            final_report = GENERATE_FINAL_REPORT(
-                missing_outputs,
-                split_outputs,
-                normalized_output.report,
-                feature_selection_results.report, 
-                modeling_results.report,
-                prediction_results,
-                classified_results,
-                SUMMARIZE_PREDICTIONS.output.summary_metrics,
-                modeling_results.model_summary,
-                normalized_output.norm_summary,
-                params.html_template,
-                params.letterhead,
-                params.config_file,
-                GENERATE_ROI_DETAIL_PAGES.output.roi_mapping
-            )
+        // Generate individual ROI detail pages
+        GENERATE_ROI_DETAIL_PAGES(
+            SUMMARIZE_PREDICTIONS.output.abundance_results.flatten().collect(),
+            classified_results
+        )
 
-            ZIP_PUBLISHED(final_report.map {"done"}, "${params.output_dir}/final_reports")
-        }
+        // Pass all to reporting including summary JSONs
+        final_report = GENERATE_FINAL_REPORT(
+            missing_outputs,
+            split_outputs,
+            normalized_output.report,
+            feature_selection_results.report, 
+            modeling_results.report,
+            prediction_results,
+            classified_results,
+            SUMMARIZE_PREDICTIONS.output.summary_metrics,
+            modeling_results.model_summary,
+            normalized_output.norm_summary,
+            params.html_template,
+            params.letterhead,
+            params.config_file,
+            GENERATE_ROI_DETAIL_PAGES.output.roi_mapping
+        )
+
+        ZIP_PUBLISHED(final_report.map {"done"}, "${params.output_dir}/final_reports")
     }
     
 }
