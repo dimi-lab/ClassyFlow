@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import scanpy as sc
 import scimap as sm
+import scimap
 import matplotlib.pyplot as plt
 import os
 import seaborn as sns
@@ -23,7 +24,7 @@ def find_best_coord(colnames, axis):
     Find the best-fit column for X or Y coordinates using regex patterns.
     """
     import re
-    patterns = [fr'Centroid {axis} um', fr'Centroid {axis}', fr'{axis}']
+    patterns = [fr'Centroid {axis} µm', fr'Centroid {axis} um', fr'Centroid {axis}', fr'{axis}']
     for pat in patterns:
         matches = [c for c in colnames if re.search(pat, c, re.IGNORECASE)]
         if matches:
@@ -31,11 +32,30 @@ def find_best_coord(colnames, axis):
     raise ValueError(f"No column found for {axis} coordinate.")
 
 def load_and_filter_data(input_tsv, qupath_object_type, label_col):
-    df = pd.read_csv(input_tsv, sep='\t')
+    df = pd.read_csv(input_tsv, sep='\t', low_memory=False)  # Fix mixed types warning
     if 'qc' in df.columns:
         df = df[~df['qc'].astype(str).str.contains("Artifact", na=False)]
-    if label_col in df.columns:
-        df[label_col] = df[label_col].replace('0', '')
+    
+    # Check if the label column exists, if not create it with NaN values
+    if label_col not in df.columns:
+        print(f"[WARN] Column '{label_col}' not found in {input_tsv}. Creating empty column.")
+        df[label_col] = pd.NA
+    else:
+        # Enhanced cleaning of the classification column
+        # Convert to string first to handle any mixed types
+        df[label_col] = df[label_col].astype(str)
+        
+        # Replace various representations of "empty" or "unknown" with empty string
+        replacements = ['0', '0.0', 'nan', 'NaN', 'None', 'null', 'NULL']
+        for val in replacements:
+            df[label_col] = df[label_col].replace(val, '')
+        
+        # Strip whitespace and replace empty strings with NaN
+        df[label_col] = df[label_col].str.strip()
+        df[label_col] = df[label_col].replace('', pd.NA)
+        
+        print(f"[INFO] Cleaned classification column. Unique values: {df[label_col].dropna().unique()}")
+    
     marker_regex = r'(Cell: Median)' if qupath_object_type == "CellObject" else r'(Median)'
     marker_replace = ": Cell: Median" if qupath_object_type == "CellObject" else "Median"
     marker_cols = df.filter(regex=marker_regex, axis=1)
@@ -54,8 +74,8 @@ def create_anndata(marker_cols, df):
     adata = sc.AnnData(marker_cols)
     adata.obsm["spatial"] = df[[col_x, col_y]].to_numpy()
     adata.obs["imageid"] = pd.Categorical(df["Image"])
-    adata.obs["X_centroid"] = df[[col_x]].to_numpy()
-    adata.obs["Y_centroid"] = df[[col_y]].to_numpy()
+    adata.obs["X_centroid"] = df[col_x].to_numpy()
+    adata.obs["Y_centroid"] = df[col_y].to_numpy()
     return adata
 
 def run_umap_leiden(adata, clustering_res, roi):
@@ -75,13 +95,45 @@ def run_umap_leiden(adata, clustering_res, roi):
     return adata
 
 def impute_labels(df, adata, label_col, cluster_col, label_fraction):
-    ctab = pd.crosstab(adata.obs[label_col], adata.obs[cluster_col])
-    ctab_pct = ctab.div(ctab.sum(axis=1), axis=0)
+    # Proper handling of mixed data types and missing labels
+    # Convert both columns to string to ensure compatibility
+    label_series = adata.obs[label_col].copy()
+    cluster_series = adata.obs[cluster_col].astype(str)
+    
+    # Create mask for valid (non-empty, non-NaN) labels
+    valid_mask = label_series.notna() & (label_series.astype(str).str.strip() != '') & (label_series.astype(str) != 'nan')
+    
+    if not valid_mask.any():
+        print("[WARN] No valid labels found for crosstab calculation")
+        # Return with just cluster assignments
+        cluster_assignments = adata.obs[cluster_col].astype(str)
+        df["LeidenClusters"] = [f"leiden_{cid}" for cid in cluster_assignments]
+        df[label_col + "_imputed"] = ["No"] * len(df)
+        return df, pd.DataFrame(), pd.DataFrame(), {}
+    
+    # Create crosstab only with valid labels - convert both to string for consistency
+    valid_labels = label_series[valid_mask].astype(str)
+    valid_clusters = cluster_series[valid_mask]
+    
+    try:
+        ctab = pd.crosstab(valid_labels, valid_clusters)
+        ctab_pct = ctab.div(ctab.sum(axis=1), axis=0)
+    except Exception as e:
+        print(f"[ERROR] Failed to create crosstab: {e}")
+        print(f"[DEBUG] Valid labels sample: {valid_labels.head()}")
+        print(f"[DEBUG] Valid clusters sample: {valid_clusters.head()}")
+        # Return empty results
+        cluster_assignments = adata.obs[cluster_col].astype(str)
+        df["LeidenClusters"] = [f"leiden_{cid}" for cid in cluster_assignments]
+        df[label_col + "_imputed"] = ["No"] * len(df)
+        return df, pd.DataFrame(), pd.DataFrame(), {}
+    
     cluster_to_label = {}
     for cluster in ctab.columns:
         for label in ctab.index:
             if ctab_pct.loc[label, cluster] > label_fraction:
                 cluster_to_label[cluster] = label
+    
     cluster_assignments = adata.obs[cluster_col].astype(str)
     # Add LeidenClusters column with 'leiden_' prefix
     df["LeidenClusters"] = [f"leiden_{cid}" for cid in cluster_assignments]
@@ -93,8 +145,9 @@ def impute_labels(df, adata, label_col, cluster_col, label_fraction):
 
     # For each label, override up to N blank rows in the cluster, N=3x count of that label
     for label_name in ctab.index:
-        # Find indices where original label is blank and imputed label matches label_name
-        idx_blank = [i for i, (ol, il) in enumerate(zip(orig_label, imputed_labels)) if ol == "" and il == label_name]
+        # Better handling of empty/NaN values in comparison
+        idx_blank = [i for i, (ol, il) in enumerate(zip(orig_label, imputed_labels)) 
+                    if (pd.isna(ol) or ol == "" or ol == "nan") and il == label_name]
         n_label = (df[label_col] == label_name).sum()
         n_override = min(len(idx_blank), 3 * n_label)
         if n_override > 0:
@@ -248,28 +301,48 @@ def main():
     parser.add_argument("--qupath_object_type", default="DetectionObject")
     parser.add_argument("--roi_name", default="roi1")
     parser.add_argument("--perc_top_features", type=float, default=1.0, help="Percent of top differentiating features to keep for clustering (0-1, e.g. 0.3 for top 30%)")
+    parser.add_argument("--max_k", type=int, default=10, help="Maximum number of clusters for KMeans")
     args = parser.parse_args()
 
     label_col = args.classifed_column_name
-    df, marker_cols = load_and_filter_data(args.input_tsv, args.qupath_object_type, label_col)
+    
+    try:
+        df, marker_cols = load_and_filter_data(args.input_tsv, args.qupath_object_type, label_col)
+    except Exception as e:
+        print(f"[ERROR] Failed to load data from {args.input_tsv}: {e}")
+        sys.exit(1)
 
-    # --- Feature selection: keep top N% differentiating features ---
+    # Enhanced feature selection with better error handling
     perc = args.perc_top_features
     if perc < 1.0:
         # Calculate feature importance by ANOVA F-value between labels
         from sklearn.feature_selection import f_classif
-        valid_idx = df[label_col].notna() & (df[label_col].astype(str).str.strip() != '')
-        marker_data = marker_cols[valid_idx]
-        label_data = df.loc[valid_idx, label_col]
-        try:
-            fvals, _ = f_classif(marker_data, label_data)
-            n_keep = max(1, int(len(marker_cols.columns) * perc))
-            top_idx = np.argsort(fvals)[::-1][:n_keep]
-            top_features = marker_cols.columns[top_idx]
-            marker_cols = marker_cols[top_features]
-            print(f"[INFO] Keeping top {perc*100:.1f}% ({n_keep}) features for clustering.")
-        except Exception as e:
-            print(f"[WARN] Feature selection failed: {e}. Using all features.")
+        valid_idx = df[label_col].notna() & (df[label_col].astype(str).str.strip() != '') & (df[label_col].astype(str) != 'nan')
+        
+        if valid_idx.sum() > 1:  # Need at least 2 valid samples
+            marker_data = marker_cols[valid_idx]
+            label_data = df.loc[valid_idx, label_col].astype(str)
+            
+            # Only proceed if we have multiple unique labels
+            if label_data.nunique() > 1:
+                try:
+                    # Encode labels to numeric for f_classif
+                    from sklearn.preprocessing import LabelEncoder
+                    le = LabelEncoder()
+                    label_encoded = le.fit_transform(label_data)
+                    
+                    fvals, _ = f_classif(marker_data, label_encoded)
+                    n_keep = max(1, int(len(marker_cols.columns) * perc))
+                    top_idx = np.argsort(fvals)[::-1][:n_keep]
+                    top_features = marker_cols.columns[top_idx]
+                    marker_cols = marker_cols[top_features]
+                    print(f"[INFO] Keeping top {perc*100:.1f}% ({n_keep}) features for clustering.")
+                except Exception as e:
+                    print(f"[WARN] Feature selection failed: {e}. Using all features.")
+            else:
+                print(f"[WARN] Only one unique label found. Using all features.")
+        else:
+            print(f"[WARN] Insufficient valid labels for feature selection. Using all features.")
 
     adata = create_anndata(marker_cols, df)
     adata.obs[label_col] = df[label_col].values
@@ -278,18 +351,42 @@ def main():
     col = df[label_col] if label_col in df.columns else pd.Series([])
     is_all_blank = col.isna().all() or (col.astype(str).str.strip() == '').all()
     roi = args.roi_name
+    
     if is_all_blank:
+        print(f"[INFO] No valid labels found in {args.input_tsv}. Running clustering without label imputation.")
+        
+        # Still run clustering to get cluster assignments
+        adata = run_umap_leiden(adata, args.resolution, roi)
+        cluster_col = "leiden"
+        
+        # Add cluster assignments without imputation
+        cluster_assignments = adata.obs[cluster_col].astype(str)
+        df["LeidenClusters"] = [f"leiden_{cid}" for cid in cluster_assignments]
+        df[label_col + "_imputed"] = ["No"] * len(df)
+        
+        # Save output
+        out_path = f"scimap_extended_{roi}.tsv"
+        df.to_csv(out_path, sep='\t', index=False)
+        
+        # Generate minimal report
         html_report = "clustering_report.html"
         row_count = len(df)
         with open(html_report, "w") as f:
-            f.write(f"<html><body><h2>No labels Found</h2><p>Row count: {row_count}</p><p>ROI: {roi}</p></body></html>")
-        empty_csv = f"scimap_clusters_{roi}.tsv"
-        pd.DataFrame().to_csv(empty_csv, index=False, sep='\t')
-        for fname in [f'umap_{roi}.png', f'matrixplot{roi}.png', f'spatialplot_{roi}.png']:
-            open(fname, 'a').close()
-        print(f"[INFO] No valid labels found. Exiting early. Report saved: {html_report}")
+            f.write(f"<html><body>")
+            f.write(f"<h2>Clustering Results - No Labels Found</h2>")
+            f.write(f"<p>Input file: {args.input_tsv}</p>")
+            f.write(f"<p>Row count: {row_count}</p>")
+            f.write(f"<p>ROI: {roi}</p>")
+            f.write(f"<p>Clustering resolution: {args.resolution}</p>")
+            f.write(f"<p>Number of clusters found: {len(adata.obs[cluster_col].unique())}</p>")
+            f.write(f"<p>Output file: <a href='{out_path}'>{out_path}</a></p>")
+            f.write(f"</body></html>")
+        
+        print(f"[INFO] Clustering completed. Report saved: {html_report}")
+        print(f"[INFO] Output saved: {out_path}")
         return
 
+    # If we have labels, proceed with imputation
     adata = run_umap_leiden(adata, args.resolution, roi)
     cluster_col = "leiden"
 
@@ -312,30 +409,20 @@ def main():
 
     # Generate report
     report_steps = []
-    report_steps.append("<h2>Input Data Summary</h2>")
+    report_steps.append(f"<h2>Input Data Summary</h2>")
+    report_steps.append(f"<p>Input file: {args.input_tsv}</p>")
     report_steps.append(df.describe(include='all').to_html())
-    report_steps.append("<h2>Label-Cluster Crosstab</h2>")
-    report_steps.append(ctab.to_html())
-    report_steps.append("<h2>Label-Cluster Proportions</h2>")
-    report_steps.append(ctab_pct.to_html(float_format=lambda x: f'{x:.2f}'))
+    if not ctab.empty:
+        report_steps.append("<h2>Label-Cluster Crosstab</h2>")
+        report_steps.append(ctab.to_html())
+        report_steps.append("<h2>Label-Cluster Proportions</h2>")
+        report_steps.append(ctab_pct.to_html(float_format=lambda x: f'{x:.2f}'))
     report_steps.append(f"<h2>Imputed Label Mapping</h2><pre>{cluster_to_label}</pre>")
     report_steps.append(f"<h2>Output Table</h2><a href='{out_path}'>Download {out_path}</a>")
     save_html_report(report_steps, "clustering_report.html")
 
-    # Save plots (optional, can add UMAP, barplots, etc. as needed)
-    # sc.pl.umap(adata, color=[cluster_col], save=f'_{roi}.png', show=False)
+    print(f"[INFO] Clustering and imputation completed successfully.")
+    print(f"[INFO] Output saved: {out_path}")
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
