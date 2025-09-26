@@ -245,6 +245,8 @@ process GENERATE_FINAL_REPORT {
 
     output:
     path("classyflow_report.html")
+    path("prediction_abundance_plot.png")
+    path("nextflow.config")
 
     script:
     """
