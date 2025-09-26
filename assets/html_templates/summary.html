@@ -2,13 +2,8 @@
 
 <section class="page-section">
     <h2>Analysis Summary</h2>
-    
-    <div class="alert alert-info">
-        <strong>Overview:</strong> This report presents automated cell type classification results for your multiplexed immunofluorescence data.
-    </div>
-
     <!-- Input Data Overview -->
-    <h3>Dataset Overview</h3>
+    <h3>Input Dataset Overview</h3>
     <div class="metrics-grid">
         <div class="metric-card">
             <div class="metric-value">{{ input_metrics.total_num_batches | default("--") | number_format }}</div>
@@ -40,7 +35,7 @@
 <!-- Training Data Composition -->
 {% if cell_count_table.rows %}
 <section class="page-section">
-    <h3>Training Data Composition</h3>
+    <h3>Training/Holdout Data Composition</h3>
     
     <div class="table-container medium">
         <table>

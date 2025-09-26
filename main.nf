@@ -228,7 +228,7 @@ process CLASSIFIED_REPORT_PER_SLIDE {
 
 process GENERATE_FINAL_REPORT {
     publishDir "${params.output_dir}/final_reports", pattern: "*.html", mode: 'copy', overwrite: true
-    publishDir "${params.output_dir}/final_repoers/plots", pattern: "prediction_abundance_plot.png", mode: 'copy', overwrite: true
+    publishDir "${params.output_dir}/final_reports/plots/", pattern: "prediction_abundance_plot.png", mode: 'copy', overwrite: true
     publishDir "${params.output_dir}/final_reports/pages/", pattern: "nextflow.config", mode: 'copy', overwrite: true
     
     input:
