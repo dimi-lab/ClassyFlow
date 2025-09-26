@@ -47,7 +47,7 @@
             {% if prediction_metrics.abundance_plot %}
             <div class="plot-container">
                 <div class="plot-title">Cell Type Prediction Abundance Plot</div>
-                <img src="{{ prediction_metrics.abundance_plot }}" alt="Abundance plot" class="embedded-image" />
+                <img src="plots/{{ prediction_metrics.abundance_plot }}" alt="Abundance plot" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
                     The proportion of predicted cell types per sample/slide.
                 </p>
