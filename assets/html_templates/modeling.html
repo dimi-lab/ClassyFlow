@@ -82,7 +82,7 @@
         </div>
     </div>
 
-    <div class="plot-container full">
+    <div class="plot-container">
         <div class="plot-title">
             Class Distribution Comparison
             <div class="tooltip-container" style="display: inline-block; margin-left: 8px;">
@@ -136,7 +136,7 @@
 
     <div style="display: flex; flex-direction: column; gap: 2rem;">
         {% if modeling_data.model_comparison.parameter_search_plot_path %}
-        <div class="plot-container large">
+        <div class="plot-container">
             <div class="plot-title">Parameter Search Analysis</div>
             <img src="{{ modeling_data.model_comparison.parameter_search_plot_path }}" alt="Parameter Search Results" class="embedded-image" />
             <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
@@ -342,7 +342,7 @@
             </div>
         </div>
 
-        <div class="table-container medium">
+        <div class="table-container">
             <table>
                 <thead>
                     <tr>
@@ -460,7 +460,7 @@
 
         <div style="display: flex; flex-direction: column; gap: 2rem;">
             {% if model_eval.data.confusion_matrix_csv_path %}
-            <div class="plot-container full">
+            <div class="plot-container">
                 <div class="plot-title">Confusion Matrix</div>
                 <img src="{{ model_eval.data.confusion_matrix_csv_path }}" alt="Confusion Matrix" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
@@ -470,7 +470,7 @@
             {% endif %}
 
             {% if model_eval.data.roc_curves_plot_path %}
-            <div class="plot-container large">
+            <div class="plot-container">
                 <div class="plot-title">ROC Curves</div>
                 <img src="{{ model_eval.data.roc_curves_plot_path }}" alt="ROC Curves" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">

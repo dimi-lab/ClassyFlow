@@ -250,7 +250,7 @@
 
         <div style="display: flex; flex-direction: column; gap: 2rem;">
             {% if celltype_result.data.feature_ranking_plot_path %}
-            <div class="plot-container full">
+            <div class="plot-container">
                 <div class="plot-title">Feature Ranking with Selection Cutoff</div>
                 <img src="plots/{{ celltype_result.data.feature_ranking_plot_path }}" alt="Feature Ranking Plot" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
@@ -260,7 +260,7 @@
             {% endif %}
 
             {% if celltype_result.data.rfe_plot_path %}
-            <div class="plot-container large">
+            <div class="plot-container">
                 <div class="plot-title">Recursive Feature Elimination</div>
                     <img src="plots/{{ celltype_result.data.rfe_plot_path }}" alt="RFE Analysis Plot" class="embedded-image" />
                     <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
@@ -270,7 +270,7 @@
             {% endif %}
 
             {% if celltype_result.data.correlation_matrix_path %}
-            <div class="plot-container large">
+            <div class="plot-container">
                 <div class="plot-title">Feature Correlation Matrix</div>
                 <img src="plots/{{ celltype_result.data.correlation_matrix_path }}" alt="Correlation Matrix" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
@@ -280,7 +280,7 @@
             {% endif %}
 
             {% if celltype_result.data.tile_plot_path %}
-            <div class="plot-container large">
+            <div class="plot-container">
                 <div class="plot-title">Selected Features Heatmap</div>
                 <img src="plots/{{ celltype_result.data.tile_plot_path }}" alt="Feature Heatmap" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">

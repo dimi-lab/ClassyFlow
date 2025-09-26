@@ -11,28 +11,28 @@
     <h3>Dataset Overview</h3>
     <div class="metrics-grid">
         <div class="metric-card">
-            <div class="metric-value">{{ total_cells | default("--") | number_format }}</div>
+            <div class="metric-value">{{ input_metrics.total_num_batches | default("--") | number_format }}</div>
+            <div class="metric-label">Number of Batches</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-value">{{ input_metrics.total_num_rois | default("--") | number_format }}</div>
+            <div class="metric-label">Number of ROIs</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-value">{{ input_metrics.total_num_cells | default("--") | number_format }}</div>
             <div class="metric-label">Total Cells</div>
         </div>
         
         <div class="metric-card">
-            <div class="metric-value">{{ general.per_slide | length if general.per_slide else "--" }}</div>
-            <div class="metric-label">ROIs Analyzed</div>
+            <div class="metric-value">{{ input_metrics.total_num_annotated_cells | default("--") | number_format }}</div>
+            <div class="metric-label">Total number of labelled cells</div>
         </div>
         
         <div class="metric-card">
-            <div class="metric-value">{{ total_labels | default("--") | number_format }}</div>
-            <div class="metric-label">Labeled Training Data</div>
-        </div>
-        
-        <div class="metric-card">
-            <div class="metric-value">{{ training_cell_types | default("--") }}</div>
-            <div class="metric-label">Cell Types in Training</div>
-        </div>
-        
-        <div class="metric-card">
-            <div class="metric-value">{{ num_batches | default("--") }}</div>
-            <div class="metric-label">Batches Processed</div>
+            <div class="metric-value">{{ input_metrics.total_num_cell_types | default("--") | number_format }}</div>
+            <div class="metric-label">Number of unique labels</div>
         </div>
     </div>
 </section>
@@ -70,37 +70,35 @@
     <h3>Classification Results</h3>
     <div class="metrics-grid">
         <div class="metric-card">
-            <div class="metric-value">{{ identified_cell_types | default("--") }}</div>
+            <div class="metric-value">{{ model_metrics.training_cell_types | default("--") }}</div>
             <div class="metric-label">Cell Types Identified</div>
         </div>
         
         <div class="metric-card">
-            <div class="metric-value">{{ model_accuracy | default("--") }}{% if model_accuracy %}%{% endif %}</div>
+            <div class="metric-value">{{ model_metrics.model_accuracy | default("--") }}{% if model_accuracy %}%{% endif %}</div>
             <div class="metric-label">Model Accuracy</div>
         </div>
     </div>
 
-    {% if most_abundant_types %}
+    {% if prediction_metrics.most_common_prediction %}
     <h4>Most Abundant Cell Types</h4>
     <div style="margin-left: 1rem; color: #495057;">
-        {% for cell_type in most_abundant_types[:3] %}
-        <p><strong>{{ cell_type.name }}:</strong> {{ cell_type.percentage }}% of total cells</p>
-        {% endfor %}
+        <p><strong>{{ prediction_metrics.most_common_prediction }}:</strong> {{ prediction_metrics.most_common_percentage }}% of total cells</p>
     </div>
     {% endif %}
 
-    {% if rarest_cell_type %}
+    {% if prediction_metrics.most_rare_prediction %}
     <h4>Rarest Cell Type Detected</h4>
     <div style="margin-left: 1rem; color: #495057;">
-        <p><strong>{{ rarest_cell_type.name }}:</strong> {{ rarest_cell_type.percentage }}% of total cells</p>
+        <p><strong>{{ prediction_metrics.most_rare_prediction }}:</strong> {{ prediction_metrics.most_rare_percentage }}% of total cells</p>
     </div>
     {% endif %}
 
     <!-- Cell Type Composition Chart -->
-    {% if composition_chart %}
+    {% if prediction_metrics.abundance_plot %}
     <h4>Overall Cell Type Composition</h4>
     <div class="plot-container">
-        <img src="{{ composition_chart }}" alt="Cell Type Composition" />
+        <img src="plots/{{ prediction_metrics.abundance_plot }}" alt="Predicted Cell Type Composition" />
     </div>
     {% endif %}
 </section>

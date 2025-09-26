@@ -328,6 +328,7 @@
 
         /* Tables - Enhanced styling */
         .table-container {
+            width: 95%;
             overflow-x: auto;
             margin: 1.5rem 0;
             border-radius: 8px;
@@ -431,6 +432,82 @@
             background-color: rgba(0,123,255,.075);
         }
 
+        .roi-name {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .cell-count {
+            font-weight: 500;
+            color: #28a745;
+        }
+
+        .class-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .primary-class {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .secondary-class {
+            font-size: 0.85em;
+            color: #6c757d;
+        }
+
+        .percentage {
+            font-weight: 500;
+            color: #007bff;
+        }
+
+        .view-plots-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .view-plots-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        /* Keep the search box and table controls styles */
+        .table-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            gap: 1rem;
+        }
+
+        .search-box {
+            padding: 0.5rem 1rem;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            width: 250px;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .table-info {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
         /* Images and plots - Better proportions */
         .plot-container {
             text-align: center;
@@ -443,46 +520,9 @@
         }
 
         .plot-container img {
-            max-width: 98%;
-            max-height: 600px;
+            max-width: 95%;
             height: auto;
             border-radius: 6px;
-            object-fit: contain;
-        }
-
-        .plot-container.small img {
-            max-width: 85%;
-            max-height: 400px;
-        }
-
-        /* Large plots for detailed views */
-        .plot-container.large img {
-            max-width: 95%;
-            max-height: 600px;
-        }
-
-        .plot-container.full img {
-            max-width: 100%;
-            max-height: 800px;
-        }
-
-        /* Ultra-wide plot container for maximum space utilization */
-        .plot-container.ultra-wide {
-            padding: 0.5rem;
-            margin: 1.5rem 0;
-        }
-
-        .plot-container.ultra-wide img {
-            max-width: 100%;
-            width: 100%;
-            max-height: 900px;
-        }
-
-        .embedded-image {
-            max-width: 95%;
-            max-height: 500px;
-            height: auto;
-            border-radius: 8px;
             object-fit: contain;
         }
 
@@ -706,10 +746,6 @@
             .header {
                 background: #667eea !important;
                 -webkit-print-color-adjust: exact;
-            }
-
-            .plot-container img {
-                max-height: 400px;
             }
         }
     </style>
