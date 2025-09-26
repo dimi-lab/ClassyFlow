@@ -480,7 +480,7 @@ def apply_boxcox_transform(df, batch_name, target_feature):
     df_transformed = df.fillna(0).copy()
     lambda_values = {}
     stat_cols = list(df_transformed.filter(regex='(Min|Max|Median|Mean|Std*|Variance|Area)'))
-    
+
     for col in stat_cols:
         col_values = df_transformed[col].dropna()
         if col_values.empty:
@@ -593,7 +593,7 @@ def main():
         df_transformed, results = apply_boxcox_transform(df, args.batchID, args.targetFeature)
     elif args.method == 'none':
         df_transformed = df
-        results = None   
+        results = "{}"   
     else:
         raise ValueError(f"Unknown method: {args.method}")
     

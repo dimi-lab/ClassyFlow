@@ -138,7 +138,6 @@ process GENERATE_TRAINING_N_HOLDOUT{
     
 	input:
 	path(norms_pkl_collected)
-    path(letterhead_file)
 
 	output:
     path("holdout_dataframe.pkl"), emit: holdout
@@ -186,49 +185,15 @@ process PREDICT_ALL_CELLS_XGB{
     """
 }
 
-process CLASSIFIED_REPORT_PER_SLIDE {
-    publishDir(
-        path: "${params.output_dir}/celltype_reports",
-        pattern: "*.html",
-        mode: "copy"
-    )
-
-    publishDir(
-        path: "${params.output_dir}/final_reports/plots",
-        pattern: "*_spatial_plot.html",
-        mode: "copy"
-    )
-
-    publishDir(
-        path: "${params.output_dir}/final_reports/plots",
-        pattern: "*_celltype_barplot.png",
-        mode: "copy"
-    )
-    
-    input:
-    path(prediction_tsv)
-
-    output:
-    path("*.html"), emit: slide_reports
-    tuple path("*.json"), path("*_spatial_plot.html"), path("*_celltype_barplot.png"), emit: slide_results
-
-    script:
-    """
-    generate_classified_report.py \
-        --input_tsv ${prediction_tsv} \
-        --output_html \$(basename ${prediction_tsv} .tsv)_report.html
-    """
-}
-
 process QC_DENSITY {
-    tag { prediction_tsv.baseName }
+   tag { sampleID }
     publishDir "${params.output_dir}/celltypes", pattern: "*_qPRED.tsv", mode: "copy", overwrite: true
 
     input:
-    path(prediction_tsv)
+    tuple val(sampleID), path(prediction_tsv)    
 
     output:
-    path("*.tsv"), emit: qc_predictions
+    tuple val(sampleID), path("*.tsv"), emit: qc_predictions
 
     script:
     """
@@ -239,69 +204,56 @@ process QC_DENSITY {
     """
 }
 
-process SUMMARIZE_PREDICTIONS {
+process CLASSIFIED_REPORT_PER_SLIDE {
+    publishDir(
+        path: "${params.output_dir}/final_reports/pages",
+        pattern: "*_prediction_report.html",
+        mode: "copy"
+    )
+    
     input:
-    path(prediction_files)
+    tuple val(sampleID), path(prediction_tsv)
 
     output:
-    tuple path("abundance_metrics.json"), path("prediction_abundance_plot.png"), path("*_summary_stats.json"), emit: abundance_results
-    path("summary_metrics.json"), emit: summary_metrics
+    path("*_prediction_report.html")
+    path("*_classified.json"), emit: slide_results
 
     script:
     """
-    generate_predictions_summary.py --input_dir ./
-
-    """
-}
-
-process GENERATE_ROI_DETAIL_PAGES {
-    publishDir "${params.output_dir}/final_reports/pages", pattern: "*_detail.html", mode: 'copy', overwrite: true
-    publishDir "${params.output_dir}/final_reports/pages", pattern: "roi_filename_mapping.json", mode: 'copy', overwrite: true
-    
-    input:
-    path(abundance_results, stageAs: "abundance/*")
-    path(classified_results, stageAs: "classified/*")
-    
-    output:
-    path("*_detail.html"), emit: roi_pages
-    path("roi_filename_mapping.json"), emit: roi_mapping
-    
-    script:
-    """
-    generate_roi_detail_pages.py --abundance_dir abundance/ --classified_dir classified/ --output_dir ./
+    generate_classified_report.py \
+        --input_tsv ${prediction_tsv} \
+        --output_html ${sampleID}_prediction_report.html
     """
 }
 
 process GENERATE_FINAL_REPORT {
     publishDir "${params.output_dir}/final_reports", pattern: "*.html", mode: 'copy', overwrite: true
+    publishDir "${params.output_dir}/final_repoers/plots", pattern: "prediction_abundance_plot.png", mode: 'copy', overwrite: true
     publishDir "${params.output_dir}/final_reports/pages/", pattern: "nextflow.config", mode: 'copy', overwrite: true
     
     input:
-    path(missing_files, stageAs: "general/*")
-    path(split_files, stageAs: "general/*")
+    path(split_jsons)
     path(norm_html)
     path(fs_html) 
     path(model_html)
-    path(abundance_results, stageAs: "general/*")
-    path(classified_results), stageAs: "general/per_slide/*"
-    path(summary_json, stageAs: "summary_metrics.json")
-    path(model_summary_json, stageAs: "model_summary.json") 
-    path(norm_summary_json, stageAs: "normalization_summary.json")
+    path(model_summary_json)
+    path(classified_results, stageAs: "pred_results/*")
+    path(pediction_results, stageAs: "pred_results/*")
     path(template_dir)
     path(letterhead_file)
     path(nf_config, stageAs: "nextflow.config")
-    path(roi_mapping, stageAs: "roi_filename_mapping.json")
 
     output:
     path("classyflow_report.html")
 
     script:
     """
-    generate_final_report.py --template-dir ${template_dir} \
-                            --report-name classyflow_report.html \
-                            --letterhead ${letterhead_file} \
-                            --version ${params.pipeline_version} \
-                            --roi-mapping roi_filename_mapping.json
+    generate_final_report.py \
+        --pred-dir ./pred_results \
+        --template-dir ${template_dir} \
+        --report-name classyflow_report.html \
+        --letterhead ${letterhead_file} \
+        --version ${params.pipeline_version}
     """
 
 }
@@ -312,14 +264,14 @@ process ZIP_PUBLISHED {
 
     input:
     val trigger
-    path("final_reports")
+    path(final_dir)
 
     output:
     path "final_reports.zip"
 
     script:
     """
-    zip -r final_reports.zip final_reports
+    zip -r final_reports.zip $final_dir
     """
 }
 
@@ -351,7 +303,7 @@ workflow {
         normalized_output = normalization_wf(ADD_EMPTY_MARKER_NOISE.output.modbatchtables)
         normalizedDataFrames = normalized_output.normalized
         
-        labledDataFrames = GENERATE_TRAINING_N_HOLDOUT(normalizedDataFrames.map{ it[1] }.collect(), params.letterhead)
+        labledDataFrames = GENERATE_TRAINING_N_HOLDOUT(normalizedDataFrames.map{ it[1] }.collect())
         
         /*
         * - Subworkflow to examine Cell Type Specific interpetability & Feature Selections - 
@@ -366,55 +318,46 @@ workflow {
         bestModel = modeling_results.best_model_results
         
         // Run the best model on the full input batches/files 
-        PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
+        prediction_results = PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
 
-        QC_DENSITY(PREDICT_ALL_CELLS_XGB.output.predictions.flatten())
+        prediction_results.predictions
+            .flatten() 
+            .map { file ->
+                def sampleID = file.getBaseName().split('\\.')[0]
+                [sampleID, file]
+            }
+            .set { prediction_tuples }
+
+        qc_density = QC_DENSITY(prediction_tuples)
         // Overwrite predictions with QC-augmented files for downstream steps
-        predictions_for_report = QC_DENSITY.output.qc_predictions.flatten()
+        predictions_for_report = qc_density.qc_predictions
     
         // Generate a comprehensive HTML report for each prediction file
-        CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
-
-        // Generate summary statistics and plots for all predictions
-        SUMMARIZE_PREDICTIONS(predictions_for_report.collect())
+        classified_report = CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
 
         // Generate final HTML report for the whole run
-        missing_outputs = ADD_EMPTY_MARKER_NOISE.output.empty_marker_results.flatten().collect()
         split_outputs = labledDataFrames.training_holdout_results.flatten().collect()
 
-        prediction_results = SUMMARIZE_PREDICTIONS.output.abundance_results
-            .flatten()
+        prediction_results = predictions_for_report.map {id, file -> file }
             .collect()
         
-        classified_results = CLASSIFIED_REPORT_PER_SLIDE.output.slide_results
-            .flatten()
+        classified_results = classified_report.slide_results
             .collect()
-
-        // Generate individual ROI detail pages
-        GENERATE_ROI_DETAIL_PAGES(
-            SUMMARIZE_PREDICTIONS.output.abundance_results.flatten().collect(),
-            classified_results
-        )
 
         // Pass all to reporting including summary JSONs
         final_report = GENERATE_FINAL_REPORT(
-            missing_outputs,
             split_outputs,
             normalized_output.report,
             feature_selection_results.report, 
             modeling_results.report,
-            prediction_results,
-            classified_results,
-            SUMMARIZE_PREDICTIONS.output.summary_metrics,
             modeling_results.model_summary,
-            normalized_output.norm_summary,
+            classified_results,
+            prediction_results,
             params.html_template,
             params.letterhead,
-            params.config_file,
-            GENERATE_ROI_DETAIL_PAGES.output.roi_mapping
+            params.config_file
         )
-
-        ZIP_PUBLISHED(final_report.map {"done"}, "${params.output_dir}/final_reports")
+        ZIP_PUBLISHED(final_report.map {"done"}, file("${params.output_dir}/final_reports"))
     }
     
 }

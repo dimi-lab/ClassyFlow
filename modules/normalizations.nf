@@ -9,7 +9,8 @@ process NORMALIZATION {
     
     output:
     tuple val(batchID), path("*_transformed_${batchID}.tsv"), emit: norm_df
-    tuple val(batchID), path ("*_results_${batchID}.json"), optional: true, emit: norm_results
+    tuple val(batchID), path ("*_results_${batchID}.json"), emit: norm_results
+    path("*_all_plots_${batchID}.html")
     
     script:
     """
@@ -80,7 +81,7 @@ process GENERATE_NORM_REPORT {
     //publishDir "${params.output_dir}/final_reports/", pattern: "normalization_report.html", mode: 'copy'
 
     input:
-    tuple val(batchID), path(json_files)
+    path(files)
     path(html_template)
 
     output:
@@ -89,10 +90,10 @@ process GENERATE_NORM_REPORT {
 
     script:
     """
+    echo "Template inside process ------> $html_template"
     generate_normalization_report.py \
-            ${params.override_normalization == 'none' ? '--no-normalization' : ''}
             --output-file normalization_report.html \
-            --template-dir ${html_template}
+            --template-dir ${html_template} ${params.override_normalization == 'none' ? '--no-normalization' : ''}
     """
 }
 
@@ -121,13 +122,11 @@ workflow normalization_wf {
         final_ch = gated_ch
     }
 
-    norm_outputs = norm_results.norm_results.collect()
-
-    norm_report = GENERATE_NORM_REPORT(norm_outputs, params.html_template)
+    norm_outputs = norm_results.norm_results.map { batchID, file -> file }.collect()
+    norm_report = GENERATE_NORM_REPORT(norm_outputs, "${params.html_template}")
 
     emit:
     normalized = final_ch
     report = norm_report.norm_html
-    norm_summary = norm_report.norm_summary
 }
 
