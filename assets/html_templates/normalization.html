@@ -174,125 +174,295 @@
     <!-- Batch Content Panels -->
     {% for batch_result in normalization_data.normalization_results %}
     <div id="batch-{{ loop.index0 }}" class="batch-content {% if loop.first %}active{% endif %}">
+        
         <!-- Three Tables Side by Side -->
+        <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+            
+            <!-- Table 1: Batch Overview -->
+            <div class="table-container inline-third" style="flex: 1; min-width: 300px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th colspan="2">Batch Overview</th>
+                        </tr>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Cells in Batch</td>
+                            <td>{{ batch_result.data.total_cells | number_format }}</td>
+                        </tr>
+                        <tr>
+                            <td>Number of ROIs</td>
+                            <td>{{ batch_result.data.total_slides | default("N/A") }}</td>
+                        </tr>
+                        <tr>
+                            <td>Transformation Type</td>
+                            <td>{{ batch_result.data.transformation_type | title }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
 
-        <!-- Table 1: Batch Overview -->
-        <div class="table-container inline-third">
-            <table>
-                <thead>
-                    <tr>
-                        <th colspan="2">{{ batch_result.data.transformation_type | title }} Transform Details</th>
-                    </tr>
-                    <tr>
-                        <th>Parameter</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Transform Function</td>
-                        <td>log(x + 1)</td>
-                    </tr>
-                    <tr>
-                        <td>Features Transformed</td>
-                        <td>{{ batch_result.data.total_markers | default("All") }}</td>
-                    </tr>
-                    <tr>
-                        <td>Status</td>
-                        <td>Applied</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
+            <!-- Table 2: Transformation-specific Metrics -->
+            <div class="table-container inline-third" style="flex: 1; min-width: 300px;">
+                {% if batch_result.data.transformation_type == "boxcox" and batch_result.data.boxcox_metrics %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th colspan="2">Box-Cox Metrics</th>
+                        </tr>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <div class="tooltip">
+                                    Successful Transforms
+                                    <span class="tooltiptext">Number of features that were successfully transformed using Box-Cox normalization.</span>
+                                </div>
+                            </td>
+                            <td>{{ batch_result.data.boxcox_metrics.successful_transforms }}/{{ batch_result.data.boxcox_metrics.total_features }}</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="tooltip">
+                                    Failed Transforms
+                                    <span class="tooltiptext">Number of features where Box-Cox transformation failed, typically due to negative values or other data issues.</span>
+                                </div>
+                            </td>
+                            <td>{{ batch_result.data.boxcox_metrics.failed_transforms }}</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="tooltip">
+                                    Mean Lambda
+                                    <span class="tooltiptext">Average lambda parameter used in the Box-Cox transformation across all features.</span>
+                                </div>
+                            </td>
+                            <td>{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.mean_lambda) if batch_result.data.boxcox_metrics.lambda_stats.mean_lambda else "N/A" }}</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="tooltip">
+                                    Median Lambda
+                                    <span class="tooltiptext">Median lambda parameter, providing a robust measure of the typical transformation applied.</span>
+                                </div>
+                            </td>
+                            <td>{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.median_lambda) if batch_result.data.boxcox_metrics.lambda_stats.median_lambda else "N/A" }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                {% elif batch_result.data.transformation_type == "quantile" %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th colspan="2">Quantile Transform Details</th>
+                        </tr>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Quantile Splits</td>
+                            <td>{{ batch_result.data.quantile_splits | default("100") }}</td>
+                        </tr>
+                        <tr>
+                            <td>Distribution</td>
+                            <td>Uniform</td>
+                        </tr>
+                        <tr>
+                            <td>Features Transformed</td>
+                            <td>{{ batch_result.data.total_markers | default("All") }}</td>
+                        </tr>
+                        <tr>
+                            <td>Status</td>
+                            <td>Applied</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                {% elif batch_result.data.transformation_type == "minmax" %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th colspan="2">MinMax Scaling Details</th>
+                        </tr>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Feature Range</td>
+                            <td>(-2, 2)</td>
+                        </tr>
+                        <tr>
+                            <td>Features Scaled</td>
+                            <td>{{ batch_result.data.minmax_metrics.total_features_transformed | default("All") }}</td>
+                        </tr>
+                        <tr>
+                            <td>Min Value Achieved</td>
+                            <td>{{ "%.3f" | format(batch_result.data.minmax_metrics.scaling_stats.min_transformed_value) if batch_result.data.minmax_metrics else "N/A" }}</td>
+                        </tr>
+                        <tr>
+                            <td>Max Value Achieved</td>
+                            <td>{{ "%.3f" | format(batch_result.data.minmax_metrics.scaling_stats.max_transformed_value) if batch_result.data.minmax_metrics else "N/A" }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                {% elif batch_result.data.transformation_type == "log" %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th colspan="2">{{ batch_result.data.transformation_type | title }} Transform Details</th>
+                        </tr>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Transform Function</td>
+                            <td>log(x + 1)</td>
+                        </tr>
+                        <tr>
+                            <td>Features Transformed</td>
+                            <td>{{ batch_result.data.total_markers | default("All") }}</td>
+                        </tr>
+                        <tr>
+                            <td>Status</td>
+                            <td>Applied</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                {% else %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th colspan="2">Transform Details</th>
+                        </tr>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Transformation Type</td>
+                            <td>{{ batch_result.data.transformation_type | title }}</td>
+                        </tr>
+                        <tr>
+                            <td>Features Transformed</td>
+                            <td>{{ batch_result.data.total_markers | default("All") }}</td>
+                        </tr>
+                        <tr>
+                            <td>Status</td>
+                            <td>Applied</td>
+                        </tr>
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
 
-        <!-- Table 3: Coefficient of Variation Improvement -->
-        {% if batch_result.data.cv_metrics %}
-        <div class="table-container inline-third">
-            <table>
-                <thead>
-                    <tr>
-                        <th colspan="2">
-                            CV Improvement
-                        </th>
-                    </tr>
-                    <tr>
-                        <th>Metric</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>
-                            <div class="tooltip">
-                                Mean CV Improvement
-                                <span class="tooltiptext">Average improvement in coefficient of variation after normalization. Positive values indicate reduced variability.</span>
-                            </div>
-                        </td>
-                        <td>{{ "%.3f" | format(batch_result.data.cv_metrics.mean_cv_improvement) if batch_result.data.cv_metrics.mean_cv_improvement else "N/A" }}</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="tooltip">
-                                Median CV Improvement
-                                <span class="tooltiptext">Median improvement in coefficient of variation, providing a robust measure of normalization effectiveness.</span>
-                            </div>
-                        </td>
-                        <td>{{ "%.3f" | format(batch_result.data.cv_metrics.median_cv_improvement) if batch_result.data.cv_metrics.median_cv_improvement else "N/A" }}</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="tooltip">
-                                Markers Improved
-                                <span class="tooltiptext">Number of markers that showed improvement (reduced coefficient of variation) after normalization.</span>
-                            </div>
-                        </td>
-                        <td>{{ batch_result.data.cv_metrics.markers_improved }}</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="tooltip">
-                                Markers Worsened
-                                <span class="tooltiptext">Number of markers that showed worsening (increased coefficient of variation) after normalization.</span>
-                            </div>
-                        </td>
-                        <td>{{ batch_result.data.cv_metrics.markers_worsened }}</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="tooltip">
-                                Worst Performers
-                                <span class="tooltiptext">Markers that showed the poorest normalization results and may require special attention.</span>
-                            </div>
-                        </td>
-                        <td style="font-size: 0.85em;">{{ batch_result.worst_performing_markers }}</td>
-                    </tr>
-                </tbody>
-            </table>
+            <!-- Table 3: Coefficient of Variation Improvement -->
+            <div class="table-container inline-third" style="flex: 1; min-width: 300px;">
+                {% if batch_result.data.cv_metrics %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th colspan="2">CV Improvement</th>
+                        </tr>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <div class="tooltip">
+                                    Mean CV Improvement
+                                    <span class="tooltiptext">Average improvement in coefficient of variation after normalization. Positive values indicate reduced variability.</span>
+                                </div>
+                            </td>
+                            <td>{{ "%.3f" | format(batch_result.data.cv_metrics.mean_cv_improvement) if batch_result.data.cv_metrics.mean_cv_improvement else "N/A" }}</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="tooltip">
+                                    Median CV Improvement
+                                    <span class="tooltiptext">Median improvement in coefficient of variation, providing a robust measure of normalization effectiveness.</span>
+                                </div>
+                            </td>
+                            <td>{{ "%.3f" | format(batch_result.data.cv_metrics.median_cv_improvement) if batch_result.data.cv_metrics.median_cv_improvement else "N/A" }}</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="tooltip">
+                                    Markers Improved
+                                    <span class="tooltiptext">Number of markers that showed improvement (reduced coefficient of variation) after normalization.</span>
+                                </div>
+                            </td>
+                            <td>{{ batch_result.data.cv_metrics.markers_improved }}</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="tooltip">
+                                    Markers Worsened
+                                    <span class="tooltiptext">Number of markers that showed worsening (increased coefficient of variation) after normalization.</span>
+                                </div>
+                            </td>
+                            <td>{{ batch_result.data.cv_metrics.markers_worsened }}</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="tooltip">
+                                    Worst Performers
+                                    <span class="tooltiptext">Markers that showed the poorest normalization results and may require special attention.</span>
+                                </div>
+                            </td>
+                            <td style="font-size: 0.85em;">{{ batch_result.worst_performing_markers }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                {% else %}
+                <!-- Placeholder table when CV metrics aren't available -->
+                <table>
+                    <thead>
+                        <tr>
+                            <th colspan="2">CV Analysis</th>
+                        </tr>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="2" style="text-align: center; font-style: italic; color: #6c757d;">
+                                CV improvement metrics not available for this batch
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
+            
         </div>
-        {% else %}
-        <!-- Placeholder table when CV metrics aren't available -->
-        <div class="table-container inline-third">
-            <table>
-                <thead>
-                    <tr>
-                        <th colspan="2">CV Analysis</th>
-                    </tr>
-                    <tr>
-                        <th>Metric</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td colspan="2" style="text-align: center; font-style: italic; color: #6c757d;">
-                            CV improvement metrics not available for this batch
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
 
         <!-- Visualization Plots and Link to Transformation Plots -->
         <div class="header-with-tooltip">
@@ -307,42 +477,29 @@
 
         <div style="display: flex; flex-direction: column; gap: 2rem;">
 
-        {% if batch_result.data.slide_boxplots %}
-        <div class="plot-container small">
-            <div class="plot-title">Slide-wise Distribution Comparison</div>
-            <img src="{{ batch_result.data.slide_boxplots }}" alt="Slide Boxplots" class="embedded-image" />
+            {% if batch_result.transformation_plots_html %}
+            <div style="text-align: center; margin: 2rem 0;">
+                <a href="{{ batch_result.transformation_plots_html }}" target="_blank" class="transformation-link">
+                    View All Transformation Plots →
+                </a>
+                <p style="margin-top: 0.5rem; color: #6c757d; font-size: 0.9em;">
+                    Interactive visualization of all marker transformations with detailed statistics
+                </p>
+            </div>
+            {% endif %}
+            
+            {% if batch_result.gmm_gating_report %}
+            <div style="text-align: center; margin: 1rem 0;">
+                <a href="{{ batch_result.gmm_gating_report }}" target="_blank" class="transformation-link" style="background-color: #28a745;">
+                    View GMM Gating Report →
+                </a>
+                <p style="margin-top: 0.5rem; color: #6c757d; font-size: 0.9em;">
+                    Gaussian Mixture Model gating analysis and threshold determination
+                </p>
+            </div>
+            {% endif %}
+            
         </div>
-        {% endif %}
-
-        {% if batch_result.data.cv_heatmap %}
-        <div class="plot-container small">
-            <div class="plot-title">CV Improvement Heatmap</div>
-            <img src="{{ batch_result.data.cv_heatmap }}" alt="CV Improvement Heatmap" class="embedded-image" />
-        </div>
-        {% endif %}
-
-        {% if batch_result.transformation_plots_html %}
-        <div style="text-align: center; margin: 2rem 0;">
-            <a href="{{ batch_result.transformation_plots_html }}" target="_blank" class="transformation-link">
-                View All Transformation Plots →
-            </a>
-            <p style="margin-top: 0.5rem; color: #6c757d; font-size: 0.9em;">
-                Interactive visualization of all marker transformations with detailed statistics
-            </p>
-        </div>
-        {% endif %}
-        
-        {% if batch_result.gmm_gating_report %}
-        <div style="text-align: center; margin: 1rem 0;">
-            <a href="{{ batch_result.gmm_gating_report }}" target="_blank" class="transformation-link" style="background-color: #28a745;">
-                View GMM Gating Report →
-            </a>
-            <p style="margin-top: 0.5rem; color: #6c757d; font-size: 0.9em;">
-                Gaussian Mixture Model gating analysis and threshold determination
-            </p>
-        </div>
-        {% endif %}
-    </div>
     </div>
     {% endfor %}
 </section>
@@ -393,148 +550,4 @@ function showBatch(batchId) {
 </section>
 {% endif %}
 
-</div>>
-                        <th colspan="2">Batch Overview</th>
-                    </tr>
-                    <tr>
-                        <th>Metric</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Cells in Batch</td>
-                        <td>{{ batch_result.data.total_cells | number_format }}</td>
-                    </tr>
-                    <tr>
-                        <td>Number of ROIs</td>
-                        <td>{{ batch_result.data.total_slides | default("N/A") }}</td>
-                    </tr>
-                    <tr>
-                        <td>Transformation Type</td>
-                        <td>{{ batch_result.data.transformation_type | title }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Table 2: Transformation-specific Metrics -->
-        {% if batch_result.data.transformation_type == "boxcox" and batch_result.data.boxcox_metrics %}
-        <div class="table-container inline-third">
-            <table>
-                <thead>
-                    <tr>
-                        <th colspan="2">
-                            Box-Cox Metrics
-                        </th>
-                    </tr>
-                    <tr>
-                        <th>Parameter</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>
-                            <div class="tooltip">
-                                Successful Transforms
-                                <span class="tooltiptext">Number of features that were successfully transformed using Box-Cox normalization.</span>
-                            </div>
-                        </td>
-                        <td>{{ batch_result.data.boxcox_metrics.successful_transforms }}/{{ batch_result.data.boxcox_metrics.total_features }}</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="tooltip">
-                                Failed Transforms
-                                <span class="tooltiptext">Number of features where Box-Cox transformation failed, typically due to negative values or other data issues.</span>
-                            </div>
-                        </td>
-                        <td>{{ batch_result.data.boxcox_metrics.failed_transforms }}</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="tooltip">
-                                Mean Lambda
-                                <span class="tooltiptext">Average lambda parameter used in the Box-Cox transformation across all features.</span>
-                            </div>
-                        </td>
-                        <td>{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.mean_lambda) if batch_result.data.boxcox_metrics.lambda_stats.mean_lambda else "N/A" }}</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="tooltip">
-                                Median Lambda
-                                <span class="tooltiptext">Median lambda parameter, providing a robust measure of the typical transformation applied.</span>
-                            </div>
-                        </td>
-                        <td>{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.median_lambda) if batch_result.data.boxcox_metrics.lambda_stats.median_lambda else "N/A" }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        {% elif batch_result.data.transformation_type == "quantile" %}
-        <div class="table-container inline-third">
-            <table>
-                <thead>
-                    <tr>
-                        <th colspan="2">Quantile Transform Details</th>
-                    </tr>
-                    <tr>
-                        <th>Parameter</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Quantile Splits</td>
-                        <td>{{ batch_result.data.quantile_splits | default("100") }}</td>
-                    </tr>
-                    <tr>
-                        <td>Distribution</td>
-                        <td>Uniform</td>
-                    </tr>
-                    <tr>
-                        <td>Features Transformed</td>
-                        <td>{{ batch_result.data.total_markers | default("All") }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        {% elif batch_result.data.transformation_type == "minmax" %}
-        <div class="table-container inline-third">
-            <table>
-                <thead>
-                    <tr>
-                        <th colspan="2">MinMax Scaling Details</th>
-                    </tr>
-                    <tr>
-                        <th>Parameter</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Feature Range</td>
-                        <td>(-2, 2)</td>
-                    </tr>
-                    <tr>
-                        <td>Features Scaled</td>
-                        <td>{{ batch_result.data.minmax_metrics.total_features_transformed | default("All") }}</td>
-                    </tr>
-                    <tr>
-                        <td>Min Value Achieved</td>
-                        <td>{{ "%.3f" | format(batch_result.data.minmax_metrics.scaling_stats.min_transformed_value) if batch_result.data.minmax_metrics else "N/A" }}</td>
-                    </tr>
-                    <tr>
-                        <td>Max Value Achieved</td>
-                        <td>{{ "%.3f" | format(batch_result.data.minmax_metrics.scaling_stats.max_transformed_value) if batch_result.data.minmax_metrics else "N/A" }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="table-container inline-third">
-            <table>
-                <thead>
-                    <tr
+</div>
