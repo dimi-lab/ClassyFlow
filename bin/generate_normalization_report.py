@@ -388,6 +388,7 @@ def main():
         logger.warning("No normalization results found. The report will be empty.")
     
     # Set up Jinja2 environment
+    print(args.template_dir)
     jinja_env = setup_jinja_environment(str(args.template_dir))
     
     # Generate the report
