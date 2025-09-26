@@ -35,14 +35,3 @@ RUN curl -s https://get.nextflow.io | bash && \
 
 # Cleanup to reduce image size
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
-WORKDIR /app
-
-COPY bin/ /app/bin
-COPY conf/ /app/conf
-COPY data/ /app/data
-COPY assets/ /app/assets
-COPY main.nf /app/main.nf
-COPY modules/ /app/modules
-COPY nextflow.config /app/nextflow.config
