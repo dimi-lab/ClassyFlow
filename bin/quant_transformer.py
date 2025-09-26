@@ -535,7 +535,9 @@ def apply_boxcox_transform(df, batch_name, target_feature):
         'boxcox_metrics': {
             'total_features': len(boxcox_metrics),
             'successful_transforms': len(boxcox_metrics[boxcox_metrics['Lambda'] != 'Failed']),
-            'failed_transforms': len(boxcox_metrics[boxcox_metrics['Lambda'] == 'Failed'])
+            'failed_transforms': len(boxcox_metrics[boxcox_metrics['Lambda'] == 'Failed']),
+            'mean_lambda': boxcox_metrics[boxcox_metrics['Lambda'] != 'Failed']['Lambda'].astype(float).mean(),
+            'median_lambda': boxcox_metrics[boxcox_metrics['Lambda'] != 'Failed']['Lambda'].astype(float).median()
         },
         'cv_metrics': {
             'mean_cv_improvement': cv_df['cv_improvement'].mean(),

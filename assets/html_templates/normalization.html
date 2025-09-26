@@ -246,7 +246,7 @@
                                     <span class="tooltiptext">Average lambda parameter used in the Box-Cox transformation across all features.</span>
                                 </div>
                             </td>
-                            <td>{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.mean_lambda) if batch_result.data.boxcox_metrics.lambda_stats.mean_lambda else "N/A" }}</td>
+                            <td>{{ "%.3f" | format(batch_result.data.boxcox_metrics.mean_lambda) if batch_result.data.boxcox_metrics.mean_lambda else "N/A" }}</td>
                         </tr>
                         <tr>
                             <td>
@@ -255,7 +255,7 @@
                                     <span class="tooltiptext">Median lambda parameter, providing a robust measure of the typical transformation applied.</span>
                                 </div>
                             </td>
-                            <td>{{ "%.3f" | format(batch_result.data.boxcox_metrics.lambda_stats.median_lambda) if batch_result.data.boxcox_metrics.lambda_stats.median_lambda else "N/A" }}</td>
+                            <td>{{ "%.3f" | format(batch_result.data.boxcox_metrics.median_lambda) if batch_result.data.boxcox_metrics.median_lambda else "N/A" }}</td>
                         </tr>
                     </tbody>
                 </table>
