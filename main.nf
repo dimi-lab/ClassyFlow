@@ -244,7 +244,7 @@ process GENERATE_FINAL_REPORT {
     path(nf_config, stageAs: "nextflow.config")
 
     output:
-    path("classyflow_report.html")
+    path("classyflow_report.html"), emit: report_done
     path("prediction_abundance_plot.png")
     path("nextflow.config")
 
@@ -359,7 +359,7 @@ workflow {
             params.letterhead,
             params.config_file
         )
-        ZIP_PUBLISHED(final_report.map {"done"}, file("${params.output_dir}/final_reports"))
+        ZIP_PUBLISHED(final_report.report_done.map {"done"}, file("${params.output_dir}/final_reports"))
     }
     
 }
