@@ -17,12 +17,12 @@
             <div class="metric-label">Cell Types Analyzed</div>
         </div>
         <div class="metric-card">
-            <div class="metric-value">{{ feature_selection_data.summary_statistics.avg_original_features }}</div>
-            <div class="metric-label">Avg Original Features</div>
+            <div class="metric-value">{{ feature_selection_data.summary_statistics.unique_original_features }}</div>
+            <div class="metric-label">Total Unique Features</div>
         </div>
         <div class="metric-card">
-            <div class="metric-value">{{ feature_selection_data.summary_statistics.avg_selected_features }}</div>
-            <div class="metric-label">Avg Selected Features</div>
+            <div class="metric-value">{{ feature_selection_data.summary_statistics.unique_selected_features }}</div>
+            <div class="metric-label">Unique Selected Features</div>
         </div>
         <div class="metric-card">
             <div class="metric-value">{{ feature_selection_data.summary_statistics.avg_reduction_rate }}%</div>
@@ -176,16 +176,6 @@
         <div class="metrics-grid">
             <div class="metric-card">
                 <div class="tooltip">
-                    <div class="metric-value">{{ celltype_result.data.feature_selection_summary.original_features }}</div>
-                    <div class="metric-label">Original Features</div>
-                    <span class="tooltiptext">
-                        Number of features available before feature selection for this cell type.
-                    </span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="tooltip">
                     <div class="metric-value">{{ celltype_result.data.feature_selection_summary.non_variant_removed | default("N/A") }}</div>
                     <div class="metric-label">Non-Variant Removed</div>
                     <span class="tooltiptext">
@@ -260,7 +250,7 @@
 
         <div style="display: flex; flex-direction: column; gap: 2rem;">
             {% if celltype_result.data.feature_ranking_plot_path %}
-            <div class="plot-container full">
+            <div class="plot-container">
                 <div class="plot-title">Feature Ranking with Selection Cutoff</div>
                 <img src="plots/{{ celltype_result.data.feature_ranking_plot_path }}" alt="Feature Ranking Plot" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
@@ -270,7 +260,7 @@
             {% endif %}
 
             {% if celltype_result.data.rfe_plot_path %}
-            <div class="plot-container large">
+            <div class="plot-container">
                 <div class="plot-title">Recursive Feature Elimination</div>
                     <img src="plots/{{ celltype_result.data.rfe_plot_path }}" alt="RFE Analysis Plot" class="embedded-image" />
                     <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
@@ -280,7 +270,7 @@
             {% endif %}
 
             {% if celltype_result.data.correlation_matrix_path %}
-            <div class="plot-container large">
+            <div class="plot-container">
                 <div class="plot-title">Feature Correlation Matrix</div>
                 <img src="plots/{{ celltype_result.data.correlation_matrix_path }}" alt="Correlation Matrix" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
@@ -290,7 +280,7 @@
             {% endif %}
 
             {% if celltype_result.data.tile_plot_path %}
-            <div class="plot-container large">
+            <div class="plot-container">
                 <div class="plot-title">Selected Features Heatmap</div>
                 <img src="plots/{{ celltype_result.data.tile_plot_path }}" alt="Feature Heatmap" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">

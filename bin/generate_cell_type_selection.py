@@ -70,7 +70,7 @@ def plot_feature_ranking_with_cutoff(featureRankDF, output_path, cutoff_n, top_n
     top_features = featureRankDF.nlargest(top_n, columns="score").sort_values(by="score", ascending=True)
     
     # Create figure
-    fig, ax = plt.subplots(figsize=(12, max(8, top_n * 0.3)))
+    fig, ax = plt.subplots(figsize=(16, max(10, top_n * 0.4)))
     
     # Determine colors based on cutoff
     colors = []
@@ -174,8 +174,8 @@ def plot_improved_rfe(rfeTbl, summary_df, output_path, optimal_n):
     categories = sorted(rfeTbl['n_features'].unique())
     grouped_data = [rfeTbl[rfeTbl['n_features'] == cat]['rfe_score'] for cat in categories]
     
-    # Create figure with better proportions
-    fig, ax = plt.subplots(figsize=(12, 7))
+    # Create figure with better proportions for page width utilization
+    fig, ax = plt.subplots(figsize=(16, 8))
     
     # Create violin plots for better distribution visualization
     parts = ax.violinplot(grouped_data, positions=range(len(categories)), 
@@ -208,7 +208,7 @@ def plot_improved_rfe(rfeTbl, summary_df, output_path, optimal_n):
     ax.fill_between(x_pos, 
                     [m - s for m, s in zip(mean_scores, std_scores)],
                     [m + s for m, s in zip(mean_scores, std_scores)],
-                    alpha=0.2, color='blue', label='±1 std')
+                    alpha=0.2, color='lightgrey', label='±1 std')
     
     # Highlight optimal region
     optimal_idx = categories.index(optimal_n)
@@ -244,7 +244,7 @@ def plot_improved_rfe(rfeTbl, summary_df, output_path, optimal_n):
                 bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7))
     
     # Add legend
-    ax.legend(loc='best', fontsize=10, frameon=True, fancybox=True, shadow=True)
+    ax.legend(loc='upper right', fontsize=10, frameon=True, fancybox=True, shadow=True)
     
     # Tight layout
     plt.tight_layout()
@@ -279,7 +279,7 @@ def create_feature_correlation_matrix(df, selected_features, output_path, cellty
     corr_matrix = df[features_to_plot].corr()
     
     # Create figure
-    fig, ax = plt.subplots(figsize=(12, 10))
+    fig, ax = plt.subplots(figsize=(16, 12))
     
     # Create heatmap
     mask = np.triu(np.ones_like(corr_matrix, dtype=bool), k=1)
@@ -355,7 +355,7 @@ def analyze_feature_stability(df, selected_features, n_folds, output_path, cellt
     stability_scores = {feat: freq/n_folds * 100 for feat, freq in feature_frequency.items()}
     
     # Create stability plot
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(16, 8))
     
     # Sort features by stability
     sorted_features = sorted(stability_scores.items(), key=lambda x: x[1], reverse=True)
@@ -568,33 +568,56 @@ def get_lasso_classification_features(
     if stability_scores:
         results['feature_stability'] = {k: float(v) for k, v in stability_scores.items()}
 
-    # Generate tile plot (heatmap) of selected features vs Lasso_Binary
-    print("\nGenerating tile plot (heatmap) of selected features vs Lasso_Binary...")
+    # Generate tile plot (heatmap) of top 35 features with selected features marked
+    print("\nGenerating tile plot (heatmap) of top 35 features vs Lasso_Binary...")
     
-    # Use only selected features for the tile plot
-    available_selected = [f for f in selected_features if f in df.columns]
-    if available_selected:
-        tile_data = df.groupby('Lasso_Binary')[available_selected].mean()
+    # Get top 35 features from feature ranking
+    top_35_features = featureRankDF.nlargest(35, columns="score").index.tolist()
+    available_top35 = [f for f in top_35_features if f in df.columns]
+    
+    if available_top35:
+        tile_data = df.groupby('Lasso_Binary')[available_top35].mean()
         tile_data = tile_data.transpose()
         
-        # Calculate dimensions
-        max_width, max_height = 15, 12
-        min_width, min_height = 8, 6
+        # Enhanced dimensions for better page utilization
+        width = 18
+        height = max(12, len(tile_data.index) * 0.4)
         
-        width = min(max_width, max(min_width, len(tile_data.columns) * 2))
-        height = min(max_height, max(min_height, len(tile_data.index) * 0.4))
-        
-        # Always show annotations for selected features (should be manageable)
         plt.figure(figsize=(width, height))
-        sns.heatmap(tile_data, annot=True, fmt='.2f', cmap='viridis', cbar=True)
-        plt.title(f'Mean Values of Selected Features by Lasso_Binary - {celltype}')
-        plt.xlabel('Lasso_Binary')
-        plt.ylabel('Selected Features')
+        
+        # Create heatmap without annotations initially
+        ax = sns.heatmap(tile_data, annot=False, fmt='.2f', cmap='viridis', cbar=True)
+        
+        # Mark selected features with special formatting
+        selected_indices = []
+        for i, feature in enumerate(tile_data.index):
+            if feature in selected_features:
+                selected_indices.append(i)
+        
+        # Add colored rectangles around selected features
+        for idx in selected_indices:
+            ax.add_patch(plt.Rectangle((0, idx), tile_data.shape[1], 1, 
+                                     fill=False, edgecolor='red', lw=3))
+        
+        # Customize y-axis labels to highlight selected features
+        y_labels = []
+        for feature in tile_data.index:
+            if feature in selected_features:
+                y_labels.append(f"★ {feature}")
+            else:
+                y_labels.append(feature)
+        
+        ax.set_yticklabels(y_labels, fontsize=9)
+        
+        plt.title(f'Top 35 Features by Lasso_Binary - {celltype}\n(★ = Selected Features)', 
+                 fontsize=14, fontweight='bold', pad=20)
+        plt.xlabel('Lasso_Binary', fontsize=12, fontweight='bold')
+        plt.ylabel('Top 35 Features (by importance)', fontsize=12, fontweight='bold')
         tile_plot_path = f"{output_prefix}_tileplot.png"
         plt.tight_layout()
         plt.savefig(tile_plot_path, dpi=300, bbox_inches='tight')
         plt.close()
-        print(f"Tile plot saved: {tile_plot_path}")
+        print(f"Enhanced tile plot saved: {tile_plot_path}")
         results['tile_plot_path'] = tile_plot_path
 
     # Feature selection summary

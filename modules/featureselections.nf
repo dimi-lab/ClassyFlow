@@ -161,6 +161,7 @@ process MERGE_AND_SORT_CSV {
 process GENERATE_FS_REPORT {
     input:
     path(fs_files)
+    path(features_list)
     path(html_template)
 
     output:
@@ -241,8 +242,11 @@ workflow featureselection_wf {
     final_results = fts.feature_selection_results
             .flatten()
             .collect()
+    feature_list = fts.feature_list
+            .flatten()
+            .collect()
 
-    fs_report = GENERATE_FS_REPORT(final_results, params.html_template)
+    fs_report = GENERATE_FS_REPORT(final_results, feature_list, params.html_template)
     
     // Step 12: Emit final results
     emit:
