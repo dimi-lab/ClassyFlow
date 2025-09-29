@@ -5,26 +5,26 @@ import groovy.json.JsonOutput
 nextflow.enable.dsl=2
 println "Active profile: ${workflow.profile}"
 
-// All of the default parameters are being set in `nextflow.config`
-params.input_dirs = [
-    "${workflow.projectDir}/data/TMA1990",
-    "${workflow.projectDir}/data/TMAS1_4xB2"
-]
 // Users can override this in their own config or with --input_dirs
 params.output_dir = "${workflow.projectDir}/output"
 
 //Static Assests for beautification
 params.letterhead = file("${projectDir}/assets/images/ClassyFlow_Letterhead.PNG", checkIfExists: true)
 params.html_template = file("${projectDir}/assets/html_templates", checkIfExists: true)
-params.pipeline_version = "1.0"
+params.pipeline_version = "1.2"
 params.reports_dir = "${params.output_dir}/final_reports"
 
 params.config_file = file(workflow.configFiles[0], checkIfExists: true)
 
 // Build Input List of Batches
-Channel.fromList(params.input_dirs)
-		.ifEmpty { error "No files found in ${params.input_dirs}" }
-		.set { batchDirs }
+Channel
+    .fromList(params.input_dirs)
+    .map { dir -> Channel.fromPath("${dir}/*.tsv", checkIfExists: true).map{ file -> file.getParent() } }
+    .flatten()
+    .unique()
+    .map { file(it) }
+    .ifEmpty { error "No input directories specified or no files found!" }
+    .set { batchDirs }
 			
 // Import sub-workflows
 include { normalization_wf } from './modules/normalizations'
@@ -290,7 +290,7 @@ workflow {
         // Exit out and do not run anything else
         exit 1
     } else {
-
+        batchDirs.view { "Batch directory: $it" }
         // Pull channel object `batchDirs` from nextflow env - see top of file.
         MERGE_TAB_DELIMITED_FILES(batchDirs)
     
@@ -322,11 +322,11 @@ workflow {
         // Run the best model on the full input batches/files 
         prediction_results = PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
 
-        prediction_results.predictions
-            .flatten() 
+        prediction_tuples = prediction_results.predictions
+            .flatten()
             .map { file ->
                 def sampleID = file.getBaseName().split('\\.')[0]
-                [sampleID, file]
+                tuple(sampleID, file)
             }
             .set { prediction_tuples }
 
