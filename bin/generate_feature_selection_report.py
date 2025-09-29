@@ -141,16 +141,22 @@ def calculate_summary_statistics(results: List[Dict[str, Any]]) -> Dict[str, Any
     
     total_celltypes = len(results)
     
-    # Calculate average statistics
-    avg_original_features = np.mean([
+    # Calculate unique feature counts instead of averages
+    # For original features, use the maximum count as approximation since all cell types 
+    # typically start with the same feature set
+    max_original_features = max([
         r['data'].get('feature_selection_summary', {}).get('original_features', 0) 
         for r in results
-    ])
+    ], default=0)
     
-    avg_selected_features = np.mean([
-        r['data'].get('optimal_n_features', 0) 
-        for r in results
-    ])
+    # Collect all unique selected features across cell types
+    all_selected_features = set()
+    for r in results:
+        if r['selected_features']:
+            all_selected_features.update(r['selected_features'])
+    
+    unique_original_features = max_original_features
+    unique_selected_features = len(all_selected_features)
     
     avg_reduction_rate = np.mean([
         (1 - r['data'].get('optimal_n_features', 0) / 
@@ -167,8 +173,8 @@ def calculate_summary_statistics(results: List[Dict[str, Any]]) -> Dict[str, Any
     
     summary = {
         'total_celltypes': total_celltypes,
-        'avg_original_features': int(avg_original_features),
-        'avg_selected_features': int(avg_selected_features),
+        'unique_original_features': int(unique_original_features),
+        'unique_selected_features': int(unique_selected_features),
         'avg_reduction_rate': round(avg_reduction_rate, 1),
         'celltypes_with_warnings': celltypes_with_warnings,
         'cv_folds_summary': cv_folds_summary
@@ -330,8 +336,8 @@ def main():
     if fs_data['summary_statistics']:
         stats = fs_data['summary_statistics']
         print(f"\nSummary Statistics:")
-        print(f"  - Average original features: {stats['avg_original_features']}")
-        print(f"  - Average selected features: {stats['avg_selected_features']}")
+        print(f"  - Total unique original features: {stats['unique_original_features']}")
+        print(f"  - Total unique selected features: {stats['unique_selected_features']}")
         print(f"  - Average reduction rate: {stats['avg_reduction_rate']}%")
         print(f"  - Cell types with RFE warnings: {stats['celltypes_with_warnings']}")
         print(f"  - CV folds used: {stats['cv_folds_summary']}")
