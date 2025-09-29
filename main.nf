@@ -138,13 +138,11 @@ process GENERATE_TRAINING_N_HOLDOUT{
     
 	input:
 	path(norms_pkl_collected)
-    path(letterhead_file)
 
 	output:
     path("holdout_dataframe.pkl"), emit: holdout
     path("training_dataframe.pkl"), emit: training
 	path("celltypes.csv"), emit: lableFile
-	path("annotation_report.html")
     tuple path("training_split_report.json"), path("cell_count_table.csv"), emit: training_holdout_results
 
     script:
@@ -154,8 +152,7 @@ process GENERATE_TRAINING_N_HOLDOUT{
         --holdoutFraction ${params.holdout_fraction} \
         --cellTypeNegative "${params.filter_out_junk_celltype_labels}" \
         --minimunHoldoutThreshold ${params.minimum_label_count} \
-        --pickle_files "${norms_pkl_collected}" \
-        --letterhead "${letterhead_file}"
+        --pickle_files "${norms_pkl_collected}"
     """
 
 }
@@ -188,49 +185,15 @@ process PREDICT_ALL_CELLS_XGB{
     """
 }
 
-process CLASSIFIED_REPORT_PER_SLIDE {
-    publishDir(
-        path: "${params.output_dir}/celltype_reports",
-        pattern: "*.html",
-        mode: "copy"
-    )
-
-    publishDir(
-        path: "${params.output_dir}/final_reports/plots",
-        pattern: "*_spatial_plot.html",
-        mode: "copy"
-    )
-
-    publishDir(
-        path: "${params.output_dir}/final_reports/plots",
-        pattern: "*_celltype_barplot.png",
-        mode: "copy"
-    )
-    
-    input:
-    path(prediction_tsv)
-
-    output:
-    path("*.html"), emit: slide_reports
-    tuple path("*.json"), path("*_spatial_plot.html"), path("*_celltype_barplot.png"), emit: slide_results
-
-    script:
-    """
-    generate_classified_report.py \
-        --input_tsv ${prediction_tsv} \
-        --output_html \$(basename ${prediction_tsv} .tsv)_report.html
-    """
-}
-
 process QC_DENSITY {
-    tag { prediction_tsv.baseName }
+   tag { sampleID }
     publishDir "${params.output_dir}/celltypes", pattern: "*_qPRED.tsv", mode: "copy", overwrite: true
 
     input:
-    path(prediction_tsv)
+    tuple val(sampleID), path(prediction_tsv)    
 
     output:
-    path("*.tsv"), emit: qc_predictions
+    tuple val(sampleID), path("*.tsv"), emit: qc_predictions
 
     script:
     """
@@ -241,46 +204,58 @@ process QC_DENSITY {
     """
 }
 
-process SUMMARIZE_PREDICTIONS {
+process CLASSIFIED_REPORT_PER_SLIDE {
+    publishDir(
+        path: "${params.output_dir}/final_reports/pages",
+        pattern: "*_prediction_report.html",
+        mode: "copy"
+    )
+    
     input:
-    path(prediction_files)
+    tuple val(sampleID), path(prediction_tsv)
 
     output:
-    tuple path("abundance_metrics.json"), path("prediction_abundance_plot.png"), emit: abundance_results
+    path("*_prediction_report.html")
+    path("*_classified.json"), emit: slide_results
 
     script:
     """
-    generate_predictions_summary.py --input_dir ./
-
+    generate_classified_report.py \
+        --input_tsv ${prediction_tsv} \
+        --output_html ${sampleID}_prediction_report.html
     """
 }
 
 process GENERATE_FINAL_REPORT {
     publishDir "${params.output_dir}/final_reports", pattern: "*.html", mode: 'copy', overwrite: true
+    publishDir "${params.output_dir}/final_reports/plots/", pattern: "prediction_abundance_plot.png", mode: 'copy', overwrite: true
     publishDir "${params.output_dir}/final_reports/pages/", pattern: "nextflow.config", mode: 'copy', overwrite: true
     
     input:
-    path(missing_files, stageAs: "general/*")
-    path(split_files, stageAs: "general/*")
+    path(split_jsons)
     path(norm_html)
     path(fs_html) 
-    path(xgb_winners, stageAs: "modeling/*")
-    path(holdout_files, stageAs: "modeling/*")
-    path(abundance_results, stageAs: "general/*")
-    path(classified_results), stageAs: "general/per_slide/*"
+    path(model_html)
+    path(model_summary_json)
+    path(classified_results, stageAs: "pred_results/*")
+    path(pediction_results, stageAs: "pred_results/*")
     path(template_dir)
     path(letterhead_file)
     path(nf_config, stageAs: "nextflow.config")
 
     output:
     path("classyflow_report.html")
+    path("prediction_abundance_plot.png")
+    path("nextflow.config")
 
     script:
     """
-    generate_final_report.py --template-dir ${template_dir} \
-                            --report-name classyflow_report.html \
-                            --letterhead ${letterhead_file} \
-                            --version ${params.pipeline_version} 
+    generate_final_report.py \
+        --pred-dir ./pred_results \
+        --template-dir ${template_dir} \
+        --report-name classyflow_report.html \
+        --letterhead ${letterhead_file} \
+        --version ${params.pipeline_version}
     """
 
 }
@@ -291,14 +266,14 @@ process ZIP_PUBLISHED {
 
     input:
     val trigger
-    path("final_reports/")
+    path(final_dir)
 
     output:
     path "final_reports.zip"
 
     script:
     """
-    zip -r final_reports.zip final_reports/
+    zip -r final_reports.zip $final_dir
     """
 }
 
@@ -330,71 +305,61 @@ workflow {
         normalized_output = normalization_wf(ADD_EMPTY_MARKER_NOISE.output.modbatchtables)
         normalizedDataFrames = normalized_output.normalized
         
-        labledDataFrames = GENERATE_TRAINING_N_HOLDOUT(normalizedDataFrames.map{ it[1] }.collect(), params.letterhead)
+        labledDataFrames = GENERATE_TRAINING_N_HOLDOUT(normalizedDataFrames.map{ it[1] }.collect())
         
         /*
-         * - Subworkflow to examine Cell Type Specific interpetability & Feature Selections - 
-         */ 
+        * - Subworkflow to examine Cell Type Specific interpetability & Feature Selections - 
+        */ 
         feature_selection_results = featureselection_wf(labledDataFrames.training, labledDataFrames.lableFile)
         selectFeatures = feature_selection_results.mas_results
         
         /*
-         * - Subworkflow to generate models and then check them against the holdout - 
-         */ 
+        * - Subworkflow to generate models and then check them against the holdout - 
+        */ 
         modeling_results = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures, labledDataFrames.lableFile)
         bestModel = modeling_results.best_model_results
         
         // Run the best model on the full input batches/files 
-        PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
+        prediction_results = PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
 
-        QC_DENSITY(PREDICT_ALL_CELLS_XGB.output.predictions.flatten())
+        prediction_results.predictions
+            .flatten() 
+            .map { file ->
+                def sampleID = file.getBaseName().split('\\.')[0]
+                [sampleID, file]
+            }
+            .set { prediction_tuples }
+
+        qc_density = QC_DENSITY(prediction_tuples)
         // Overwrite predictions with QC-augmented files for downstream steps
-        predictions_for_report = QC_DENSITY.output.qc_predictions.flatten()
+        predictions_for_report = qc_density.qc_predictions
     
         // Generate a comprehensive HTML report for each prediction file
-        CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
-
-        // Generate summary statistics and plots for all predictions
-        SUMMARIZE_PREDICTIONS(predictions_for_report.collect())
+        classified_report = CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
 
         // Generate final HTML report for the whole run
-        missing_outputs = ADD_EMPTY_MARKER_NOISE.output.empty_marker_results.flatten().collect()
         split_outputs = labledDataFrames.training_holdout_results.flatten().collect()
 
-        xgb_winners = modeling_results.xgb_results
-            .flatten() 
-            .collect()
-            
-        holdout_evals = modeling_results.holdout_results
-            .flatten()
-            .collect()
-
-        prediction_results = SUMMARIZE_PREDICTIONS.output.abundance_results
-            .flatten()
+        prediction_results = predictions_for_report.map {id, file -> file }
             .collect()
         
-        classified_results = CLASSIFIED_REPORT_PER_SLIDE.output.slide_results
-            .flatten()
+        classified_results = classified_report.slide_results
             .collect()
 
-        // Pass all to reporting
+        // Pass all to reporting including summary JSONs
         final_report = GENERATE_FINAL_REPORT(
-            missing_outputs,
             split_outputs,
             normalized_output.report,
             feature_selection_results.report, 
-            xgb_winners,
-            holdout_evals,
-            prediction_results,
+            modeling_results.report,
+            modeling_results.model_summary,
             classified_results,
+            prediction_results,
             params.html_template,
             params.letterhead,
             params.config_file
         )
-
-        ZIP_PUBLISHED(final_report.map {"done"}, params.reports_dir)
-
-    	
+        ZIP_PUBLISHED(final_report.map {"done"}, file("${params.output_dir}/final_reports"))
     }
     
 }

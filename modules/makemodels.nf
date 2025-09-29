@@ -66,6 +66,12 @@ process XGBOOSTING_FINAL_MODEL {
         overwrite: true,
         mode: "copy"
     )
+    publishDir(
+        path: "${params.output_dir}/final_reports/plots",
+        pattern: "xgbWinners_*.png",
+        overwrite: true,
+        mode: "copy"
+    )
 	
 	input:
 	path(trainingDataframe)
@@ -91,6 +97,13 @@ process XGBOOSTING_FINAL_MODEL {
 }
 
 process HOLDOUT_XGB_EVALUATION {  
+publishDir(
+        path: "${params.output_dir}/final_reports/plots",
+        pattern: "holdoutEval_XGBoost_Model_*.png",
+        overwrite: true,
+        mode: "copy"
+    )
+    
 	input:
 	path(holdoutDataframe)
 	path(select_features_csv)
@@ -178,6 +191,37 @@ process GLMTRANS_MODEL {
     """
 }
 
+process GENERATE_MODEL_REPORT {
+    publishDir(
+        path: "${params.output_dir}/final_reports/plots",
+        pattern: "train_holdout_comparison.png",
+        overwrite: true,
+        mode: "copy"
+    )
+    input:
+    path(xgb_files)
+    path(holdout_files)
+    path(training_pickle)
+    path(holdout_pickle)
+    path(html_template)
+
+    output:
+    path("model_report.html"), emit: model_html
+    path("train_holdout_comparison.png")
+    path("model_summary.json"), emit: model_summary
+
+    script:
+    """
+    generate_model_report.py \
+            --output-file model_report.html \
+            --training-dataframe $training_pickle \
+            --holdout-dataframe $holdout_pickle \
+            --template-dir $html_template \
+            --class-column ${params.classifed_column_name}
+    """
+
+}
+
 
 
 workflow modelling_wf {
@@ -225,17 +269,26 @@ workflow modelling_wf {
     list_channel.subscribe { println "Label: $it" }
 
 
-    glmtrans_results = GLMTRANS_MODEL(
-        trainingPickleTable,
-        featuresCSV,
-        holdoutPickleTable,
-        best_model_info,
-        list_channel
-    )
+    // glmtrans_results = GLMTRANS_MODEL(
+    //     trainingPickleTable,
+    //     featuresCSV,
+    //     holdoutPickleTable,
+    //     best_model_info,
+    //     list_channel
+    // )
 
+    xgb_results = xgbModels.xgboost_results
+        .flatten()
+        .collect()
+    
+    holdout_evals = allHoldoutResults.holdoutEval_results
+        .flatten()
+        .collect()
+
+    model_report = GENERATE_MODEL_REPORT(xgb_results, holdout_evals, trainingPickleTable, holdoutPickleTable, params.html_template)
 
     emit:
     best_model_results = best_model_info
-    xgb_results = xgbModels.xgboost_results
-    holdout_results = allHoldoutResults. holdoutEval_results
+    report = model_report.model_html
+    model_summary = model_report.model_summary
 }
