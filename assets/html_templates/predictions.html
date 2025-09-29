@@ -10,7 +10,7 @@
     <div class="metrics-grid">
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ general.total_predicted_cells if general.total_predicted_cells else "N/A" }}</div>
+                <div class="metric-value">{{ prediction_metrics.total_predicted_cells if prediction_metrics.total_predicted_cells else "N/A" }}</div>
                 <div class="metric-label">Total Predicted Cells</div>
                 <span class="tooltiptext">
                     The total number of cells that got assigned a predicted cell type across all batches
@@ -20,21 +20,21 @@
 
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ general.most_common_prediction if general.most_common_prediction else "N/A" }}</div>
+                <div class="metric-value">{{ prediction_metrics.most_common_prediction if prediction_metrics.most_common_prediction else "N/A" }}</div>
                 <div class="metric-label">Most Abundant Cell Type</div>
             </div>
         </div>
 
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ general.most_rare_prediction if general.most_rare_prediction else "N/A" }}</div>
+                <div class="metric-value">{{ prediction_metrics.most_rare_prediction if prediction_metrics.most_rare_prediction else "N/A" }}</div>
                 <div class="metric-label">Least Abundant Cell Type</div>
             </div>
         </div>
 
         <div class="metric-card">
             <div class="tooltip">
-                <div class="metric-value">{{ general.total_low_density_cells if general.total_low_density_cells else "N/A" }}</div>
+                <div class="metric-value">{{ prediction_metrics.total_low_density_cells if prediction_metrics.total_low_density_cells else "N/A" }}</div>
                 <div class="metric-label">Number of Low Density Cells</div>
                 <span class="tooltiptext">
                     This is the number of of cells in low density regions, or lonely cells.
@@ -44,10 +44,10 @@
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 2rem;">
-            {% if general.abundance_plot %}
-            <div class="plot-container large">
+            {% if prediction_metrics.abundance_plot %}
+            <div class="plot-container">
                 <div class="plot-title">Cell Type Prediction Abundance Plot</div>
-                <img src="{{ general.abundance_plot }}" alt="Abundance plot" class="embedded-image" />
+                <img src="plots/{{ prediction_metrics.abundance_plot }}" alt="Abundance plot" class="embedded-image" />
                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
                     The proportion of predicted cell types per sample/slide.
                 </p>
@@ -56,129 +56,117 @@
     </div>
 </section>
 
-{% if general.per_slide %}
-<!-- Cell Type Tabs Navigation -->
+{% if prediction_metrics.samples %}
+<!-- ROI Summary Table Section -->
 <section class="page-section">
-    <style>
-        .sample-tabs {
-            display: flex;
-            border-bottom: 2px solid #e9ecef;
-            margin-bottom: 2rem;
-            overflow-x: auto;
-            flex-wrap: wrap;
-        }
+    <h3>ROI Summary</h3>
+    <p style="color: #6c757d; margin-bottom: 1.5rem;">
+        Click on any ROI row or "View Details" button to open a detailed analysis page in a new tab, including cell type distribution plots and spatial visualization.
+    </p>
 
-        .sample-tab {
-            padding: 0.75rem 1.5rem;
-            background-color: #f8f9fa;
-            border: 1px solid #e9ecef;
-            border-bottom: none;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: all 0.3s ease;
-            margin-right: 2px;
-            margin-bottom: 2px;
-            border-radius: 6px 6px 0 0;
-            min-width: 120px;
-            text-align: center;
-        }
-
-        .sample-tab:hover {
-            background-color: #e9ecef;
-        }
-
-        .sample-tab.active {
-            background-color: white;
-            border-bottom: 2px solid white;
-            color: #667eea;
-            font-weight: 600;
-        }
-
-        .sample-content {
-            display: none;
-        }
-
-        .sample-content.active {
-            display: block;
-        }
-
-        @media (max-width: 768px) {
-            .sample-tabs {
-                flex-direction: column;
-            }
-            
-            .sample-tab {
-                margin-right: 0;
-                margin-bottom: 2px;
-                border-radius: 6px;
-                min-width: auto;
-            }
-        }
-    </style>
-
-    <!-- Cell Type Tabs -->
-    <div class="sample-tabs">
-        {% for thissample in general.per_slide %}
-        <div class="sample-tab {% if loop.first %}active{% endif %}" 
-             onclick="showSampleName('sample-{{ loop.index0 }}')">
-            {{ thissample.sample }}
-        </div>
-        {% endfor %}
-    </div>
-
-    <!-- Cell Type Content Panels -->
-    {% for thissample in general.per_slide %}
-    <div id="sample-{{ loop.index0 }}" class="sample-content {% if loop.first %}active{% endif %}">
-        
-        <!-- Cell Type Overview -->
-        <h3>{{ thissample.sample }} Prediction Results</h3>
-
-        <div style="display: flex; flex-direction: column; gap: 2rem;">
-            {% if thissample.data.celltype_barplot %}
-            <div class="plot-container large">
-                <div class="plot-title">Predicted Cell Types Barplot</div>
-                <img src="plots/{{ thissample.data.celltype_barplot }}" alt="Cell Type Barplot" class="embedded-image" />
-                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
-                    Barplot summarizing the counts and percentages of cell types predicted fot this sample
-                </p>
-            </div>
-            {% endif %}
-
-            {% if thissample.data.spatial_plot %}
-            <div class="plot-container full">
-                <object 
-                    data="plots/{{ thissample.data.spatial_plot}}"
-                    type="text/html"
-                    width="100%" 
-                    height="600px"
-                    style="border: 1px solid #ddd;">
-                </object>
-            </div>
-            {% endif %}
+    <div class="table-controls">
+        <input type="text" class="search-box" id="roiSearch" placeholder="Search ROI names..." onkeyup="filterROITable()">
+        <div class="table-info">
+            <span id="roiCount">{{ prediction_metrics.samples | length }}</span> ROIs total
         </div>
     </div>
-    {% endfor %}
+
+    <div class="table-container">
+        <table id="roiTable">
+            <thead>
+                <tr>
+                    <th>ROI Name</th>
+                    <th>Total Cells</th>
+                    <th>Unique Classes</th>
+                    <th>Most Common Class</th>
+                    <th>Second Most Common</th>
+                    <th>Least Common Class</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for thissample in prediction_metrics.samples %}
+                <tr onclick="window.open('pages/{{ thissample.roi_report }}', '_blank')">
+                    <td class="roi-name">{{ thissample.sample_name }}</td>
+                    <td class="cell-count" data-cell-count="{{ thissample.total_cells if thissample.total_cells else 'N/A' }}">
+                        {{ "{:,}".format(thissample.total_cells) if thissample.total_cells else "N/A" }}
+                    </td>
+                    <td data-unique-classes="{{ thissample.unique_classes if thissample.unique_classes else 'N/A' }}">
+                        {{ thissample.unique_classes if thissample.unique_classes else "N/A" }}
+                    </td>
+                    <td>
+                        <div class="class-info">
+                            <div class="primary-class">{{ thissample.most_common_class if thissample.most_common_class else "N/A" }}</div>
+                            <div class="percentage">{{ "{:.1f}%".format(thissample.most_common_percentage) if thissample.most_common_percentage else "N/A" }}</div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="class-info">
+                            <div class="secondary-class">{{ thissample.second_common_class if thissample.second_common_class else "N/A" }}</div>
+                            <div class="percentage">{{ "{:.1f}%".format(thissample.second_common_percentage) if thissample.second_common_percentage else "N/A" }}</div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="class-info">
+                            <div class="secondary-class">{{ thissample.least_common_class if thissample.least_common_class else "N/A" }}</div>
+                            <div class="percentage">{{ "{:.1f}%".format(thissample.least_common_percentage) if thissample.least_common_percentage else "N/A" }}</div>
+                        </div>
+                    </td>
+                    <td>
+                        <button class="view-plots-btn" onclick="event.stopPropagation(); window.open('pages/{{ thissample.roi_report }}', '_blank')">
+                            View Details
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </section>
- {% endif %}
+
 
 <script>
-function showSampleName(sampleName) {
-    // Hide all celltype content
-    var contents = document.getElementsByClassName('sample-content');
-    for (var i = 0; i < contents.length; i++) {
-        contents[i].classList.remove('active');
+// ROI data for JavaScript access (simplified for search functionality)
+const roiData = [
+    {% for thissample in prediction_metrics.samples %}
+    {
+        sample: "{{ thissample.sample_name }}",
+        total_cells: {{ thissample.total_cells if thissample.total_cells else 0 }},
+        unique_classes: {{ thissample.unique_classes if thissample.unique_classes else 0 }},
+        most_common_class: "{{ thissample.most_common_class if thissample.most_common_class else 'N/A' }}",
+        most_common_percentage: {{ thissample.most_common_percentage if thissample.most_common_percentage else 0 }},
+        second_common_class: "{{ thissample.second_common_class if thissample.second_common_class else 'N/A' }}",
+        second_common_percentage: {{ thissample.second_common_percentage if thissample.second_common_percentage else 0 }},
+        least_common_class: "{{ thissample.least_common_class if thissample.least_common_class else 'N/A' }}",
+        least_common_percentage: {{ thissample.least_common_percentage if thissample.least_common_percentage else 0 }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+
+function filterROITable() {
+    const input = document.getElementById('roiSearch');
+    const filter = input.value.toLowerCase();
+    const table = document.getElementById('roiTable');
+    const rows = table.getElementsByTagName('tr');
+    let visibleCount = 0;
+    
+    for (let i = 1; i < rows.length; i++) { // Skip header row
+        const roiName = rows[i].getElementsByTagName('td')[0];
+        if (roiName) {
+            const textValue = roiName.textContent || roiName.innerText;
+            if (textValue.toLowerCase().indexOf(filter) > -1) {
+                rows[i].style.display = '';
+                visibleCount++;
+            } else {
+                rows[i].style.display = 'none';
+            }
+        }
     }
     
-    // Remove active class from all tabs
-    var tabs = document.getElementsByClassName('sample-tab');
-    for (var i = 0; i < tabs.length; i++) {
-        tabs[i].classList.remove('active');
-    }
-    
-    // Show selected celltype content
-    document.getElementById(sampleName).classList.add('active');
-    
-    // Add active class to clicked tab
-    event.target.classList.add('active');
+    document.getElementById('roiCount').textContent = `${visibleCount} of ${roiData.length}`;
 }
 </script>
+{% endif %}
+
+</div>

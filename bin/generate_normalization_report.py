@@ -7,6 +7,7 @@ and generates a comprehensive HTML report section using Jinja2 templates.
 
 Usage:
     python generate_normalization_report.py --norm-dir /path/to/norm/output --output-file normalization_report.html
+    python generate_normalization_report.py --no-normalization --output-file normalization_report.html
 """
 
 import os
@@ -49,6 +50,28 @@ def setup_jinja_environment(template_dir: str):
     jinja_env.filters['title'] = lambda s: s.title() if s else ""
     
     return jinja_env
+
+
+def create_no_normalization_data() -> Dict[str, Any]:
+    """
+    Create normalization data structure for when no normalization was applied.
+    
+    Returns:
+        Dictionary containing empty normalization data with appropriate flags
+    """
+    return {
+        'normalization_results': [],
+        'normalization_methods': [],
+        'batch_names': [],
+        'total_batches': 0,
+        'total_markers': 0,
+        'primary_method': None,
+        'primary_method_display': "None",
+        'comparison_mode': False,
+        'methods_summary': {},
+        'no_normalization_applied': True,
+        'no_normalization_reason': "No normalization was performed on the data"
+    }
 
 
 def read_transformation_results(norm_dir: Path, transformation_type: str) -> List[Dict[str, Any]]:
@@ -145,16 +168,21 @@ def read_transformation_results(norm_dir: Path, transformation_type: str) -> Lis
     return results
 
 
-def collect_normalization_data(norm_dir: Path) -> Dict[str, Any]:
+def collect_normalization_data(norm_dir: Path, no_normalization: bool = False) -> Dict[str, Any]:
     """
     Collect all normalization data from the norm directory.
     
     Args:
         norm_dir: Directory containing normalization outputs
+        no_normalization: If True, skip data collection and return empty structure
     
     Returns:
         Dictionary containing all normalization data organized by method
     """
+    if no_normalization:
+        logger.info("No normalization flag set - creating empty normalization data")
+        return create_no_normalization_data()
+    
     norm_data = {
         'normalization_results': [],
         'normalization_methods': [],
@@ -164,7 +192,8 @@ def collect_normalization_data(norm_dir: Path) -> Dict[str, Any]:
         'primary_method': None,
         'primary_method_display': "N/A",
         'comparison_mode': False,
-        'methods_summary': {}
+        'methods_summary': {},
+        'no_normalization_applied': False
     }
     
     if not norm_dir.exists():
@@ -221,6 +250,8 @@ def collect_normalization_data(norm_dir: Path) -> Dict[str, Any]:
     if len(all_methods) == 0:
         primary_method = None
         display_text = "No normalization applied"
+        norm_data['no_normalization_applied'] = True
+        norm_data['no_normalization_reason'] = "No normalization methods were found in the specified directory"
     elif len(all_methods) == 1:
         primary_method = all_methods[0]
         display_text = all_methods[0].title()
@@ -330,6 +361,11 @@ def main():
         help='Directory containing Jinja2 templates (default: templates)'
     )
     parser.add_argument(
+        '--no-normalization',
+        action='store_true',
+        help='Indicate that no normalization was applied to the data'
+    )
+    parser.add_argument(
         '--debug',
         action='store_true',
         help='Enable debug logging'
@@ -341,13 +377,18 @@ def main():
         logging.getLogger().setLevel(logging.DEBUG)
     
     # Collect normalization data
-    logger.info(f"Collecting normalization data from: {args.norm_dir}")
-    norm_data = collect_normalization_data(args.norm_dir)
+    if args.no_normalization:
+        logger.info("No normalization flag specified - generating report for no normalization scenario")
+    else:
+        logger.info(f"Collecting normalization data from: {args.norm_dir}")
     
-    if not norm_data['normalization_results']:
+    norm_data = collect_normalization_data(args.norm_dir, no_normalization=args.no_normalization)
+    
+    if not args.no_normalization and not norm_data['normalization_results']:
         logger.warning("No normalization results found. The report will be empty.")
     
     # Set up Jinja2 environment
+    print(args.template_dir)
     jinja_env = setup_jinja_environment(str(args.template_dir))
     
     # Generate the report
@@ -357,23 +398,39 @@ def main():
     json_output_path = args.output_file.parent / "normalization_results.json"
     export_normalization_json(norm_data, json_output_path)
     
+    # Save summary metrics for final report
+    normalization_summary = {
+        'num_batches': norm_data.get('total_batches', 0) if norm_data.get('total_batches', 0) != "N/A" and norm_data.get('total_batches', 0) > 0 else None,
+        'no_normalization_applied': norm_data.get('no_normalization_applied', False)
+    }
+    
+    with open('normalization_summary.json', 'w') as f:
+        json.dump(normalization_summary, f, indent=2)
+    print("Saved normalization summary to normalization_summary.json")
+    
     # Print summary
     print("\n" + "="*60)
     print("NORMALIZATION REPORT GENERATION COMPLETE")
     print("="*60)
     print(f"Output file: {args.output_file}")
-    print(f"Methods processed: {', '.join(norm_data['normalization_methods']) if norm_data['normalization_methods'] else 'None'}")
-    print(f"Batches processed: {norm_data['total_batches']}")
-    print(f"Total markers: {norm_data['total_markers']}")
-    print(f"Total result sets: {len(norm_data['normalization_results'])}")
     
-    if norm_data['comparison_mode']:
-        print("\nComparison Mode: Multiple normalization methods detected")
-        print("Method Summary:")
-        for method, summary in norm_data['methods_summary'].items():
-            print(f"  - {method}: {summary['batch_count']} batches")
-            if summary['avg_cv_improvement'] is not None:
-                print(f"    Average CV improvement: {summary['avg_cv_improvement']:.4f}")
+    if args.no_normalization or norm_data.get('no_normalization_applied', False):
+        print("No normalization was applied to the data")
+        if 'no_normalization_reason' in norm_data:
+            print(f"Reason: {norm_data['no_normalization_reason']}")
+    else:
+        print(f"Methods processed: {', '.join(norm_data['normalization_methods']) if norm_data['normalization_methods'] else 'None'}")
+        print(f"Batches processed: {norm_data['total_batches']}")
+        print(f"Total markers: {norm_data['total_markers']}")
+        print(f"Total result sets: {len(norm_data['normalization_results'])}")
+        
+        if norm_data['comparison_mode']:
+            print("\nComparison Mode: Multiple normalization methods detected")
+            print("Method Summary:")
+            for method, summary in norm_data['methods_summary'].items():
+                print(f"  - {method}: {summary['batch_count']} batches")
+                if summary['avg_cv_improvement'] is not None:
+                    print(f"    Average CV improvement: {summary['avg_cv_improvement']:.4f}")
     
     print("="*60)
 
