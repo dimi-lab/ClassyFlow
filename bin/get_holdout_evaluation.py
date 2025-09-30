@@ -84,12 +84,19 @@ def create_confusion_matrix_plot(cm_df, class_names, output_path):
     colors = ['#ffffff', '#9ecae1', '#08519c']  # white → light blue → dark blue
     cmap = LinearSegmentedColormap.from_list('white_to_blue', colors, N=256)
 
-    # Compute vmax as the 90th percentile of the matrix
-    vmax = np.percentile(cm_df.values, 90)
+    # Compute vmax as the 90th percentile of the matrix (excluding zeros for better scaling)
+    non_zero_values = cm_df.values[cm_df.values > 0]
+    if len(non_zero_values) > 0:
+        vmax = np.percentile(non_zero_values, 90)
+    else:
+        vmax = cm_df.values.max()
+    
+    # Ensure vmax is at least 1 to avoid issues
+    vmax = max(vmax, 1)
     norm = Normalize(vmin=0, vmax=vmax)
 
     # Determine annotation font size dynamically
-    annot_font = max(10, 16 - n_classes // 2)
+    annot_font = max(12, 18 - n_classes // 2)
 
     # Create heatmap
     sns.heatmap(
@@ -112,10 +119,15 @@ def create_confusion_matrix_plot(cm_df, class_names, output_path):
         }
     )
 
+    # Colorbar
+    cbar = ax.collections[0].colorbar
+    cbar.set_label('Number of Predictions', size=16, weight='bold', color='#2c3e50')
+    cbar.ax.set_yticks([])
+
     # Labels and title
     ax.set_xlabel('Predicted Class', fontsize=16, fontweight='bold', color='#2c3e50')
     ax.set_ylabel('Actual Class', fontsize=16, fontweight='bold', color='#2c3e50')
-    ax.set_title('Confusion Matrix', fontsize=18, fontweight='bold', color='#2c3e50', pad=25)
+    ax.set_title('Confusion Matrix', fontsize=20, fontweight='bold', color='#2c3e50', pad=25)
 
     # Rotate labels if needed
     if n_classes > 8:
@@ -126,7 +138,7 @@ def create_confusion_matrix_plot(cm_df, class_names, output_path):
         ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
 
     # Tick styling
-    tick_fontsize = max(10, 14 - n_classes // 4)
+    tick_fontsize = max(10, 16 - n_classes // 4)
     ax.tick_params(axis='both', which='major', labelsize=tick_fontsize, colors='#2c3e50')
 
     # Background and layout
