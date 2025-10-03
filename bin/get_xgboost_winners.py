@@ -16,21 +16,26 @@ import os
 def plot_parameter_search(df, output_path):
     """Create improved parameter search boxplot and save to file"""
     df['combination'] = df.apply(lambda row: f"max_depth={row['max_depth']}, eta={row['eta']}", axis=1)
+    
+    # Sort combinations by max_depth first, then eta
+    df_sorted = df.sort_values(['max_depth', 'eta'])
+    ordered_combs = df_sorted['combination'].unique().tolist()
+    
     mean_values = df.groupby('combination')['testf'].mean()
     max_comb = mean_values.idxmax()
     second_max_comb = mean_values.nlargest(2).idxmin()
-    unique_combs = df['combination'].unique().tolist()
     
     # Create better color palette
-    color_palette = ['#bdc3c7'] * len(unique_combs)  # Light gray for others
-    color_palette[unique_combs.index(max_comb)] = '#e74c3c'  # Red for best
-    color_palette[unique_combs.index(second_max_comb)] = '#f39c12'  # Orange for second
+    color_palette = ['#bdc3c7'] * len(ordered_combs)  # Light gray for others
+    color_palette[ordered_combs.index(max_comb)] = '#e74c3c'  # Red for best
+    color_palette[ordered_combs.index(second_max_comb)] = '#f39c12'  # Orange for second
 
     fig, ax = plt.subplots(figsize=(18, 10))
     
-    # Create boxplot with improved styling
+    # Create boxplot with improved styling and specified order
     box_plot = sns.boxplot(
         x='combination', y='testf', hue='combination', data=df,
+        order=ordered_combs,  # Add order parameter
         palette=color_palette, legend=False, 
         flierprops={'markerfacecolor':'#95a5a6', 'markeredgecolor':'#7f8c8d', 'markersize': 6},
         boxprops={'alpha': 0.8, 'linewidth': 1.5},
@@ -39,6 +44,15 @@ def plot_parameter_search(df, output_path):
         medianprops={'linewidth': 2, 'color': '#2c3e50'},
         ax=ax
     )
+    
+    # Find positions where max_depth changes and draw vertical lines
+    max_depths = df_sorted.groupby('combination')['max_depth'].first()
+    max_depths_ordered = [max_depths[comb] for comb in ordered_combs]
+    
+    for i in range(1, len(max_depths_ordered)):
+        if max_depths_ordered[i] != max_depths_ordered[i-1]:
+            # Draw vertical line between position i-1 and i
+            ax.axvline(x=i-0.5, color='#34495e', linestyle='--', linewidth=2, alpha=0.6)
     
     # Styling
     ax.set_ylim(df['testf'].min() - 0.01, df['testf'].max() + 0.01)
