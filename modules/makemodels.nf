@@ -1,12 +1,14 @@
 process CREATE_XGB_PARAMS {
     input:
     path(trainingDataframe)
+    path(holdoutDataframe)
     path(select_features_csv)
 
     output:
     path("xgb_iterate_params.csv"), emit: params
     path("cv_splits.pkl"), emit: cv_splits
     path("toTrainDF.pkl"), emit: training_df
+    path("toHoldoutDF.pkl"), emit: holdout_df
 
     script:
     """
@@ -18,6 +20,7 @@ process CREATE_XGB_PARAMS {
         --learnRates "${params.xgb_learn_rates}" \
         --classColumn ${params.classifed_column_name} \
         --trainingDataframe ${trainingDataframe} \
+        --holdoutDataframe ${holdoutDataframe} \
         --select_features_csv ${select_features_csv} 
     """
 }
@@ -237,7 +240,7 @@ workflow modelling_wf {
     celltypeCsv
 
     main:
-    xgbconfig = CREATE_XGB_PARAMS(trainingPickleTable, featuresCSV)
+    xgbconfig = CREATE_XGB_PARAMS(trainingPickleTable, holdoutPickleTable, featuresCSV)
     params_channel = xgbconfig.params.splitCsv( header: true, sep: ',' )
     
     xgbHyper = XGBOOSTING_MODEL(xgbconfig.training_df, xgbconfig.cv_splits, params_channel)
@@ -249,7 +252,7 @@ workflow modelling_wf {
     allModelsTrained.subscribe { println "Model: $it" }
     
     allHoldoutResults = HOLDOUT_XGB_EVALUATION(
-        holdoutPickleTable, 
+        xgbconfig.holdout_df, 
         featuresCSV, 
         allModelsTrained, 
         xgbModels.classes
@@ -290,7 +293,7 @@ workflow modelling_wf {
         .flatten()
         .collect()
 
-    model_report = GENERATE_MODEL_REPORT(xgb_results, holdout_evals, trainingPickleTable, holdoutPickleTable, params.html_template)
+    model_report = GENERATE_MODEL_REPORT(xgb_results, holdout_evals, xgbconfig.training_df, xgbconfig.holdout_df, params.html_template)
 
     emit:
     best_model_results = best_model_info
