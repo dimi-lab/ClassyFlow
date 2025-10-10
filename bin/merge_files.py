@@ -56,7 +56,7 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
 
     # Concatenate all DataFrames
     merged_df = pd.concat(dataframes, ignore_index=True)
-    merged_df = merged_df.reset_index()
+    merged_df = merged_df.reset_index(drop=True)
 
     ## Throw Error if Quant Files are empty.
     if merged_df.shape[0] == 0:

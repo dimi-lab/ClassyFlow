@@ -1,6 +1,14 @@
 process CREATE_XGB_PARAMS {
+    input:
+    path(trainingDataframe)
+    path(holdoutDataframe)
+    path(select_features_csv)
+
     output:
     path("xgb_iterate_params.csv"), emit: params
+    path("cv_splits.pkl"), emit: cv_splits
+    path("toTrainDF.pkl"), emit: training_df
+    path("toHoldoutDF.pkl"), emit: holdout_df
 
     script:
     """
@@ -9,14 +17,18 @@ process CREATE_XGB_PARAMS {
         --depth_start ${params.xgb_depth_start} \
         --depth_stop ${params.xgb_depth_stop} \
         --depth_step ${params.xgb_depth_step} \
-        --learnRates "${params.xgb_learn_rates}"
+        --learnRates "${params.xgb_learn_rates}" \
+        --classColumn ${params.classifed_column_name} \
+        --trainingDataframe ${trainingDataframe} \
+        --holdoutDataframe ${holdoutDataframe} \
+        --select_features_csv ${select_features_csv} 
     """
 }
 
 process XGBOOSTING_MODEL {
     input:
     path(trainingDataframe)
-    path(select_features_csv)
+    path(cv_splits)
     tuple val(cv_c), val(depth_d), val(eta_l)
     
     output:
@@ -28,12 +40,11 @@ process XGBOOSTING_MODEL {
         --classColumn ${params.classifed_column_name} \
         --cpu_jobs 16 \
         --uTaskID ${task.index} \
-        --mim_class_label_threshold ${params.minimum_label_count} \
         --depth_d ${depth_d} \
         --eta_l ${eta_l} \
         --cv_c ${cv_c} \
         --trainingDataframe ${trainingDataframe} \
-        --select_features_csv ${select_features_csv}
+        --cv_splits ${cv_splits}
     """
 }
 
@@ -75,7 +86,6 @@ process XGBOOSTING_FINAL_MODEL {
 	
 	input:
 	path(trainingDataframe)
-	path(select_features_csv)
 	path(model_performance_table)
 	
 	output:
@@ -89,10 +99,8 @@ process XGBOOSTING_FINAL_MODEL {
     get_xgboost_winners.py \
         --classColumn ${params.classifed_column_name} \
         --cpu_jobs 16 \
-        --mim_class_label_threshold ${params.minimum_label_count} \
         --model_performance_table ${model_performance_table} \
-        --trainingDataframe ${trainingDataframe} \
-        --select_features_csv ${select_features_csv}
+        --trainingDataframe ${trainingDataframe}
     """
 }
 
@@ -232,19 +240,19 @@ workflow modelling_wf {
     celltypeCsv
 
     main:
-    xgbconfig = CREATE_XGB_PARAMS()
+    xgbconfig = CREATE_XGB_PARAMS(trainingPickleTable, holdoutPickleTable, featuresCSV)
     params_channel = xgbconfig.params.splitCsv( header: true, sep: ',' )
     
-    xgbHyper = XGBOOSTING_MODEL(trainingPickleTable, featuresCSV, params_channel)
+    xgbHyper = XGBOOSTING_MODEL(xgbconfig.training_df, xgbconfig.cv_splits, params_channel)
     paramSearch = MERGE_XGB_CSV(xgbHyper.behavior.collect())
     
-    xgbModels = XGBOOSTING_FINAL_MODEL(trainingPickleTable, featuresCSV, paramSearch.table)
+    xgbModels = XGBOOSTING_FINAL_MODEL(xgbconfig.training_df, paramSearch.table)
     
     allModelsTrained = xgbModels.m1.concat(xgbModels.m2).flatten()
     allModelsTrained.subscribe { println "Model: $it" }
     
     allHoldoutResults = HOLDOUT_XGB_EVALUATION(
-        holdoutPickleTable, 
+        xgbconfig.holdout_df, 
         featuresCSV, 
         allModelsTrained, 
         xgbModels.classes
@@ -285,7 +293,7 @@ workflow modelling_wf {
         .flatten()
         .collect()
 
-    model_report = GENERATE_MODEL_REPORT(xgb_results, holdout_evals, trainingPickleTable, holdoutPickleTable, params.html_template)
+    model_report = GENERATE_MODEL_REPORT(xgb_results, holdout_evals, xgbconfig.training_df, xgbconfig.holdout_df, params.html_template)
 
     emit:
     best_model_results = best_model_info
