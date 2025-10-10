@@ -142,26 +142,21 @@ def plot_class_distribution(unique, counts, output_path):
     plt.close()
     print(f"Class distribution plot saved: {output_path}")
 
-def make_a_new_model(toTrainDF, classColumn, cpu_jobs, mim_class_label_threshold, 
+def make_a_new_model(toTrainDF, classColumn, cpu_jobs, 
                      model_performance_table):
     """Train XGBoost models and save outputs as separate files"""  
 
     results = {
-        'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'min_class_threshold': mim_class_label_threshold
+        'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
 
     # Filter classes based on threshold
     class_counts = toTrainDF[classColumn].value_counts()
     print(f"Original class counts: {dict(class_counts)}")
 
-    classes_to_keep = class_counts[class_counts > mim_class_label_threshold].index
-    toTrainDF = toTrainDF[toTrainDF[classColumn].isin(classes_to_keep)]
-
     label_counts = pd.DataFrame({
     'Cell Type': class_counts.index,
-    'Number of annotations': class_counts.values,
-    'Included in training': class_counts.index.isin(classes_to_keep)
+    'Number of annotations': class_counts.values
     })
 
     classes_summary_path = "xgbWinners_classes_summary.csv"
@@ -204,13 +199,11 @@ def make_a_new_model(toTrainDF, classColumn, cpu_jobs, mim_class_label_threshold
         Test_std=('testf', 'std')
     ).reset_index()
 
-    # --- Add this to handle parameter search being too small ---
     if len(summary_table) < 2:
         raise RuntimeError(
             f"Parameter search did not yield at least 2 unique parameter sets (found {len(summary_table)}). "
             "Multiple models cannot be compared. Please check your parameter search grid or input data."
         )
-    # -----------------------------------------------------------
 
     param_table_path = "xgbWinners_parameter_summary.csv"
     summary_table.to_csv(param_table_path, index=False)
@@ -225,13 +218,17 @@ def make_a_new_model(toTrainDF, classColumn, cpu_jobs, mim_class_label_threshold
         param = {
             'max_depth': int(row['max_depth']),
             'eta': row['eta'],
-            'objective': 'multi:softmax',
+            'objective': 'multi:softprob',
             'n_jobs': cpu_jobs,
             'num_class': len(unique),
             'eval_metric': 'mlogloss'
         }
-        dtrainAll = xgb.DMatrix(X, label=y_Encode)
+        
+        #Creating dmatrix and saving the feature names/order
+        dtrainAll = xgb.DMatrix(X, label=y_Encode, feature_names=X.columns.tolist())
+        #Train the model
         bst = xgb.train(param, dtrainAll, num_round)
+        #Save
         pickle.dump(bst, open(fname, "wb"))
         print(f"Model saved: {fname}")
 
@@ -241,27 +238,16 @@ def main():
     parser = argparse.ArgumentParser(description="Train and select XGBoost models based on parameter search results.")
     parser.add_argument('--classColumn', required=True, help='Name of the classified column')
     parser.add_argument('--cpu_jobs', type=int, default=16, help='Number of CPU jobs to use')
-    parser.add_argument('--mim_class_label_threshold', type=int, required=True, help='Minimum label count')
     parser.add_argument('--model_performance_table', required=True, help='CSV with model performance')
     parser.add_argument('--trainingDataframe', required=True, help='Path to training dataframe pickle')
-    parser.add_argument('--select_features_csv', required=True, help='Path to selected features CSV')
     args = parser.parse_args()
 
-    myData = pd.read_pickle(args.trainingDataframe)
-    with open(args.select_features_csv, 'r') as file:
-        next(file)
-        featureList = [line.strip() for line in file if line.strip()]
-
-    if 'level_0' in featureList:
-        featureList.remove('level_0')
-    featureList.append(args.classColumn)
-    focusData = myData[featureList]
+    focusData = pd.read_pickle(args.trainingDataframe)
 
     training_results = make_a_new_model(
         focusData,
         args.classColumn,
         args.cpu_jobs,
-        args.mim_class_label_threshold,
         args.model_performance_table
     )
 
