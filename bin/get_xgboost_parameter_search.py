@@ -47,11 +47,11 @@ if __name__ == "__main__":
     parser.add_argument('--learnRates', type=str, default="0.1,0.7,1.0", help='Comma-separated list of learning rates')
     parser.add_argument('--classColumn', required=True, help='Name of the classified column')
     parser.add_argument('--trainingDataframe', required=True, help='Path to training dataframe pickle')
+    parser.add_argument('--holdoutDataframe', required=True, help='Path to training dataframe pickle')
     parser.add_argument('--select_features_csv', required=True, help='Path to selected features CSV')
     args = parser.parse_args()
 
-    #Create training df with selected features
-    myData = pd.read_pickle(args.trainingDataframe)
+    
     with open(args.select_features_csv, 'r') as file:
         next(file)  # Skip header
         featureList = file.readlines()
@@ -59,12 +59,24 @@ if __name__ == "__main__":
     if 'level_0' in featureList:
         featureList.remove('level_0')
     featureList.append(args.classColumn)
-    focusData = myData[featureList]
+
+    #Create holdout df with selected features
+    holdout = pd.read_pickle(args.holdoutDataframe)
+    holdout = holdout[featureList]
+
+    # Save to disk
+    with open('toHoldoutDF.pkl', 'wb') as f:
+        pickle.dump(holdout, f)
+    
+    del holdout
+
+    #Create training df with selected features
+    training = pd.read_pickle(args.trainingDataframe)
+    focusData = training[featureList]
 
     # Save to disk
     with open('toTrainDF.pkl', 'wb') as f:
         pickle.dump(focusData, f)
-
 
     #create_kfold_cv_splits(focusData, args.classColumn, args.max_cv)
     create_random_cv_splits(focusData, args.classColumn, args.max_cv)

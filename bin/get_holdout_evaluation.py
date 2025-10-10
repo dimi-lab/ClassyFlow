@@ -403,19 +403,20 @@ if __name__ == "__main__":
     with open(args.model_pickle, 'rb') as file:
         xgbMdl = pickle.load(file)
 
-    myData = pd.read_pickle(args.holdoutDataframe)
     with open(args.select_features_csv, 'r') as file:
         next(file)  # Skip header
         featureList = [line.strip() for line in file if line.strip()]
     if 'level_0' in featureList:
         featureList.remove('level_0')
     featureList.append(classColumn)
-    focusData = myData[featureList]    
 
     prefix = f"holdoutEval_{os.path.splitext(os.path.basename(args.model_pickle))[0]}"
 
+    #Read the directly use. Filtering to featureList already done upstream
+    focusData = pd.read_pickle(args.holdoutDataframe)
+
     # Generate evaluation data and plots
-    results = check_holdout(myData, xgbMdl, classColumn, leEncoderFile, prefix)
+    results = check_holdout(focusData, xgbMdl, classColumn, leEncoderFile, prefix)
     
     # Add metadata
     results['metadata'] = {
