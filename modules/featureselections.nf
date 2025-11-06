@@ -154,7 +154,7 @@ process MERGE_AND_SORT_CSV {
     script:
     """
     head -n 1 ${csv_files[0]} > selected_features.csv
-    tail -n +2 -q ${csv_files.join(' ')} | sort >> selected_features.csv
+    tail -n +2 -q ${csv_files.join(' ')} | sort -u >> selected_features.csv
     """
 }
 

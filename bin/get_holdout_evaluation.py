@@ -84,12 +84,19 @@ def create_confusion_matrix_plot(cm_df, class_names, output_path):
     colors = ['#ffffff', '#9ecae1', '#08519c']  # white → light blue → dark blue
     cmap = LinearSegmentedColormap.from_list('white_to_blue', colors, N=256)
 
-    # Compute vmax as the 90th percentile of the matrix
-    vmax = np.percentile(cm_df.values, 90)
+    # Compute vmax as the 90th percentile of the matrix (excluding zeros for better scaling)
+    non_zero_values = cm_df.values[cm_df.values > 0]
+    if len(non_zero_values) > 0:
+        vmax = np.percentile(non_zero_values, 90)
+    else:
+        vmax = cm_df.values.max()
+    
+    # Ensure vmax is at least 1 to avoid issues
+    vmax = max(vmax, 1)
     norm = Normalize(vmin=0, vmax=vmax)
 
     # Determine annotation font size dynamically
-    annot_font = max(10, 16 - n_classes // 2)
+    annot_font = max(12, 18 - n_classes // 2)
 
     # Create heatmap
     sns.heatmap(
@@ -112,10 +119,15 @@ def create_confusion_matrix_plot(cm_df, class_names, output_path):
         }
     )
 
+    # Colorbar
+    cbar = ax.collections[0].colorbar
+    cbar.set_label('Number of Predictions', size=16, weight='bold', color='#2c3e50')
+    cbar.ax.set_yticks([])
+
     # Labels and title
     ax.set_xlabel('Predicted Class', fontsize=16, fontweight='bold', color='#2c3e50')
     ax.set_ylabel('Actual Class', fontsize=16, fontweight='bold', color='#2c3e50')
-    ax.set_title('Confusion Matrix', fontsize=18, fontweight='bold', color='#2c3e50', pad=25)
+    ax.set_title('Confusion Matrix', fontsize=20, fontweight='bold', color='#2c3e50', pad=25)
 
     # Rotate labels if needed
     if n_classes > 8:
@@ -126,7 +138,7 @@ def create_confusion_matrix_plot(cm_df, class_names, output_path):
         ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
 
     # Tick styling
-    tick_fontsize = max(10, 14 - n_classes // 4)
+    tick_fontsize = max(10, 16 - n_classes // 4)
     ax.tick_params(axis='both', which='major', labelsize=tick_fontsize, colors='#2c3e50')
 
     # Background and layout
@@ -245,8 +257,9 @@ def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
         'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
 
-    X_holdout = toCheckDF[list(toCheckDF.select_dtypes(include=[np.number]).columns.values)]
-    X_holdout = X_holdout[xgbM.feature_names]
+    model_features = xgbM.feature_names
+
+    X_holdout = toCheckDF[model_features]
 
     le = preprocessing.LabelEncoder()
     le.classes_ = np.load(leEncoderFile, allow_pickle=True)
@@ -257,6 +270,9 @@ def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
     dmatrix = xgb.DMatrix(X_holdout)
     y_pred_proba = xgbM.predict(dmatrix)
 
+    #Convert probabilities to class labels
+    y_pred = np.argmax(y_pred_proba, axis=1)
+
     """Plot ROC curve for binary or multiclass classification."""
     # Get unique values and their counts
     unique_values, counts = np.unique(y_holdout, return_counts=True)
@@ -264,9 +280,9 @@ def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
     print(n_classes)
     uniqNames = le.inverse_transform(unique_values)
 
-    accuracy = accuracy_score(y_holdout, y_pred_proba)
+    accuracy = accuracy_score(y_holdout, y_pred)
     results['accuracy'] = float(accuracy)
-    f1 = f1_score(y_holdout, y_pred_proba, average='weighted')
+    f1 = f1_score(y_holdout, y_pred, average='weighted')
     results['f1_score'] = float(f1)
     results['class_imbalance_detected'] = bool(detect_class_imbalance(counts))
     
@@ -278,7 +294,7 @@ def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
     lableHash = dict(zip(unique_values, uniqNames))
 
     # Calculate confusion matrix
-    cm = confusion_matrix(y_holdout, y_pred_proba)
+    cm = confusion_matrix(y_holdout, y_pred)
     cm_df = pd.DataFrame(cm, columns=uniqNames, index=uniqNames)
 
     confusion_matrix_plot = f"{output_prefix}_confusion_matrix.png"
@@ -286,27 +302,30 @@ def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
     results['confusion_matrix_csv_path'] = confusion_matrix_plot
 
     # Multiclass ROC/AUC computation and plotting
-    def compute_multiclass_roc_auc(y_true, y_pred, n_classes):
+    def compute_multiclass_roc_auc(y_true, y_proba, n_classes):
         y_true_bin = label_binarize(y_true, classes=np.arange(n_classes))
-        y_pred_bin = label_binarize(y_pred, classes=np.arange(n_classes))
+        
         auc_scores = {}
         fpr_dict, tpr_dict = {}, {}
+        
         for i in range(n_classes):
-            fpr, tpr, _ = roc_curve(y_true_bin[:, i], y_pred_bin[:, i])
+            # Use actual probabilities for class i
+            fpr, tpr, _ = roc_curve(y_true_bin[:, i], y_proba[:, i])
             roc_auc = auc(fpr, tpr)
             auc_scores[i] = roc_auc
             fpr_dict[i] = fpr
             tpr_dict[i] = tpr
-        return auc_scores, fpr_dict, tpr_dict, y_true_bin, y_pred_bin
+        
+        return auc_scores, fpr_dict, tpr_dict, y_true_bin
 
-    auc_scores, fpr_dict, tpr_dict, y_true_binarized, y_pred_binarized = compute_multiclass_roc_auc(y_holdout, y_pred_proba, n_classes)
+    auc_scores, fpr_dict, tpr_dict, y_true_binarized = compute_multiclass_roc_auc(y_holdout, y_pred_proba, n_classes)
     sorted_auc_scores = sorted(auc_scores.items(), key=lambda x: x[1], reverse=True)
 
-    def export_roc_plot(y_true_bin, y_pred_bin, label_hash, n_classes, auc_scores, output_path):
+    def export_roc_plot(y_true_bin, y_pred_proba, label_hash, n_classes, auc_scores, output_path):
         plt.figure(figsize=(14, 10))
         colors = plt.cm.tab10(np.linspace(0, 1, n_classes))
         for i, color in zip(range(n_classes), colors):
-            fpr, tpr, _ = roc_curve(y_true_bin[:, i], y_pred_bin[:, i])
+            fpr, tpr, _ = roc_curve(y_true_bin[:, i], y_pred_proba[:, i])
             roc_auc = auc(fpr, tpr)
             plt.plot(fpr, tpr, color=color, lw=2, label=f'{label_hash[i]} (AUC={roc_auc:.2f})')
         plt.plot([0, 1], [0, 1], 'k--', lw=2, alpha=0.5, label='Random Classifier')
@@ -323,7 +342,7 @@ def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
         print(f"ROC curves plot saved: {output_path}")
 
     roc_curves_plot = f"{output_prefix}_roc_curves.png"
-    export_roc_plot(y_true_binarized, y_pred_binarized, lableHash, n_classes, auc_scores, roc_curves_plot)
+    export_roc_plot(y_true_binarized, y_pred_proba, lableHash, n_classes, auc_scores, roc_curves_plot)
     results['roc_curves_plot_path'] = roc_curves_plot
 
     def export_auc_table(sorted_auc_scores, label_hash, output_path):
@@ -381,20 +400,20 @@ if __name__ == "__main__":
     classColumn = args.classColumn
     leEncoderFile = args.leEncoderFile
 
-    myData = pd.read_pickle(args.holdoutDataframe)
+    with open(args.model_pickle, 'rb') as file:
+        xgbMdl = pickle.load(file)
+
     with open(args.select_features_csv, 'r') as file:
         next(file)  # Skip header
         featureList = [line.strip() for line in file if line.strip()]
     if 'level_0' in featureList:
         featureList.remove('level_0')
     featureList.append(classColumn)
-    focusData = myData[featureList]
-    focusData = focusData.loc[:, ~focusData.columns.duplicated()]
-
-    with open(args.model_pickle, 'rb') as file:
-        xgbMdl = pickle.load(file)
 
     prefix = f"holdoutEval_{os.path.splitext(os.path.basename(args.model_pickle))[0]}"
+
+    #Read the directly use. Filtering to featureList already done upstream
+    focusData = pd.read_pickle(args.holdoutDataframe)
 
     # Generate evaluation data and plots
     results = check_holdout(focusData, xgbMdl, classColumn, leEncoderFile, prefix)
