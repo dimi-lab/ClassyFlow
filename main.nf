@@ -181,7 +181,10 @@ process PREDICT_ALL_CELLS_XGB{
         --infile ${pickleTable} \
         --modelfile ${model_path} \
         --columnsToExport "${params.predict_columns_to_export}" \
-        --cpu_jobs ${params.predict_cpu_jobs}
+        --cpu_jobs ${params.predict_cpu_jobs} \
+        --include_probabilities \
+        --top_n_probs 2
+
     """
 }
 

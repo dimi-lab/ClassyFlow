@@ -16,21 +16,26 @@ import os
 def plot_parameter_search(df, output_path):
     """Create improved parameter search boxplot and save to file"""
     df['combination'] = df.apply(lambda row: f"max_depth={row['max_depth']}, eta={row['eta']}", axis=1)
+    
+    # Sort combinations by max_depth first, then eta
+    df_sorted = df.sort_values(['max_depth', 'eta'])
+    ordered_combs = df_sorted['combination'].unique().tolist()
+    
     mean_values = df.groupby('combination')['testf'].mean()
     max_comb = mean_values.idxmax()
     second_max_comb = mean_values.nlargest(2).idxmin()
-    unique_combs = df['combination'].unique().tolist()
     
     # Create better color palette
-    color_palette = ['#bdc3c7'] * len(unique_combs)  # Light gray for others
-    color_palette[unique_combs.index(max_comb)] = '#e74c3c'  # Red for best
-    color_palette[unique_combs.index(second_max_comb)] = '#f39c12'  # Orange for second
+    color_palette = ['#bdc3c7'] * len(ordered_combs)  # Light gray for others
+    color_palette[ordered_combs.index(max_comb)] = '#e74c3c'  # Red for best
+    color_palette[ordered_combs.index(second_max_comb)] = '#f39c12'  # Orange for second
 
     fig, ax = plt.subplots(figsize=(18, 10))
     
-    # Create boxplot with improved styling
+    # Create boxplot with improved styling and specified order
     box_plot = sns.boxplot(
         x='combination', y='testf', hue='combination', data=df,
+        order=ordered_combs,  # Add order parameter
         palette=color_palette, legend=False, 
         flierprops={'markerfacecolor':'#95a5a6', 'markeredgecolor':'#7f8c8d', 'markersize': 6},
         boxprops={'alpha': 0.8, 'linewidth': 1.5},
@@ -39,6 +44,15 @@ def plot_parameter_search(df, output_path):
         medianprops={'linewidth': 2, 'color': '#2c3e50'},
         ax=ax
     )
+    
+    # Find positions where max_depth changes and draw vertical lines
+    max_depths = df_sorted.groupby('combination')['max_depth'].first()
+    max_depths_ordered = [max_depths[comb] for comb in ordered_combs]
+    
+    for i in range(1, len(max_depths_ordered)):
+        if max_depths_ordered[i] != max_depths_ordered[i-1]:
+            # Draw vertical line between position i-1 and i
+            ax.axvline(x=i-0.5, color='#34495e', linestyle='--', linewidth=2, alpha=0.6)
     
     # Styling
     ax.set_ylim(df['testf'].min() - 0.01, df['testf'].max() + 0.01)
@@ -128,26 +142,21 @@ def plot_class_distribution(unique, counts, output_path):
     plt.close()
     print(f"Class distribution plot saved: {output_path}")
 
-def make_a_new_model(toTrainDF, classColumn, cpu_jobs, mim_class_label_threshold, 
+def make_a_new_model(toTrainDF, classColumn, cpu_jobs, 
                      model_performance_table):
     """Train XGBoost models and save outputs as separate files"""  
 
     results = {
-        'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'min_class_threshold': mim_class_label_threshold
+        'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
 
     # Filter classes based on threshold
     class_counts = toTrainDF[classColumn].value_counts()
     print(f"Original class counts: {dict(class_counts)}")
 
-    classes_to_keep = class_counts[class_counts > mim_class_label_threshold].index
-    toTrainDF = toTrainDF[toTrainDF[classColumn].isin(classes_to_keep)]
-
     label_counts = pd.DataFrame({
     'Cell Type': class_counts.index,
-    'Number of annotations': class_counts.values,
-    'Included in training': class_counts.index.isin(classes_to_keep)
+    'Number of annotations': class_counts.values
     })
 
     classes_summary_path = "xgbWinners_classes_summary.csv"
@@ -190,13 +199,11 @@ def make_a_new_model(toTrainDF, classColumn, cpu_jobs, mim_class_label_threshold
         Test_std=('testf', 'std')
     ).reset_index()
 
-    # --- Add this to handle parameter search being too small ---
     if len(summary_table) < 2:
         raise RuntimeError(
             f"Parameter search did not yield at least 2 unique parameter sets (found {len(summary_table)}). "
             "Multiple models cannot be compared. Please check your parameter search grid or input data."
         )
-    # -----------------------------------------------------------
 
     param_table_path = "xgbWinners_parameter_summary.csv"
     summary_table.to_csv(param_table_path, index=False)
@@ -211,13 +218,17 @@ def make_a_new_model(toTrainDF, classColumn, cpu_jobs, mim_class_label_threshold
         param = {
             'max_depth': int(row['max_depth']),
             'eta': row['eta'],
-            'objective': 'multi:softmax',
+            'objective': 'multi:softprob',
             'n_jobs': cpu_jobs,
             'num_class': len(unique),
             'eval_metric': 'mlogloss'
         }
-        dtrainAll = xgb.DMatrix(X, label=y_Encode)
+        
+        #Creating dmatrix and saving the feature names/order
+        dtrainAll = xgb.DMatrix(X, label=y_Encode, feature_names=X.columns.tolist())
+        #Train the model
         bst = xgb.train(param, dtrainAll, num_round)
+        #Save
         pickle.dump(bst, open(fname, "wb"))
         print(f"Model saved: {fname}")
 
@@ -227,27 +238,16 @@ def main():
     parser = argparse.ArgumentParser(description="Train and select XGBoost models based on parameter search results.")
     parser.add_argument('--classColumn', required=True, help='Name of the classified column')
     parser.add_argument('--cpu_jobs', type=int, default=16, help='Number of CPU jobs to use')
-    parser.add_argument('--mim_class_label_threshold', type=int, required=True, help='Minimum label count')
     parser.add_argument('--model_performance_table', required=True, help='CSV with model performance')
     parser.add_argument('--trainingDataframe', required=True, help='Path to training dataframe pickle')
-    parser.add_argument('--select_features_csv', required=True, help='Path to selected features CSV')
     args = parser.parse_args()
 
-    myData = pd.read_pickle(args.trainingDataframe)
-    with open(args.select_features_csv, 'r') as file:
-        next(file)
-        featureList = [line.strip() for line in file if line.strip()]
-
-    if 'level_0' in featureList:
-        featureList.remove('level_0')
-    featureList.append(args.classColumn)
-    focusData = myData[featureList]
+    focusData = pd.read_pickle(args.trainingDataframe)
 
     training_results = make_a_new_model(
         focusData,
         args.classColumn,
         args.cpu_jobs,
-        args.mim_class_label_threshold,
         args.model_performance_table
     )
 

@@ -396,8 +396,9 @@ def apply_quantile_transform(df, batch_name, target_feature, quantile_split):
     scaler = QuantileTransformer(n_quantiles=quantile_split, random_state=0)
     imgMets = df.filter(regex='(Min|Max|Median|Mean|Std*|Variance|Area)', axis=1)
     df_norm = pd.DataFrame(scaler.fit_transform(imgMets), columns=imgMets.columns)
+    df_norm = df_norm.fillna(0)
     df_a = df[df.columns.difference(imgMets.columns)]
-    df_transformed = pd.concat([df_a.reset_index(drop=True), df_norm], axis=1).fillna(0)
+    df_transformed = pd.concat([df_a.reset_index(drop=True), df_norm], axis=1)
         
     # Create plots
     param_info_func = lambda col: {'name': 'Quantiles', 'value': str(quantile_split)}
@@ -438,8 +439,9 @@ def apply_minmax_transform(df, batch_name, target_feature):
     scaler = MinMaxScaler(feature_range=(-2, 2))
     imgMets = df.filter(regex='(Min|Max|Median|Mean|StdDev)', axis=1)
     df_norm = pd.DataFrame(scaler.fit_transform(imgMets), columns=imgMets.columns)
+    df_norm = df_norm.fillna(0)
     df_a = df[df.columns.difference(imgMets.columns)]
-    df_transformed = pd.concat([df_a.reset_index(drop=True), df_norm], axis=1).fillna(0)
+    df_transformed = pd.concat([df_a.reset_index(drop=True), df_norm], axis=1)
     
     # Create plots
     param_info_func = lambda col: {'name': 'Range', 'value': '(-2, 2)'}
@@ -477,13 +479,14 @@ def apply_boxcox_transform(df, batch_name, target_feature):
     
     # Apply Box-Cox transformation
     metrics = []
-    df_transformed = df.fillna(0).copy()
+    df_transformed = df.copy()
     lambda_values = {}
     stat_cols = list(df_transformed.filter(regex='(Min|Max|Median|Mean|Std*|Variance|Area)'))
 
     for col in stat_cols:
-        col_values = df_transformed[col].dropna()
-        if col_values.empty:
+        df_transformed[col] = df_transformed[col].fillna(0)
+        col_sum = df_transformed[col].sum()
+        if col_sum == 0:
             df_transformed[col] = np.nan
             lambda_val = 'SkippedEmpty'
             pre_mean = np.nan
@@ -534,10 +537,10 @@ def apply_boxcox_transform(df, batch_name, target_feature):
         'worst_performing_markers': worst_markers,
         'boxcox_metrics': {
             'total_features': len(boxcox_metrics),
-            'successful_transforms': len(boxcox_metrics[boxcox_metrics['Lambda'] != 'Failed']),
-            'failed_transforms': len(boxcox_metrics[boxcox_metrics['Lambda'] == 'Failed']),
-            'mean_lambda': boxcox_metrics[boxcox_metrics['Lambda'] != 'Failed']['Lambda'].astype(float).mean(),
-            'median_lambda': boxcox_metrics[boxcox_metrics['Lambda'] != 'Failed']['Lambda'].astype(float).median()
+            'successful_transforms': len(boxcox_metrics[~boxcox_metrics['Lambda'].isin(['Failed', 'SkippedEmpty'])]),
+            'failed_transforms': len(boxcox_metrics[boxcox_metrics['Lambda'].isin(['Failed', 'SkippedEmpty'])]),
+            'mean_lambda': boxcox_metrics[~boxcox_metrics['Lambda'].isin(['Failed', 'SkippedEmpty'])]['Lambda'].astype(float).mean(),
+            'median_lambda': boxcox_metrics[~boxcox_metrics['Lambda'].isin(['Failed', 'SkippedEmpty'])]['Lambda'].astype(float).median()
         },
         'cv_metrics': {
             'mean_cv_improvement': cv_df['cv_improvement'].mean(),
