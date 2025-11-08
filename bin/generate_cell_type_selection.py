@@ -64,7 +64,8 @@ def plot_best_alpha(scores, scores_std, alphas, best_alpha, n_folds, output_path
 
 def plot_feature_ranking_with_cutoff(featureRankDF, output_path, cutoff_n, top_n=35, model_name="Lasso"):
     """
-    Enhanced feature ranking plot with cutoff line showing selected features
+    Enhanced feature ranking plot with cutoff line and directionality coloring
+    Blue = positive association, Red = negative association
     """
     # Prepare data
     top_features = featureRankDF.nlargest(top_n, columns="score").sort_values(by="score", ascending=True)
@@ -72,27 +73,36 @@ def plot_feature_ranking_with_cutoff(featureRankDF, output_path, cutoff_n, top_n
     # Create figure
     fig, ax = plt.subplots(figsize=(16, max(10, top_n * 0.4)))
     
-    # Determine colors based on cutoff
+    # Determine colors based on directionality (positive=blue, negative=red)
     colors = []
-    for i, (idx, row) in enumerate(top_features.iterrows()):
-        if i >= (top_n - cutoff_n):
-            colors.append('#1f77b4')  # Selected features - blue
+    for idx, row in top_features.iterrows():
+        if row['Coefficient'] > 0:
+            colors.append('#1f77b4')  # Positive - blue
         else:
-            colors.append('#cccccc')  # Non-selected features - gray
+            colors.append('#d62728')  # Negative - red
+    
+    # Adjust alpha based on selection status
+    alphas = []
+    for i in range(len(top_features)):
+        if i >= (top_n - cutoff_n):
+            alphas.append(0.9)  # Selected features - more opaque
+        else:
+            alphas.append(0.4)  # Non-selected features - more transparent
     
     # Create bars with enhanced styling
     bars = ax.barh(range(len(top_features)), top_features['score'], 
-                   color=colors, alpha=0.8, height=0.7)
+                   color=colors, height=0.7)
     
-    # Add subtle border
-    for bar in bars:
+    # Apply alpha values individually
+    for bar, alpha in zip(bars, alphas):
+        bar.set_alpha(alpha)
         bar.set_edgecolor('white')
         bar.set_linewidth(0.8)
     
     # Add cutoff line
     if cutoff_n <= top_n:
         cutoff_position = top_n - cutoff_n - 0.5
-        ax.axhline(y=cutoff_position, color='red', linestyle='--', linewidth=2, 
+        ax.axhline(y=cutoff_position, color='black', linestyle='--', linewidth=2, 
                   label=f'Selection cutoff (top {cutoff_n} features)')
     
     # Customize plot
@@ -134,11 +144,13 @@ def plot_feature_ranking_with_cutoff(featureRankDF, output_path, cutoff_n, top_n
                f'{width:.3f}', ha=ha, va='center', 
                fontsize=9, color=color, fontweight=weight)
     
-    # Create legend
+    # Create legend with directionality explanation
     legend_elements = [
-        mpatches.Patch(color='#1f77b4', label=f'Selected ({cutoff_n} features)'),
-        mpatches.Patch(color='#cccccc', label=f'Not selected'),
-        Line2D([0], [0], color='red', linestyle='--', label='Selection cutoff')
+        mpatches.Patch(color='#1f77b4', alpha=0.9, label='Positive association (selected)'),
+        mpatches.Patch(color='#d62728', alpha=0.9, label='Negative association (selected)'),
+        mpatches.Patch(color='#1f77b4', alpha=0.4, label='Positive association (not selected)'),
+        mpatches.Patch(color='#d62728', alpha=0.4, label='Negative association (not selected)'),
+        Line2D([0], [0], color='black', linestyle='--', label='Selection cutoff')
     ]
     
     ax.legend(handles=legend_elements, loc='lower right', fontsize=9,
@@ -148,8 +160,11 @@ def plot_feature_ranking_with_cutoff(featureRankDF, output_path, cutoff_n, top_n
     selected_features = top_features.tail(cutoff_n)
     mean_importance = selected_features['score'].mean()
     std_importance = selected_features['score'].std()
+    n_positive = (selected_features['Coefficient'] > 0).sum()
+    n_negative = (selected_features['Coefficient'] < 0).sum()
     
-    stats_text = f'Selected features stats:\nMean: {mean_importance:.3f}\nStd: {std_importance:.3f}'
+    stats_text = f'Selected features:\nMean: {mean_importance:.3f}\nStd: {std_importance:.3f}\n' \
+                 f'Positive: {n_positive} | Negative: {n_negative}'
     ax.text(0.98, 0.02, stats_text, transform=ax.transAxes, 
             fontsize=9, ha='right', va='bottom',
             bbox=dict(boxstyle='round,pad=0.4', facecolor='lightblue', alpha=0.6))
@@ -166,6 +181,119 @@ def plot_feature_ranking_with_cutoff(featureRankDF, output_path, cutoff_n, top_n
     plt.close()
     print(f"Feature ranking plot with cutoff saved: {output_path}")
 
+def plot_feature_expression_heatmap(df, featureRankDF, selected_features, celltype, 
+                                   output_path, n_features=35, class_column='Lasso_Binary',
+                                   normalization='zscore'):
+
+    # Get top N features from feature ranking
+    top_features_df = featureRankDF.nlargest(n_features, columns="score")
+    
+    # Sort by coefficient (positive first, then negative) for better visual clustering
+    top_features_df = top_features_df.sort_values(by='Coefficient', ascending=False)
+    top_features = top_features_df.index.tolist()
+    
+    # Filter to available columns
+    available_features = [f for f in top_features if f in df.columns]
+    
+    if not available_features:
+        print("Warning: No features available for heatmap")
+        return None
+    
+    # Create a copy of the dataframe with selected features and class column
+    df_subset = df[[class_column] + available_features].copy()
+    
+    # Apply normalization to the ORIGINAL data (before grouping)
+    if normalization == 'zscore':
+        # Z-score normalization: (x - mean) / std for each feature
+        for feature in available_features:
+            mean_val = df_subset[feature].mean()
+            std_val = df_subset[feature].std()
+            if std_val > 0:  # Avoid division by zero
+                df_subset[feature] = (df_subset[feature] - mean_val) / std_val
+        cbar_label = 'Mean Z-score (normalized per feature)'
+        center_value = 0
+        fmt_string = '.2f'        
+    else:
+        # No normalization
+        cbar_label = 'Mean Expression Level'
+        center_value = None  # Will be calculated from data
+        fmt_string = '.2f'
+    
+    # NOW calculate mean expression by class (on normalized data)
+    tile_data = df_subset.groupby(class_column)[available_features].mean()
+    tile_data = tile_data.transpose()
+    
+    # Set center value for non-normalized data
+    if center_value is None:
+        center_value = tile_data.values.mean()
+    
+    # Enhanced dimensions
+    width = 20
+    height = max(12, len(tile_data.index) * 0.45)
+    
+    fig, ax = plt.subplots(figsize=(width, height))
+    
+    # Create heatmap
+    sns.heatmap(tile_data, annot=True, fmt=fmt_string, cmap='RdBu_r', 
+                cbar_kws={'label': cbar_label},
+                linewidths=0.5, linecolor='lightgray',
+                ax=ax, center=center_value)
+    
+    # Add visual separator between positive and negative coefficients
+    n_positive = (top_features_df['Coefficient'] > 0).sum()
+    if 0 < n_positive < len(available_features):
+        ax.axhline(y=n_positive, color='black', linestyle='-', linewidth=3, alpha=0.7)
+        
+        # Add simple labels centered above and below the line
+        ax.text(tile_data.shape[1]/2, n_positive - 0.3, 
+            'Positive Association ↑', 
+            va='top', ha='center', fontsize=11, fontweight='bold',
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='lightblue', alpha=0.7))
+        
+        ax.text(tile_data.shape[1]/2, n_positive + 0.3, 
+            'Negative Association ↓', 
+            va='bottom', ha='center', fontsize=11, fontweight='bold',
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='lightcoral', alpha=0.7))
+    
+    # Customize y-axis labels with selection markers
+    y_labels = []
+    for feature in tile_data.index:
+        if feature in selected_features:
+            y_labels.append(f"{feature} *")
+        else:
+            y_labels.append(feature)
+    
+    ax.set_yticklabels(y_labels, fontsize=10, rotation=0)
+    
+    # Customize x-axis labels
+    class_labels = [f"Class {int(col)}\n({'Negative' if col == 0 else celltype})" 
+                   for col in tile_data.columns]
+    ax.set_xticklabels(class_labels, fontsize=12, fontweight='bold')
+    
+    # Title with informative subtitle
+    n_selected = len([f for f in available_features if f in selected_features])
+    norm_text = f" | Normalization: {normalization}" if normalization != 'none' else ""
+    title = f'Top {n_features} Features: Mean Expression by Class - {celltype}\n'
+    subtitle = f'* = Selected features ({n_selected}/{len(available_features)}) | Features sorted by coefficient direction{norm_text}'
+    
+    ax.set_title(title, fontsize=16, fontweight='bold', pad=15)
+    ax.text(0.5, 1.02, subtitle, transform=ax.transAxes, 
+           ha='center', fontsize=10, style='italic')
+    
+    ax.set_xlabel('Class', fontsize=12, fontweight='bold')
+    ax.set_ylabel(f'Top {n_features} Features (sorted by coefficient direction)', 
+                 fontsize=12, fontweight='bold')
+    
+    # Improve layout
+    plt.tight_layout()
+    
+    # Save with high quality
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', 
+               facecolor='white', edgecolor='none')
+    plt.close()
+    
+    print(f"Feature expression heatmap saved: {output_path}")
+    return output_path
 
 def plot_improved_rfe(rfeTbl, summary_df, output_path, optimal_n):
     """
@@ -493,11 +621,15 @@ def get_lasso_classification_features(
     features = XAll.columns.values.tolist()
     coefficients = clf.coef_
     importance = np.abs(coefficients)
-    featureRankDF = pd.DataFrame(data=importance, index=features, columns=["score"])
+    featureRankDF = pd.DataFrame(data={'score': importance, 'Coefficient': coefficients}, 
+                             index=features)
     
     # Create feature importance dataframe
-    dfF = pd.DataFrame(list(zip(features, importance)), columns=['Name', 'Feature_Importance'])
+    dfF = pd.DataFrame(list(zip(features, importance, coefficients)), columns=['Name', 'Feature_Importance', 'Coefficient'])
     dfF = dfF.sort_values(by=['Feature_Importance'], ascending=False)
+    dfF['Direction'] = dfF['Coefficient'].apply(lambda x: 'Positive' if x > 0 else 'Negative')
+
+    dfF.to_csv("coefficients.csv", index=False)
 
     # Process RFE results
     print("\n=== PROCESSING RFE RESULTS ===")
@@ -542,7 +674,7 @@ def get_lasso_classification_features(
 
     # Create feature ranking plot with cutoff line
     feature_ranking_path = f"{output_prefix}_feature_ranking.png"
-    plot_feature_ranking_with_cutoff(featureRankDF, feature_ranking_path, featureCutoff, top_n=35, model_name="Lasso")
+    plot_feature_ranking_with_cutoff(featureRankDF, feature_ranking_path, featureCutoff, top_n=featureCutoff+5, model_name="Lasso")
     results['feature_ranking_plot_path'] = feature_ranking_path
 
     # Create feature correlation matrix
@@ -568,57 +700,10 @@ def get_lasso_classification_features(
     if stability_scores:
         results['feature_stability'] = {k: float(v) for k, v in stability_scores.items()}
 
-    # Generate tile plot (heatmap) of top 35 features with selected features marked
-    print("\nGenerating tile plot (heatmap) of top 35 features vs Lasso_Binary...")
-    
-    # Get top 35 features from feature ranking
-    top_35_features = featureRankDF.nlargest(35, columns="score").index.tolist()
-    available_top35 = [f for f in top_35_features if f in df.columns]
-    
-    if available_top35:
-        tile_data = df.groupby('Lasso_Binary')[available_top35].mean()
-        tile_data = tile_data.transpose()
-        
-        # Enhanced dimensions for better page utilization
-        width = 18
-        height = max(12, len(tile_data.index) * 0.4)
-        
-        plt.figure(figsize=(width, height))
-        
-        # Create heatmap without annotations initially
-        ax = sns.heatmap(tile_data, annot=False, fmt='.2f', cmap='viridis', cbar=True)
-        
-        # Mark selected features with special formatting
-        selected_indices = []
-        for i, feature in enumerate(tile_data.index):
-            if feature in selected_features:
-                selected_indices.append(i)
-        
-        # Add colored rectangles around selected features
-        for idx in selected_indices:
-            ax.add_patch(plt.Rectangle((0, idx), tile_data.shape[1], 1, 
-                                     fill=False, edgecolor='red', lw=3))
-        
-        # Customize y-axis labels to highlight selected features
-        y_labels = []
-        for feature in tile_data.index:
-            if feature in selected_features:
-                y_labels.append(f"★ {feature}")
-            else:
-                y_labels.append(feature)
-        
-        ax.set_yticklabels(y_labels, fontsize=9)
-        
-        plt.title(f'Top 35 Features by Lasso_Binary - {celltype}\n(★ = Selected Features)', 
-                 fontsize=14, fontweight='bold', pad=20)
-        plt.xlabel('Lasso_Binary', fontsize=12, fontweight='bold')
-        plt.ylabel('Top 35 Features (by importance)', fontsize=12, fontweight='bold')
-        tile_plot_path = f"{output_prefix}_tileplot.png"
-        plt.tight_layout()
-        plt.savefig(tile_plot_path, dpi=300, bbox_inches='tight')
-        plt.close()
-        print(f"Enhanced tile plot saved: {tile_plot_path}")
-        results['tile_plot_path'] = tile_plot_path
+    tile_plot_path = f"{output_prefix}_tileplot.png"
+    plot_feature_expression_heatmap(df, featureRankDF, selected_features, 
+                                celltype, tile_plot_path, n_features=featureCutoff+5)
+    results['tile_plot_path'] = tile_plot_path
 
     # Feature selection summary
     results['feature_selection_summary'] = {
