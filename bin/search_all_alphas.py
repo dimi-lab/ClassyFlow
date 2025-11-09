@@ -29,7 +29,7 @@ def grid_search_alpha_set(df, celltype, alphas, n_folds):
     
     pprint(alphas)
     pipeline = Pipeline([
-        ('scaler',StandardScaler(with_mean=False)),
+        ('scaler',StandardScaler(with_mean=True)),
         ('model',Lasso())
     ])
     search = GridSearchCV(pipeline,
