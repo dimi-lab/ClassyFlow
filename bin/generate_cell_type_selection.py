@@ -606,6 +606,9 @@ def get_lasso_classification_features(
     nonVarFeatures = [x for x in XAll.columns if x not in XAll.columns[sel.get_support()]]
     print(f"Non-variant Features: {', '.join(nonVarFeatures)}")
 
+    #XAll = XAll[XAll.columns[sel.get_support()]]
+
+
     # Print model description
     print("\nModel description:")
     print(f"• Model type: Lasso regression")
@@ -613,9 +616,13 @@ def get_lasso_classification_features(
     print(f"• Number of input features: {XAll.shape[1]}")
     print(f"• Number of samples: {XAll.shape[0]}")
     print(f"• Target variable: Lasso_Binary")
+    
+    scaler = StandardScaler(with_mean=True)
+    X_scaled = scaler.fit_transform(XAll)
+
     clf = Lasso(alpha=a)
     print(f"• Model object: {clf}")
-    clf.fit(XAll, yAll)
+    clf.fit(X_scaled, yAll)
     print("• Model fit complete.")
 
     features = XAll.columns.values.tolist()
