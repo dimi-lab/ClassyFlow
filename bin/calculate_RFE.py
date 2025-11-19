@@ -12,6 +12,7 @@ from sklearn.model_selection import RepeatedStratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.model_selection import cross_val_score
+from sklearn.preprocessing import StandardScaler
 
 def calculate_rfe_of_n(df, celltype, a, idx, n_splits, n_folds, lasso_max_iteration, parallel_cpus):
     XAll = df[list(df.select_dtypes(include=[np.number]).columns.values)]
@@ -19,9 +20,9 @@ def calculate_rfe_of_n(df, celltype, a, idx, n_splits, n_folds, lasso_max_iterat
     yAll = df['Lasso_Binary']
 
     print(f"Starting task {idx}")
-    rfe = RFE(estimator=Lasso(), n_features_to_select=idx)
     model = Lasso(alpha=a, max_iter=lasso_max_iteration)
-    pipeline = Pipeline(steps=[('s', rfe), ('m', model)])
+    rfe = RFE(estimator=model, n_features_to_select=idx)
+    pipeline = Pipeline(steps=[('scaler', StandardScaler(with_mean=True)), ('s', rfe), ('m', model)])
     cv = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_folds, random_state=1)
 
     with warnings.catch_warnings():
