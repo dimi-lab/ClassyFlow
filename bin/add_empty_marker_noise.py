@@ -22,7 +22,16 @@ def getUniqueSets(objtype):
 
 def findMissingFeatures(df, nom, designFile, objtype):
     panelDesign = pd.read_csv(designFile)
-    pdf2 = panelDesign.loc[panelDesign[nom] == 0]
+    if '-' in nom:
+        hyphen_index = nom.rfind('-')
+        if hyphen_index != -1 and len(nom) - hyphen_index > 5:
+            nom2 = nom[:hyphen_index]
+        else:
+            nom2 = nom
+    else:
+        nom2 = nom
+
+    pdf2 = panelDesign.loc[panelDesign[nom2] == 0]
     print(pdf2)
     synthetic_features = 0
     if pdf2.shape[0] == 0:

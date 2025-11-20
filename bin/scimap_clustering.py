@@ -79,15 +79,35 @@ def create_anndata(marker_cols, df):
     return adata
 
 def run_umap_leiden(adata, clustering_res, roi):
-    """
-    Run UMAP and Leiden clustering, plot and save UMAP and matrixplot, and spatial scatter plot.
-    """
     sc.pp.neighbors(adata, n_neighbors=30, n_pcs=10)
     sc.tl.umap(adata)
     adata = sm.tl.cluster(adata, method='leiden', resolution=clustering_res, use_raw=False)
     sc.pl.umap(adata, color=['leiden'], cmap='vlag', use_raw=False, s=30, save=f'_{roi}.png', show=False)
-    sc.pl.matrixplot(adata, var_names=adata.var.index, groupby='leiden', dendrogram=True,
-        use_raw=False, cmap="vlag", standard_scale='var', save=f'{roi}.png', show=False)
+    try:
+        sc.pl.matrixplot(
+            adata,
+            var_names=adata.var.index,
+            groupby='leiden',
+            dendrogram=True,
+            use_raw=False,
+            cmap="vlag",
+            standard_scale='var',
+            save=f'{roi}.png',
+            show=False
+        )
+    except Exception as e:
+        print(f"[WARN] matrixplot dendrogram failed: {e}. Plotting without dendrogram.")
+        sc.pl.matrixplot(
+            adata,
+            var_names=adata.var.index,
+            groupby='leiden',
+            dendrogram=False,
+            use_raw=False,
+            cmap="vlag",
+            standard_scale='var',
+            save=f'{roi}_nodendro.png',
+            show=False
+        )
     ax = sm.pl.spatial_scatterPlot(adata, colorBy='leiden', s=2)
     plt.savefig(f'spatialplot_{roi}.png')
     plt.close()

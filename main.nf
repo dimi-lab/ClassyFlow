@@ -5,14 +5,8 @@ import groovy.json.JsonOutput
 nextflow.enable.dsl=2
 println "Active profile: ${workflow.profile}"
 
-// All of the default parameters are being set in `nextflow.config`
-params.input_dirs = [
-    "${workflow.projectDir}/data/TMA1990",
-    "${workflow.projectDir}/data/TMAS1_4xB2"
-]
 // Users can override this in their own config or with --input_dirs
 params.output_dir = "${workflow.projectDir}/output"
-
 //Static Assests for beautification
 params.letterhead = file("${projectDir}/assets/images/ClassyFlow_Letterhead.PNG", checkIfExists: true)
 params.html_template = file("${projectDir}/assets/html_templates", checkIfExists: true)
@@ -30,8 +24,6 @@ Channel.fromList(params.input_dirs)
 include { normalization_wf } from './modules/normalizations'
 include { featureselection_wf } from './modules/featureselections'
 include { modelling_wf } from './modules/makemodels'
-
-
 
 
 // -------------------------------------- //
@@ -59,8 +51,8 @@ process MERGE_TAB_DELIMITED_FILES {
     path subdir
     
     output:
-    tuple val(batchID), path("merged_dataframe_${batchID}.pkl"), emit: namedBatchtables
-    path("merged_dataframe_${batchID}.pkl"), emit: batchtables
+    //tuple val(batchID), path("merged_dataframe_${batchID}*.pkl"), emit: namedBatchtables
+    path("merged_dataframe_${batchID}*.pkl"), emit: batchtables
 
     script:
     batchID = subdir.baseName
@@ -72,7 +64,9 @@ process MERGE_TAB_DELIMITED_FILES {
         ${params.folder_is_slide == 'True' ? '--folder_is_slide' : ''} \
         --input_extension ${params.quant_file_extension} \
         --input_delimiter '${params.quant_file_delimiter}' \
-        --batchID ${batchID}
+        --batchID ${batchID} \
+        ${params.enable_large_file_splitting == 'True' ? '--enable_large_file_splitting' : ''}
+
     """
 }
 
@@ -102,6 +96,8 @@ process CHECK_PANEL_DESIGN {
  * The modified table is saved for downstream normalization and modeling.
  */
 process ADD_EMPTY_MARKER_NOISE {
+    tag { batchID }
+
 	input:
 	tuple val(batchID), path(pickleTable)
 	path designTable
@@ -128,8 +124,6 @@ process ADD_EMPTY_MARKER_NOISE {
  * ensuring balanced and reproducible training/validation splits for downstream modeling.
  */
 process GENERATE_TRAINING_N_HOLDOUT{
-    machineType 'n2-standard-32'	
-
 	publishDir(
         path: "${params.output_dir}/celltype_reports",
         pattern: "*.pdf",
@@ -159,11 +153,6 @@ process GENERATE_TRAINING_N_HOLDOUT{
 
 // Run model on everything make results
 process PREDICT_ALL_CELLS_XGB{
-	//publishDir(
-    //    path: "${params.output_dir}/celltypes",
-    //    pattern: "*_PRED.tsv",
-    //    mode: "copy"
-    //)
     
 	input:
 	tuple val(model_name), path(model_path), path(leEncoderFile)
@@ -241,7 +230,7 @@ process GENERATE_FINAL_REPORT {
     path(model_html)
     path(model_summary_json)
     path(classified_results, stageAs: "pred_results/*")
-    path(pediction_results, stageAs: "pred_results/*")
+    path(prediction_results, stageAs: "pred_results/*")
     path(template_dir)
     path(letterhead_file)
     path(nf_config, stageAs: "nextflow.config")
@@ -263,6 +252,24 @@ process GENERATE_FINAL_REPORT {
 
 }
 
+
+process MERGE_BACK_LARGE_TABLES {
+    tag { mergedID }
+    input:
+    tuple val(mergedID), path(files_to_merge)
+
+    output:
+    tuple val(mergedID), path("full_data_${mergedID}.tsv"), emit: merged_tables
+
+    script:
+    """
+    merge_back_large_tables.py \
+        --input_files ${files_to_merge.join(' ')} \
+        --output_file full_data_${mergedID}.tsv
+    """
+}
+
+
 process ZIP_PUBLISHED {
     tag "zipping published dir"
     publishDir "${params.output_dir}", pattern: "final_reports.zip", mode: 'copy', overwrite: true
@@ -279,7 +286,6 @@ process ZIP_PUBLISHED {
     zip -r final_reports.zip $final_dir
     """
 }
-
 // -------------------------------------- //
 
 
@@ -287,20 +293,26 @@ process ZIP_PUBLISHED {
 workflow {
     // Show help message if the user specifies the --help flag at runtime
     // or if any required params are not provided
-    if ( params.help || params.input_dirs == false ){
+    if ( params.help || !params.input_dirs ){
         // Invoke the function above which prints the help message
         helpMessage()
         // Exit out and do not run anything else
         exit 1
     } else {
-
         // Pull channel object `batchDirs` from nextflow env - see top of file.
         MERGE_TAB_DELIMITED_FILES(batchDirs)
-    
         CHECK_PANEL_DESIGN(MERGE_TAB_DELIMITED_FILES.output.batchtables.collect())  
+
+        // Create namedBatchtables channel from batchtables
+        namedBatchtables = MERGE_TAB_DELIMITED_FILES.output.batchtables
+            .flatten()
+            .map { file ->
+                def base = file.getBaseName()
+                def batchID = base.replaceFirst(/^merged_dataframe_/, '').replaceFirst(/\.pkl$/, '')
+                tuple(batchID, file)
+            }
         
-        //modify the pickle files to account for missing features...
-        ADD_EMPTY_MARKER_NOISE(MERGE_TAB_DELIMITED_FILES.output.namedBatchtables, CHECK_PANEL_DESIGN.output.paneldesignfile)
+        ADD_EMPTY_MARKER_NOISE(namedBatchtables, CHECK_PANEL_DESIGN.output.paneldesignfile)
            
         /*
          * - Subworkflow to handle all Normalization/Standardization Tasks - 
@@ -322,8 +334,25 @@ workflow {
         modeling_results = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures, labledDataFrames.lableFile)
         bestModel = modeling_results.best_model_results
         
+        normalizedDataFrames.view()
+        // If large file splitting is enabled, merge back the normalized tables
+        if (params.enable_large_file_splitting) {
+            // Group normalizedDataFrames by removing hyphen and last 5 chars from key
+            merged_groups = normalizedDataFrames
+            .groupTuple { tuple ->
+                def key = tuple[0].replaceFirst(/-[^-]{5}$/, '')
+                key
+            }
+            .map { key, files -> tuple(key, files.collect { it[1] }) }
+            mergeResult = MERGE_BACK_LARGE_TABLES(merged_groups)
+            normalizedDataFrames = mergeResult.merged_tables
+        }
+
         // Run the best model on the full input batches/files 
         prediction_results = PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
+
+        prediction_results.view()
+
 
         prediction_results.predictions
             .flatten() 
@@ -332,6 +361,9 @@ workflow {
                 [sampleID, file]
             }
             .set { prediction_tuples }
+
+        prediction_tuples.view()
+
 
         qc_density = QC_DENSITY(prediction_tuples)
         // Overwrite predictions with QC-augmented files for downstream steps
