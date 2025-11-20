@@ -4,8 +4,10 @@ import sys, os
 import argparse
 import pandas as pd
 import re
+import random
+import string
 
-def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_slide, input_extension, input_delimiter, batchID):
+def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_slide, input_extension, input_delimiter, batchID, target_size):
     # List all files in the directory
     files = [f for f in os.listdir(directory_path) if f.endswith(input_extension)]
 
@@ -62,8 +64,19 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
     if merged_df.shape[0] == 0:
         sys.exit("Merged Input Files result in EMPTY data table: {}".format(directory_path))
 
-    # Save the merged DataFrame as a pickle file
-    merged_df.to_pickle(f'merged_dataframe_{batchID}.pkl')
+    # If target_size is set and merged_df is larger, split into multiple files
+    if target_size and merged_df.shape[0] > target_size:
+        n_splits = (merged_df.shape[0] + target_size - 1) // target_size
+        for i in range(n_splits):
+            start_idx = i * target_size
+            end_idx = min((i + 1) * target_size, merged_df.shape[0])
+            split_df = merged_df.iloc[start_idx:end_idx]
+            rand_suffix = ''.join(random.choices(string.ascii_letters + string.digits, k=5))
+            split_df.to_pickle(f'merged_dataframe_{batchID}-{rand_suffix}.pkl')
+            print(f"[INFO] Saved split {i+1}/{n_splits} with {end_idx-start_idx} rows to merged_dataframe_{batchID}-{rand_suffix}.pkl")
+    else:
+        merged_df.to_pickle(f'merged_dataframe_{batchID}-00000.pkl')
+        print(f"[INFO] Saved merged dataframe to merged_dataframe_{batchID}-00000.pkl")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Merge tab-delimited files in a directory.")
@@ -74,7 +87,8 @@ if __name__ == "__main__":
     parser.add_argument('--input_extension', default='.txt', help='File extension to look for (default: .txt)')
     parser.add_argument('--input_delimiter', default='\t', help='Delimiter for input files (default: tab)')
     parser.add_argument('--batchID', default='batch', help='Batch ID for output pickle file name')
-
+    parser.add_argument('--target_size', type=int, default=8000, help='Target number of rows per output file (default: 8000)')
+    parser.add_argument('--enable_large_file_splitting', action='store_false', help='Enable splitting of large files into smaller chunks')
     args = parser.parse_args()
 
     if args.input_delimiter == '\\t':
@@ -88,6 +102,7 @@ if __name__ == "__main__":
         args.folder_is_slide,
         args.input_extension,
         args.input_delimiter,
-        args.batchID
+        args.batchID,
+        args.target_size
     )
 

@@ -81,8 +81,9 @@ def predict_on_xgb_best_model(toCheckDF, xgbM, bID, leEncoderFile, columnsToExpo
     
     # Export per image
     for img in toExport['Image'].unique():
+        rand_suffix = str(randint(10000, 99999))
+        outFh = os.path.join(f"{img}_{rand_suffix}_PRED.tsv")
         roiTbl = toExport[toExport['Image'] == img]
-        outFh = os.path.join(img + "_PRED.tsv")
         roiTbl.to_csv(outFh, sep="\t", index=False)
         print(f"[INFO] Saved predictions for {img} to {outFh}")
     
