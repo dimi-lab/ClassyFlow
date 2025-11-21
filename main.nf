@@ -338,12 +338,14 @@ workflow {
         //if (params.enable_large_file_splitting) {
             // Group normalizedDataFrames by removing hyphen and last 5 chars from key
         merged_groups = normalizedDataFrames
-        .map { tuple ->
-            def key = tuple[0].replaceFirst(/-[^-]{5}$/, '')
-            tuple(key, tuple[1])
+        .map { item ->
+            def key = item[0].replaceFirst(/-[^-]{5}$/, '')
+            [key, item[1]]
         }
-        .map { key, files -> tuple(key, files) }
-        merged_groups.view()    
+        .groupTuple()  
+
+        merged_groups.view()
+
 
         mergeResult = MERGE_BACK_LARGE_TABLES(merged_groups)
         normalizedDataFrames = mergeResult.merged_tables
