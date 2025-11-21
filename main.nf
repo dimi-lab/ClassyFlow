@@ -313,7 +313,6 @@ workflow {
             }
         
         ADD_EMPTY_MARKER_NOISE(namedBatchtables, CHECK_PANEL_DESIGN.output.paneldesignfile)
-           
         /*
          * - Subworkflow to handle all Normalization/Standardization Tasks - 
          */ 
@@ -343,7 +342,6 @@ workflow {
             def key = tuple[0].replaceFirst(/-[^-]{5}$/, '')
             tuple(key, tuple[1])
         }
-        .collectFile(name: { it[0] })
         .map { key, files -> tuple(key, files) }
         merged_groups.view()    
 
