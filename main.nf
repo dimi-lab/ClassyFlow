@@ -336,17 +336,20 @@ workflow {
         
         normalizedDataFrames.view()
         // If large file splitting is enabled, merge back the normalized tables
-        if (params.enable_large_file_splitting) {
+        //if (params.enable_large_file_splitting) {
             // Group normalizedDataFrames by removing hyphen and last 5 chars from key
-            merged_groups = normalizedDataFrames
-            .groupTuple { tuple ->
-                def key = tuple[0].replaceFirst(/-[^-]{5}$/, '')
-                key
-            }
-            .map { key, files -> tuple(key, files.collect { it[1] }) }
-            mergeResult = MERGE_BACK_LARGE_TABLES(merged_groups)
-            normalizedDataFrames = mergeResult.merged_tables
+        merged_groups = normalizedDataFrames
+        .map { tuple ->
+            def key = tuple[0].replaceFirst(/-[^-]{5}$/, '')
+            tuple(key, tuple[1])
         }
+        .collectFile(name: { it[0] })
+        .map { key, files -> tuple(key, files) }
+        merged_groups.view()    
+
+        mergeResult = MERGE_BACK_LARGE_TABLES(merged_groups)
+        normalizedDataFrames = mergeResult.merged_tables
+        //}
 
         // Run the best model on the full input batches/files 
         prediction_results = PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)

@@ -109,7 +109,7 @@ workflow normalization_wf {
     //if (params.override_normalization in ["boxcox", "quantile", "minmax", "log", "none"]) 
 
     norm_results = NORMALIZATION(batchPickleTable)
-
+    norm_results.view()
     // Step 2: Apply GMM gating to the normalized data
     gmm_gated = GMM_GATING(norm_results.norm_df)
     gated_ch = gmm_gated.norm_df
