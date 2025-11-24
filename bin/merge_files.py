@@ -87,7 +87,7 @@ if __name__ == "__main__":
     parser.add_argument('--input_extension', default='.txt', help='File extension to look for (default: .txt)')
     parser.add_argument('--input_delimiter', default='\t', help='Delimiter for input files (default: tab)')
     parser.add_argument('--batchID', default='batch', help='Batch ID for output pickle file name')
-    parser.add_argument('--target_size', type=int, default=8000, help='Target number of rows per output file (default: 8000)')
+    parser.add_argument('--target_size', type=int, default=20000, help='Target number of rows per output file (default: 8000)')
     parser.add_argument('--enable_large_file_splitting', action='store_false', help='Enable splitting of large files into smaller chunks')
     args = parser.parse_args()
 
