@@ -333,7 +333,6 @@ workflow {
         modeling_results = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures, labledDataFrames.lableFile)
         bestModel = modeling_results.best_model_results
         
-        normalizedDataFrames.view()
         // If large file splitting is enabled, merge back the normalized tables
         //if (params.enable_large_file_splitting) {
             // Group normalizedDataFrames by removing hyphen and last 5 chars from key
@@ -344,17 +343,12 @@ workflow {
         }
         .groupTuple()  
 
-        merged_groups.view()
-
 
         mergeResult = MERGE_BACK_LARGE_TABLES(merged_groups)
         normalizedDataFrames = mergeResult.merged_tables
-        //}
 
         // Run the best model on the full input batches/files 
         prediction_results = PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
-
-        prediction_results.view()
 
 
         prediction_results.predictions
@@ -365,7 +359,6 @@ workflow {
             }
             .set { prediction_tuples }
 
-        prediction_tuples.view()
 
 
         qc_density = QC_DENSITY(prediction_tuples)
@@ -377,14 +370,9 @@ workflow {
 
         // Generate final HTML report for the whole run
         split_outputs = labledDataFrames.training_holdout_results.flatten().collect()
+        prediction_results = predictions_for_report.map {id, file -> file }.collect()
+        classified_results = classified_report.slide_results.collect()
 
-        prediction_results = predictions_for_report.map {id, file -> file }
-            .collect()
-        
-        classified_results = classified_report.slide_results
-            .collect()
-
-        classified_results.view()
 
         // Pass all to reporting including summary JSONs
         final_report = GENERATE_FINAL_REPORT(
