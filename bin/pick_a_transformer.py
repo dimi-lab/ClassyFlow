@@ -186,10 +186,35 @@ def create_plot_for_column(df_original, df_transformed, col, transformation_type
     # Calculate correlation
     paired = pd.concat([df_original[col], df_transformed[col]], axis=1, join='inner').dropna()
     
-    if len(paired) > 0:
+    try:
         correlation, _ = pearsonr(paired.iloc[:, 0], paired.iloc[:, 1])
-    else:
-        correlation = 0
+    except TypeError as e:
+        print(f"\n[ERROR] TypeError while computing pearsonr for column '{col}': {e}")
+        print(f"Column '{col}' original dtype: {df_original[col].dtype}")
+        print(f"Column '{col}' transformed dtype: {df_transformed[col].dtype}")
+
+        # Find and print problematic values in both columns
+        orig_non_float = df_original[col][~df_original[col].apply(lambda x: isinstance(x, (int, float, float, complex)) or pd.isna(x))]
+        trans_non_float = df_transformed[col][~df_transformed[col].apply(lambda x: isinstance(x, (int, float, float, complex)) or pd.isna(x))]
+
+        if not orig_non_float.empty:
+            print(f"\n[DEBUG] Non-numeric values in original column '{col}':")
+            print(orig_non_float.head(10))
+        if not trans_non_float.empty:
+            print(f"\n[DEBUG] Non-numeric values in transformed column '{col}':")
+            print(trans_non_float.head(10))
+
+        # Show a sample of the paired data that caused the error
+        print("\n[DEBUG] Sample of paired data (first 10 rows):")
+        print(paired.head(10))
+
+        # Optionally, show all unique non-numeric values
+        print("\n[DEBUG] Unique non-numeric values in original column:")
+        print(orig_non_float.unique())
+        print("\n[DEBUG] Unique non-numeric values in transformed column:")
+        print(trans_non_float.unique())
+
+        raise  # Re-raise the error after printing
     
     # Create plot
     plt.style.use('default')
@@ -484,7 +509,20 @@ def apply_boxcox_transform(df, batch_name, target_feature):
     stat_cols = list(df_transformed.filter(regex='(Min|Max|Median|Mean|Std*|Variance|Area)'))
 
     for col in stat_cols:
-        df_transformed[col] = df_transformed[col].fillna(0)
+        # Coerce to numeric, skip column if any non-numeric values remain
+        coerced = pd.to_numeric(df_transformed[col], errors='coerce')
+        if coerced.isna().all():
+            print(f"[WARNING] Skipping column '{col}' (all values non-numeric or NaN).")
+            df_transformed[col] = np.nan
+            lambda_val = 'SkippedEmpty'
+            pre_mean = np.nan
+            metrics.append([col, pre_mean, lambda_val, np.nan, np.nan, np.nan])
+            continue
+        if coerced.isna().sum() > 0:
+            print(f"[WARNING] Column '{col}' contains some non-numeric values. These will be set to 0 for Box-Cox.")
+            coerced = coerced.fillna(0)
+        df_transformed[col] = coerced
+
         col_sum = df_transformed[col].sum()
         if col_sum == 0:
             df_transformed[col] = np.nan
@@ -500,7 +538,7 @@ def apply_boxcox_transform(df, batch_name, target_feature):
                 df_transformed[col] = 0
                 lambda_val = 'Failed'
                 lambda_values[col] = 'Failed'
-        
+
         metrics.append([col, pre_mean, lambda_val, df_transformed[col].mean(), 
                        df_transformed[col].min(), df_transformed[col].max()])
     
@@ -584,6 +622,19 @@ def main():
     print(f"Loading data from {args.pickleTable}...")
     df = pd.read_pickle(args.pickleTable)
     df = clean_image_names(df)
+    
+    # Convert statistical columns to numeric if they are not
+    sts = ["Min", "Max", "Median", "Mean", "Std.Dev.", "Variance"]
+
+    for col in df.columns:
+        if any(s in col for s in sts):
+            if not pd.api.types.is_numeric_dtype(df[col]):
+                print(f"[WARNING] Column '{col}' should be numeric but is {df[col].dtype}. Converting to numeric.")
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+                n_nans = df[col].isna().sum()
+                if n_nans > 0:
+                    print(f"[INFO] Filled {n_nans} NaN values in '{col}' with 0 after conversion.")
+                    df[col] = df[col].fillna(0)
     
     # Apply transformation
     print(f"Applying {args.method} transformation...")
