@@ -47,11 +47,12 @@ def helpMessage() {
 
 // Define a process to merge tab-delimited files and save as pickle
 process MERGE_TAB_DELIMITED_FILES {
+    tag { batchID }
+
 	input:
     path subdir
-    
+
     output:
-    //tuple val(batchID), path("merged_dataframe_${batchID}*.pkl"), emit: namedBatchtables
     path("merged_dataframe_${batchID}*.pkl"), emit: batchtables
 
     script:
@@ -65,8 +66,7 @@ process MERGE_TAB_DELIMITED_FILES {
         --input_extension ${params.quant_file_extension} \
         --input_delimiter '${params.quant_file_delimiter}' \
         --batchID ${batchID} \
-        ${params.enable_large_file_splitting == 'True' ? '--enable_large_file_splitting' : ''}
-
+        ${params.target_splitting_size ? "--target_size ${params.target_splitting_size}" : ""}
     """
 }
 
