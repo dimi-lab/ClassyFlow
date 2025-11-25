@@ -89,7 +89,7 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
         file_path = os.path.join(directory_path, file)
         try:
             header = pd.read_csv(file_path, nrows=0, sep=input_delimiter, dtype=str).columns
-            print(f"[INFO] {os.path.basename(file_path)}: {len(header)} columns")
+            print(f"[INFO] {os.path.basename(file_path)} ({directory_path}): {len(header)} columns")
         except Exception as e:
             print(f"[WARNING] Could not read columns from {file_path}: {e}")
 
@@ -119,6 +119,19 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
                 print(f"  Extra columns: {extra}")
     if mismatch:
         sys.exit("[ERROR] Not all files have identical columns. Please fix the input files.")
+
+    sts = ["Min", "Max", "Median", "Mean", "Std.Dev.", "Variance"]
+
+    for col in merged_df.columns:
+        if any(s in col for s in sts):
+            # Check if column is numeric
+            if not pd.api.types.is_numeric_dtype(merged_df[col]):
+                print(f"[WARNING] Column '{col}' should be numeric but is {merged_df[col].dtype}. Attempting to convert.")
+                merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce')
+                n_nans = merged_df[col].isna().sum()
+                if n_nans > 0:
+                    print(f"[INFO] Filled {n_nans} NaN values in '{col}' with 0 after conversion.")
+                    merged_df[col] = merged_df[col].fillna(0)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Merge tab-delimited files in a directory.")
