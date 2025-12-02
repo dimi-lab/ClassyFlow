@@ -48,7 +48,7 @@ if __name__ == "__main__":
     parser.add_argument('--varThreshold', type=float, default=0.01, help='Variance threshold')
     parser.add_argument('--mim_class_label_threshold', type=int, required=True, help='Minimum class label threshold')
     parser.add_argument('--ifSubsetData', type=lambda x: (str(x).lower() == 'true'), default=True, help='Whether to subset data')
-    parser.add_argument('--subSet_n', type=int, default=3000, help='Subset size for each class')
+    parser.add_argument('--subSet_n', type=int, default=4000, help='Subset size for each class')
 
     args = parser.parse_args()
 

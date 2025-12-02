@@ -96,6 +96,7 @@ process RUN_ALL_RFE{
 
 
 process MERGE_RFE_SCORE_CSV_FILES {
+    tag{celltype}
     input:
     tuple val(celltype), path(csv_files)
 
