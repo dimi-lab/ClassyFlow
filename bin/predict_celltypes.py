@@ -3,15 +3,12 @@
 import os, sys
 import pickle
 import argparse
-
 import xgboost as xgb
 from sklearn import preprocessing
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-
 from random import randint
 
 ## Static Variables: File Formatting

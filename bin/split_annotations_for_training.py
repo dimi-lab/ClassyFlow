@@ -4,14 +4,13 @@ import os, sys, csv, time
 import argparse
 import pandas as pd
 import json
-
+import gc
 import warnings
+import concurrent.futures
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-
-### Static Variables: File Formatting
 batchColumn = 'Batch'
-
+excludeErronousNanString = "nan"
 
 def stratified_split(df, stratify_cols, holdout_frac, min_count):    
     if df.empty:
@@ -62,6 +61,24 @@ def stratified_split(df, stratify_cols, holdout_frac, min_count):
     
     return split_indicator
 
+def process_file(file, classColumn, cellTypeNegative, excludeErronousNanString, batchColumn):
+    print(f"Getting...{file}")
+    if file.endswith('.pkl'):
+        df = pd.read_pickle(file)
+        dataframe_name = os.path.basename(file).replace('.pkl','').replace('merged_dataframe_','')
+    else:
+        df = pd.read_csv(file, sep='\t', low_memory=False)
+        dataframe_name = os.path.basename(file).replace('.tsv','').replace('boxcox_transformed_','')
+    df[batchColumn] = dataframe_name
+
+    # Filter out negative/unwanted classes and drop NA in classColumn
+    df[classColumn] = df[classColumn].astype(str).str.strip()
+    df = df.dropna(subset=[classColumn])
+    df = df.loc[~df[classColumn].isin(cellTypeNegative)]
+    df = df[df[classColumn] != excludeErronousNanString]
+    print(f"After filtering erroneous 'nan' strings: {df.shape[0]} rows")
+    print(f"Value counts for '{classColumn}' after filtering:\n{df[classColumn].value_counts()}")
+    return df
 
 def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegative, minimumHoldoutThreshold):
     dataframes = []
@@ -71,34 +88,28 @@ def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegat
         'min_holdout_thresh': minimumHoldoutThreshold
     }
 
-    # Load and combine data
-    for file in pickle_files:
-        print(f"Getting...{file}")
-        if file.endswith('.pkl'):
-            df = pd.read_pickle(file)
-            dataframe_name = os.path.basename(file).replace('.pkl','').replace('merged_dataframe_','')
-        else:
-            df = pd.read_csv(file, sep='\t', low_memory=False)
-            dataframe_name = os.path.basename(file).replace('.tsv','').replace('boxcox_transformed_','')
-        df[batchColumn] = dataframe_name
-        dataframes.append(df)
-    
+    # Parallel file processing
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [
+            executor.submit(
+                process_file, file, classColumn, cellTypeNegative, excludeErronousNanString, batchColumn
+            )
+            for file in pickle_files
+        ]
+        for future in concurrent.futures.as_completed(futures):
+            df = future.result()
+            dataframes.append(df)
+            gc.collect()
+
     merged_df = pd.concat(dataframes, ignore_index=True)
+    print(f"[MERGE CHECK] After merging: {merged_df.shape[0]} rows, {merged_df.shape[1]} columns")
     del dataframes
-    del df
+    gc.collect()
     
-    #Gather some metrics before any filtering
+    # Gather some metrics before any further filtering
     results['total_num_cells'] = len(merged_df)
     results['total_num_batches'] = merged_df[batchColumn].nunique()
     results['total_num_rois'] = merged_df["Image"].nunique()
-
-    # Clean data and remove unlabelled rows
-    merged_df[classColumn] = merged_df[classColumn].str.strip()
-    merged_df = merged_df.dropna(subset=[classColumn])
-
-    # Remove empty strings and negative classes
-    merged_df = merged_df.loc[~merged_df[classColumn].isin(cellTypeNegative)]
-    merged_df = merged_df.reset_index(drop=True)  # Clean reset
     results['total_num_annotated_cells'] = len(merged_df)
     results['total_num_cell_types'] = merged_df[classColumn].nunique()
 
@@ -112,24 +123,26 @@ def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegat
     
     # Add split column to dataframe
     merged_df['split'] = split_indicator
+    merged_df = merged_df.copy()  # Defragments the DataFrame in memory
+
+    # --- Add check here ---
+    print(f"Unique '{classColumn}' values: {merged_df[classColumn].nunique()} = [{', '.join(merged_df[classColumn].unique())}]")
+    print(f"Total rows: {merged_df.shape[0]}, Total columns: {merged_df.shape[1]}")
+    # --- End check ---
 
     ct = merged_df[classColumn].value_counts().rename('Label Count')
     pt = merged_df[classColumn].value_counts(normalize=True).mul(100).round(2).rename('Label Percent').astype(str) + '%'
     grouped = (merged_df.groupby([classColumn, 'split']).size().unstack(fill_value=0).rename_axis(None, axis=1))
     grouped.rename(columns={'train': 'Training Set Count', 'holdout': 'Holdout Set Count'}, inplace=True)
     
-     # Combine everything
     freq_table = pd.concat([ct, pt, grouped], axis=1).reset_index()
     freq_table.rename(columns={classColumn: 'Label'}, inplace=True)
 
-    # Ensure consistent column order
     for col in ['Training labels', 'Holdout labels', 'Not Used']:
         if col not in freq_table.columns:
             freq_table[col] = 0
 
-    #Keep only columns we want 
     freq_table = freq_table[['Label', 'Label Count', 'Label Percent', 'Training Set Count', 'Holdout Set Count']]
-    
     freq_table.to_csv('cell_count_table.csv', index=False)
 
     # Save cell types that made it to holdout
@@ -143,22 +156,20 @@ def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegat
     holdout_df = merged_df[merged_df['split'] == 'holdout'].copy()
     train_df = merged_df[merged_df['split'] == 'train'].copy()
     del merged_df
+    gc.collect()
 
     # Remove split column before saving
     holdout_df = holdout_df.drop('split', axis=1)
     train_df = train_df.drop('split', axis=1)
     
-    # Validation checks
     assert holdout_df[classColumn].nunique() == train_df[classColumn].nunique(), "Training and holdout data have different number of classes!!!"
     
     results['total_holdout'] = len(holdout_df)
     results['total_training'] = len(train_df)
     
-    # Save final dataframes
     holdout_df.to_pickle('holdout_dataframe.pkl')
     train_df.to_pickle('training_dataframe.pkl')
     
-    # Save results
     with open('training_split_report.json', 'w') as f:
         json.dump(results, f, indent=2)
     
