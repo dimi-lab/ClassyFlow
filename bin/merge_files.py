@@ -39,12 +39,32 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
         else:
             return 100000
 
+    # Read headers first to determine reference column order
+    header_sets = {}
+    for file in files:
+        file_path = os.path.join(directory_path, file)
+        try:
+            header = pd.read_csv(file_path, nrows=0, sep=input_delimiter, dtype=str).columns.tolist()
+            header_sets[file] = header
+        except Exception as e:
+            print(f"[ERROR] Could not read header from {file_path}: {e}")
+            sys.exit(1)
+    ref_file = files[0]
+    ref_header = header_sets[ref_file]
+
     dataframes = []
     for file in files:
         file_path = os.path.join(directory_path, file)
         excld_regex = excld if excld != '' else None
         chunk_size = get_chunk_size(file_path)
         df = load_selected_columns(file_path, chunk_size=chunk_size, excld_regex=excld_regex)
+        # Reorder columns if possible
+        if list(df.columns) != ref_header and len(df.columns) == len(ref_header):
+            try:
+                df = df.reindex(columns=ref_header)
+                print(f"[INFO] Reordered columns in '{file}' to match '{ref_file}'.")
+            except Exception as e:
+                print(f"[WARNING] Could not reorder columns in '{file}': {e}")
         if slide_by_prefix:
             df['Slide'] = [e.split('_')[0] for e in df['Image'].tolist() ]
         elif folder_is_slide:
@@ -109,14 +129,23 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
     mismatch = False
     for fname, header in header_sets.items():
         if header != ref_header:
-            mismatch = True
             missing = sorted(set(ref_header) - set(header))
             extra = sorted(set(header) - set(ref_header))
-            print(f"[ERROR] File '{fname}' has different columns than '{ref_file}'.")
-            if missing:
-                print(f"  Missing columns: {missing}")
-            if extra:
-                print(f"  Extra columns: {extra}")
+            if not missing and not extra:
+                print(f"[WARNING] File '{fname}' columns are out of order compared to '{ref_file}'. Reordering columns.")
+                # Fix column order in the corresponding dataframe
+                for i, file in enumerate(files):
+                    if file == fname:
+                        dataframes[i] = dataframes[i].reindex(columns=ref_header)
+                        break
+            else:
+                mismatch = True
+                print(f"[ERROR] File '{fname}' has different columns than '{ref_file}'.")
+                print(f"  Missing = {missing}  & Extra = {extra}")
+                if missing:
+                    print(f"  Missing columns: {missing}")
+                if extra:
+                    print(f"  Extra columns: {extra}")
     if mismatch:
         sys.exit("[ERROR] Not all files have identical columns. Please fix the input files.")
 
