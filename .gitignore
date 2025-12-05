@@ -1,5 +1,6 @@
 # Development environment files
 .envrc
+conf/ahn2.config
 
 # Nexflow items
 .nextflow*
