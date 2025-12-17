@@ -13,29 +13,32 @@ from datetime import datetime
 import json
 import os
 
-def plot_parameter_search(df, output_path):
-    """Create improved parameter search boxplot and save to file"""
+def plot_parameter_search(df, top_models, output_path):
+    """Create parameter search boxplot and save to file"""
     df['combination'] = df.apply(lambda row: f"max_depth={row['max_depth']}, eta={row['eta']}", axis=1)
-    
+
     # Sort combinations by max_depth first, then eta
     df_sorted = df.sort_values(['max_depth', 'eta'])
     ordered_combs = df_sorted['combination'].unique().tolist()
-    
-    mean_values = df.groupby('combination')['testf'].mean()
-    max_comb = mean_values.idxmax()
-    second_max_comb = mean_values.nlargest(2).idxmin()
-    
+
+    # Get top 2 combinations from provided top_models
+    top_2_combs = [f"max_depth={row['max_depth']}, eta={row['eta']}" 
+                    for _, row in top_models.iterrows()]
+    max_comb = top_2_combs[0]
+    second_max_comb = top_2_combs[1] if len(top_2_combs) > 1 else None
+
     # Create better color palette
     color_palette = ['#bdc3c7'] * len(ordered_combs)  # Light gray for others
     color_palette[ordered_combs.index(max_comb)] = '#e74c3c'  # Red for best
-    color_palette[ordered_combs.index(second_max_comb)] = '#f39c12'  # Orange for second
+    if second_max_comb:
+        color_palette[ordered_combs.index(second_max_comb)] = '#f39c12'  # Orange for second
 
     fig, ax = plt.subplots(figsize=(18, 10))
-    
+
     # Create boxplot with improved styling and specified order
     box_plot = sns.boxplot(
         x='combination', y='testf', hue='combination', data=df,
-        order=ordered_combs,  # Add order parameter
+        order=ordered_combs,
         palette=color_palette, legend=False, 
         flierprops={'markerfacecolor':'#95a5a6', 'markeredgecolor':'#7f8c8d', 'markersize': 6},
         boxprops={'alpha': 0.8, 'linewidth': 1.5},
@@ -44,26 +47,25 @@ def plot_parameter_search(df, output_path):
         medianprops={'linewidth': 2, 'color': '#2c3e50'},
         ax=ax
     )
-    
+
     # Find positions where max_depth changes and draw vertical lines
     max_depths = df_sorted.groupby('combination')['max_depth'].first()
     max_depths_ordered = [max_depths[comb] for comb in ordered_combs]
-    
+
     for i in range(1, len(max_depths_ordered)):
         if max_depths_ordered[i] != max_depths_ordered[i-1]:
-            # Draw vertical line between position i-1 and i
             ax.axvline(x=i-0.5, color='#34495e', linestyle='--', linewidth=2, alpha=0.6)
-    
+
     # Styling
     ax.set_ylim(df['testf'].min() - 0.01, df['testf'].max() + 0.01)
     yticks = ax.get_yticks()
     ax.set_yticklabels(['{:.0f}%'.format(y * 100) for y in yticks])
-    
+
     ax.set_xlabel('Parameter Combinations', fontsize=14, fontweight='bold', color='#2c3e50')
     ax.set_ylabel('Test Accuracy', fontsize=14, fontweight='bold', color='#2c3e50')
     ax.set_title('XGBoost Parameter Search Results', fontsize=16, fontweight='bold', 
-                 color='#2c3e50', pad=20)
-    
+                    color='#2c3e50', pad=20)
+
     # Grid and axis styling
     ax.grid(True, alpha=0.3, axis='y', linestyle='-', color='#bdc3c7')
     ax.set_axisbelow(True)
@@ -71,25 +73,30 @@ def plot_parameter_search(df, output_path):
     ax.spines['right'].set_visible(False)
     ax.spines['left'].set_color('#bdc3c7')
     ax.spines['bottom'].set_color('#bdc3c7')
-    
+
     # Rotate x-axis labels
     plt.xticks(rotation=35, ha='right', fontsize=11, color='#2c3e50')
     ax.tick_params(axis='y', which='major', labelsize=12, colors='#2c3e50')
-    
+
     # Background styling
     fig.patch.set_facecolor('white')
     ax.set_facecolor('#f8f9fa')
-    
+
     # Add legend for color coding
     from matplotlib.patches import Patch
     legend_elements = [
         Patch(facecolor='#e74c3c', alpha=0.8, label='Best Model'),
-        Patch(facecolor='#f39c12', alpha=0.8, label='Second Best Model'),
-        Patch(facecolor='#bdc3c7', alpha=0.8, label='Other Models')
     ]
+    if second_max_comb:
+        legend_elements.append(
+            Patch(facecolor='#f39c12', alpha=0.8, label='Second Best Model')
+        )
+    legend_elements.append(
+        Patch(facecolor='#bdc3c7', alpha=0.8, label='Other Models')
+    )
     ax.legend(handles=legend_elements, loc='upper left', frameon=True, 
-              fancybox=True, shadow=True, framealpha=0.9)
-    
+                fancybox=True, shadow=True, framealpha=0.9)
+
     plt.tight_layout()
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.close()
@@ -185,10 +192,6 @@ def make_a_new_model(toTrainDF, classColumn, cpu_jobs,
     num_round = 200
     xgboostParams = pd.read_csv(model_performance_table)
 
-    param_plot_path = "xgbWinners_parameter_search.png"
-    plot_parameter_search(xgboostParams, param_plot_path)
-    results['parameter_search_plot_path'] = param_plot_path
-
     #Create summary table
     xgboostParams['Training'] = xgboostParams['Training'].str.rstrip('%').astype(float) / 100
     summary_table = xgboostParams.groupby(['max_depth', 'eta']).agg(
@@ -231,6 +234,11 @@ def make_a_new_model(toTrainDF, classColumn, cpu_jobs,
         #Save
         pickle.dump(bst, open(fname, "wb"))
         print(f"Model saved: {fname}")
+
+    #Plot param search 
+    param_plot_path = "xgbWinners_parameter_search.png"
+    plot_parameter_search(xgboostParams, top_models, param_plot_path)
+    results['parameter_search_plot_path'] = param_plot_path
 
     return results
 
