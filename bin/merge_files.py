@@ -6,14 +6,17 @@ import pandas as pd
 import re
 import random
 import string
+import numpy as np
 
 def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_slide, input_extension, input_delimiter, batchID, target_size):
     # List all files in the directory
     files = [f for f in os.listdir(directory_path) if f.endswith(input_extension)]
+    assert len(files) > 0, f"No files with extension '{input_extension}' found in directory: {directory_path}"
 
     def load_selected_columns(file_path, chunk_size=40000, excld_regex=None):
         selected_columns = []
         all_chunks = []
+        sts = ["Min", "Max", "Median", "Mean", "Std.Dev.", "Variance"]
         # Read the first chunk to identify columns to exclude
         for first_chunk in pd.read_csv(file_path, chunksize=1, low_memory=False, sep=input_delimiter, dtype=str):
             columns = first_chunk.columns
@@ -26,8 +29,19 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
         # Process chunks efficiently
         with pd.read_csv(file_path, usecols=selected_columns, chunksize=chunk_size, low_memory=False, sep=input_delimiter, dtype=str) as reader:
             for chunk in reader:
+                # Convert stat columns to numeric during chunk loading
+                for col in chunk.columns:
+                    if any(s in col for s in sts):
+                        chunk[col] = pd.to_numeric(chunk[col], errors='coerce').fillna(0)
                 all_chunks.append(chunk)
         allLnData = pd.concat(all_chunks, axis=0, ignore_index=True)
+        # Assert file is not empty
+        assert allLnData.shape[0] > 0, f"Input file '{file_path}' is empty after loading."
+        # Assert no duplicate columns
+        assert allLnData.columns.duplicated().sum() == 0, f"Duplicate columns found in file '{file_path}': {allLnData.columns[allLnData.columns.duplicated()].tolist()}"
+        # Assert key columns present
+        for key_col in ['Image']:
+            assert key_col in allLnData.columns, f"Required column '{key_col}' missing in file '{file_path}'"
         return allLnData
 
     def get_chunk_size(file_path):
@@ -58,6 +72,19 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
         excld_regex = excld if excld != '' else None
         chunk_size = get_chunk_size(file_path)
         df = load_selected_columns(file_path, chunk_size=chunk_size, excld_regex=excld_regex)
+        # Assert consistent data types for each column
+        if len(dataframes) > 0:
+            prev_df = dataframes[0]
+            for col in df.columns:
+                if col in prev_df.columns:
+                    if df[col].dtype != prev_df[col].dtype:
+                        # If both are numeric, cast both to float and warn
+                        if (pd.api.types.is_numeric_dtype(df[col]) and pd.api.types.is_numeric_dtype(prev_df[col])):
+                            print(f"[WARNING] Column '{col}' has inconsistent numeric dtypes between files: {df[col].dtype} vs {prev_df[col].dtype}. Casting both to float.")
+                            df[col] = df[col].astype(float)
+                            prev_df[col] = prev_df[col].astype(float)
+                        else:
+                            raise AssertionError(f"Column '{col}' has inconsistent dtype between files: {df[col].dtype} vs {prev_df[col].dtype}")
         # Reorder columns if possible
         if list(df.columns) != ref_header and len(df.columns) == len(ref_header):
             try:
@@ -66,7 +93,7 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
             except Exception as e:
                 print(f"[WARNING] Could not reorder columns in '{file}': {e}")
         if slide_by_prefix:
-            df['Slide'] = [e.split('_')[0] for e in df['Image'].tolist() ]
+            df['Slide'] = df['Image'].str.split('_').str[0]
         elif folder_is_slide:
             df['Slide'] = directory_path
         else:
@@ -79,30 +106,23 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
     # Concatenate all DataFrames
     merged_df = pd.concat(dataframes, ignore_index=True)
     merged_df = merged_df.reset_index(drop=True)
+    # Assert merged DataFrame is not empty
+    assert merged_df.shape[0] > 0, f"Merged Input Files result in EMPTY data table: {directory_path}"
+    # Assert no duplicate columns in merged DataFrame
+    assert merged_df.columns.duplicated().sum() == 0, f"Duplicate columns found in merged DataFrame: {merged_df.columns[merged_df.columns.duplicated()].tolist()}"
+    # Warn if merged DataFrame has fewer columns than expected (may be due to excludingString)
+    expected_cols = len(ref_header)
+    if merged_df.shape[1] < expected_cols:
+        print(f"[WARNING] Merged DataFrame has fewer columns ({merged_df.shape[1]}) than expected ({expected_cols}). This may be due to the excludingString filter.")
+    # Assert key columns present
+    for key_col in ['Image', 'Slide']:
+        assert key_col in merged_df.columns, f"Required column '{key_col}' missing in merged DataFrame"
+    # Assert unique image origin mapping
+    assert merged_df['Image'].notna().all(), "Some rows in merged DataFrame have missing 'Image' values"
 
-    ## Throw Error if Quant Files are empty.
-    if merged_df.shape[0] == 0:
-        sys.exit("Merged Input Files result in EMPTY data table: {}".format(directory_path))
-
-    # If target_size is set and merged_df is larger, split into multiple files (round robin)
-    if target_size and merged_df.shape[0] > target_size:
-        n_splits = (merged_df.shape[0] + target_size - 1) // target_size
-        rand_suffixes = [''.join(random.choices(string.ascii_letters + string.digits, k=5)) for _ in range(n_splits)]
-        out_paths = [f'merged_dataframe_{batchID}-{suffix}.pkl' for suffix in rand_suffixes]
-        split_dfs = [[] for _ in range(n_splits)]
-
-        # Assign each row to a split in round robin fashion
-        for idx, row in merged_df.iterrows():
-            split_idx = idx % n_splits
-            split_dfs[split_idx].append(row)
-
-        for i, rows in enumerate(split_dfs):
-            split_df = pd.DataFrame(rows, columns=merged_df.columns)
-            split_df.to_pickle(out_paths[i])
-            print(f"[INFO] Saved split {i+1}/{n_splits} with {split_df.shape[0]} rows to {out_paths[i]}")
-    else:
-        merged_df.to_pickle(f'merged_dataframe_{batchID}-00000.pkl')
-        print(f"[INFO] Saved merged dataframe to merged_dataframe_{batchID}-00000.pkl")
+    # Save merged dataframe to a single output file
+    merged_df.to_pickle(f'merged_dataframe_{batchID}-00000.pkl')
+    print(f"[INFO] Saved merged dataframe to merged_dataframe_{batchID}-00000.pkl")
 
     # Print basename and number of columns for each file
     for file in files:
@@ -148,19 +168,6 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
                     print(f"  Extra columns: {extra}")
     if mismatch:
         sys.exit("[ERROR] Not all files have identical columns. Please fix the input files.")
-
-    sts = ["Min", "Max", "Median", "Mean", "Std.Dev.", "Variance"]
-
-    for col in merged_df.columns:
-        if any(s in col for s in sts):
-            # Check if column is numeric
-            if not pd.api.types.is_numeric_dtype(merged_df[col]):
-                print(f"[WARNING] Column '{col}' should be numeric but is {merged_df[col].dtype}. Attempting to convert.")
-                merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce')
-                n_nans = merged_df[col].isna().sum()
-                if n_nans > 0:
-                    print(f"[INFO] Filled {n_nans} NaN values in '{col}' with 0 after conversion.")
-                    merged_df[col] = merged_df[col].fillna(0)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Merge tab-delimited files in a directory.")
