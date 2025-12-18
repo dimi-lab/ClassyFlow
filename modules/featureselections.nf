@@ -223,7 +223,7 @@ workflow featureselection_wf {
     labelWithAlphas.dump(tag: 'labelWithAlphas', pretty: true)
     
     // Step 9: Generate a channel of feature counts for RFE (Recursive Feature Elimination)
-    ref_counts = Channel.from(params.min_rfe_nfeatures..params.max_rfe_nfeatures)
+    ref_counts = Channel.from((params.min_rfe_nfeatures..params.max_rfe_nfeatures).step(params.rfe_step))
     // Combine labelWithAlphas and feature counts for RFE
     scatter2_channel = labelWithAlphas.combine(ref_counts)
     //scatter2_channel.view()
