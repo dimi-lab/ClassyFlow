@@ -334,8 +334,7 @@ workflow {
         bestModel = modeling_results.best_model_results
         
         // If large file splitting is enabled, merge back the normalized tables
-        //if (params.enable_large_file_splitting) {
-            // Group normalizedDataFrames by removing hyphen and last 5 chars from key
+        // Group normalizedDataFrames by removing hyphen and last 5 chars from key
         merged_groups = normalizedDataFrames
         .map { item ->
             def key = item[0].replaceFirst(/-[^-]{5}$/, '')
@@ -343,7 +342,7 @@ workflow {
         }
         .groupTuple()  
 
-
+        merged_groups.view()
         mergeResult = MERGE_BACK_LARGE_TABLES(merged_groups)
         normalizedDataFrames = mergeResult.merged_tables
 
