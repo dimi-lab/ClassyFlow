@@ -12,7 +12,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 batchColumn = 'Batch'
 excludeErronousNanString = "nan"
 
-def stratified_split(df, stratify_cols, holdout_frac, min_count):    
+def stratified_split(df, stratify_cols, holdout_frac, min_count, min_count_col):    
     if df.empty:
         return pd.Series(dtype='object', name='split')
     if not (0 < holdout_frac < 1):
@@ -24,37 +24,50 @@ def stratified_split(df, stratify_cols, holdout_frac, min_count):
     if missing_cols:
         raise ValueError(f"Columns not found in DataFrame: {missing_cols}")
     
-    group_sizes = df.groupby(stratify_cols).size()
-    valid_groups = group_sizes[group_sizes >= min_count].index
+    if min_count_col not in df.columns:
+        raise ValueError(f"min_count_col '{min_count_col}' not found in DataFrame")
     
+    # Filter based on overall counts in min_count_col
+    class_counts = df[min_count_col].value_counts()
+    valid_classes = class_counts[class_counts >= min_count].index
+    
+    print(f"Classes with >= {min_count} samples: {len(valid_classes)}/{len(class_counts)}")
+    excluded_classes = class_counts[class_counts < min_count]
+    if len(excluded_classes) > 0:
+        print(f"Excluded classes (< {min_count} samples):")
+        for cls, count in excluded_classes.items():
+            print(f"  {cls}: {count} samples")
+    
+    # Keep only rows with valid classes
+    valid_mask = df[min_count_col].isin(valid_classes)
+    valid_indices = df.index[valid_mask]
+    
+    # Create grouping keys for stratification
     if len(stratify_cols) == 1:
         group_keys = df[stratify_cols[0]]
     else:
         group_keys = df[stratify_cols].apply(tuple, axis=1)
     
-    mask = group_keys.isin(valid_groups)
-    valid_indices = df.index[mask]
-    
     def sample_group(group_df):
         n_holdout = int(len(group_df) * holdout_frac)
         if n_holdout == 0:
+            # If group is too small for holdout, put all in train
             return pd.Series(False, index=group_df.index)
         sampled_indices = group_df.sample(n=n_holdout, random_state=42).index
         holdout_series = pd.Series(False, index=group_df.index)
         holdout_series.loc[sampled_indices] = True
         return holdout_series
     
+    # Stratified sampling on valid data only
     holdout_mask = (
         df.loc[valid_indices]
-        .groupby(group_keys[valid_indices])
-        .apply(sample_group)
+        .groupby(group_keys[valid_indices], group_keys=False)
+        .apply(sample_group, include_groups=False)
     )
     
-    if isinstance(holdout_mask.index, pd.MultiIndex):
-        holdout_indices = holdout_mask[holdout_mask].index.get_level_values(-1)
-    else:
-        holdout_indices = holdout_mask[holdout_mask].index
+    holdout_indices = holdout_mask[holdout_mask].index
     
+    # Create split indicator
     split_indicator = pd.Series('Not Used', index=df.index, name='split')
     split_indicator.loc[valid_indices] = 'train'
     split_indicator.loc[holdout_indices] = 'holdout'
@@ -118,7 +131,8 @@ def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegat
         merged_df, 
         [batchColumn, classColumn], 
         holdout_frac=holdoutFraction, 
-        min_count=minimumHoldoutThreshold
+        min_count=minimumHoldoutThreshold,
+        min_count_col=classColumn
     )
     
     # Add split column to dataframe
