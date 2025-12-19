@@ -117,53 +117,55 @@ def check_header_conflicts(df, batchID_param):
         raise ValueError(f"Header columns found that start with the batchID prefix '{batchid_prefix}': {header_matches}")
 
 def generate_synthetic_columns(df, missingMarks, objtype):
-    synthetic_features = 0
-    prt1DataT = df.copy()
     if not missingMarks:
-        return prt1DataT, synthetic_features
-    new_columns_dict = {}
+        return df.copy(), 0
+
+    new_columns = {}
     warning_count = 0
+
     for st in getUniqueSets(objtype):
         # Select columns matching the substring and force all to numeric
         commonSetFeatures = df.filter(regex=st).apply(pd.to_numeric, errors='coerce')
         logging.debug(f"'{st}'   => {str(commonSetFeatures.shape)}")
+
         if commonSetFeatures.shape[1] == 0:
             logging.warning(f"No columns found for set '{st}'. Skipping.")
             warning_count += 1
             continue
+        
         # If too many warnings for CellObject, raise error
         if objtype == 'CellObject' and warning_count >= 5:
             raise ValueError("Too many missing sets for CellObject. Check if the correct object type is provided. At least 5 sets were missing.")
+        
         descTbl = commonSetFeatures.describe([0.01,0.02,0.05,0.9])
-        descTbl['avg'] = descTbl.mean(axis=1)
-        if 'min' not in descTbl.index or '5%' not in descTbl.index:
-            logging.warning(f"Could not find 'min' or '5%' in describe() for {st}. Skipping this set.")
+        mn = descTbl.loc['min'].mean()
+        mx = descTbl.loc['5%'].mean()
+
+        filteredMissingFields = [f+st for f in missingMarks if f + st not in df.columns]
+        if not filteredMissingFields:
+            logging.warning(f"Skipping synthetic column '{col}' because it already exists in input DataFrame.")
             continue
-        mn = descTbl.loc['min','avg']
-        mx = descTbl.loc['5%','avg']
-        theseMissingFields = [f+st for f in missingMarks]
-        # Only add columns that do not already exist
-        filteredMissingFields = []
-        for col in theseMissingFields:
-            if col in df.columns:
-                logging.warning(f"Skipping synthetic column '{col}' because it already exists in input DataFrame.")
-                continue
-            filteredMissingFields.append(col)
-        synthetic_features += len(filteredMissingFields)
-        if len(filteredMissingFields) == 0:
-            continue
+
         if pd.isna(mn) or pd.isna(mx):
             logging.warning(f"NaN detected for {st} (mn={mn}, mx={mx}), filling with zeros.")
-            dfTmp = pd.DataFrame(0, index=df.index, columns=filteredMissingFields)
+            for col in filteredMissingFields:
+                new_columns[col] = np.zeros(len(df))
         else:
             vals = np.random.uniform(low=mn, high=mx, size=(len(df), len(filteredMissingFields)))
-            dfTmp = pd.DataFrame(vals, columns=filteredMissingFields)
-            dfTmp[dfTmp < 0] = 0
-        for col in filteredMissingFields:
-            new_columns_dict[col] = dfTmp[col]
-    if new_columns_dict:
-        prt1DataT = pd.concat([prt1DataT, pd.DataFrame(new_columns_dict)], axis=1)
-        logging.info(f"Headers after synthetic columns added: {list(prt1DataT.columns)}")
+            vals = np.clip(vals, 0, None)
+            for i, col in enumerate(filteredMissingFields):
+                new_columns[col] = vals[:, i]
+        
+    synthetic_features = len(new_columns)
+
+    if new_columns:
+        synthetic_df = pd.DataFrame(new_columns, index=df.index)
+        prt1DataT = pd.concat([df, synthetic_df], axis=1, copy=False)
+        logging.info(f"Added {synthetic_features} synthetic columns.")
+        logging.debug(f"Headers after synthetic columns added: {list(prt1DataT.columns)}")
+    else:
+        prt1DataT = df.copy()
+
     return prt1DataT, synthetic_features
 
 def write_output_files(prt1DataT, batchID_param, missingMarks, synthetic_features, original_features):
