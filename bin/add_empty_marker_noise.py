@@ -183,9 +183,9 @@ def write_output_files(prt1DataT, batchID_param, missingMarks, synthetic_feature
     with open(f'missing_data_fill_report_{batchID_param}.json', 'w') as f:
         json.dump(summary_report, f, indent=2)
 
-def findMissingFeatures(df, batchID_param, designFile, objtype):
+def findMissingFeatures(df, batchID_param, prefix, designFile, objtype):
     panelDesign = load_and_validate_panel_design(designFile)
-    batch_col, batch_prefix, batch_suffix = resolve_batch_column(panelDesign, batchID_param)
+    batch_col, batch_prefix, batch_suffix = resolve_batch_column(panelDesign, prefix)
     missingMarks = get_missing_markers(panelDesign, batch_col, batch_prefix)
     check_header_conflicts(df, batchID_param)
     logging.info(f"For batch '{batchID_param}', missing markers to add: {missingMarks}")
@@ -239,11 +239,16 @@ if __name__ == "__main__":
                 myDataFile[col] = pd.to_numeric(myDataFile[col], errors='coerce').fillna(min_val)
                 logging.info(f"    -> Filled NaNs in numeric column '{col}' with minimum value: {min_val}")
 
+    # Get batchID directly from the df:
+    #Assert that this df only has 1 unique batchID
+    assert myDataFile["original_batchID"].nunique(dropna=False) == 1
+    prefix = str(myDataFile["original_batchID"].dropna().unique().item())
+
     myFileIdx = args.batchID
     panelCsvFile = args.designTable
     objtype = args.objtype
 
-    findMissingFeatures(myDataFile, myFileIdx, panelCsvFile, objtype)
+    findMissingFeatures(myDataFile, myFileIdx, prefix, panelCsvFile, objtype)
 
 
 

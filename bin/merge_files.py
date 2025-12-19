@@ -106,6 +106,10 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
     # Concatenate all DataFrames
     merged_df = pd.concat(dataframes, ignore_index=True)
     merged_df = merged_df.reset_index(drop=True)
+
+    #Adding batchID to track throughout the pipeline
+    merged_df["original_batchID"] = batchID
+    
     # Assert merged DataFrame is not empty
     assert merged_df.shape[0] > 0, f"Merged Input Files result in EMPTY data table: {directory_path}"
     # Assert no duplicate columns in merged DataFrame
