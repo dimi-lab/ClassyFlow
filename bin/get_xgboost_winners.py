@@ -22,8 +22,7 @@ def plot_parameter_search(df, top_models, output_path):
     ordered_combs = df_sorted['combination'].unique().tolist()
 
     # Get top 2 combinations from provided top_models
-    top_2_combs = [f"max_depth={row['max_depth']}, eta={row['eta']}" 
-                    for _, row in top_models.iterrows()]
+    top_2_combs = [f"max_depth={int(row['max_depth'])}, eta={row['eta']}" for _, row in top_models.iterrows()]
     max_comb = top_2_combs[0]
     second_max_comb = top_2_combs[1] if len(top_2_combs) > 1 else None
 
