@@ -120,9 +120,25 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
     # Assert unique image origin mapping
     assert merged_df['Image'].notna().all(), "Some rows in merged DataFrame have missing 'Image' values"
 
-    # Save merged dataframe to a single output file
-    merged_df.to_pickle(f'merged_dataframe_{batchID}-00000.pkl')
-    print(f"[INFO] Saved merged dataframe to merged_dataframe_{batchID}-00000.pkl")
+    # If target_size is set and merged_df is larger, split into multiple files (round robin)
+    if target_size and merged_df.shape[0] > target_size:
+        n_splits = (merged_df.shape[0] + target_size - 1) // target_size
+        rand_suffixes = [''.join(random.choices(string.ascii_letters + string.digits, k=5)) for _ in range(n_splits)]
+        out_paths = [f'merged_dataframe_{batchID}-{suffix}.pkl' for suffix in rand_suffixes]
+        split_dfs = [[] for _ in range(n_splits)]
+
+        # Assign each row to a split in round robin fashion
+        for idx, row in merged_df.iterrows():
+            split_idx = idx % n_splits
+            split_dfs[split_idx].append(row)
+
+        for i, rows in enumerate(split_dfs):
+            split_df = pd.DataFrame(rows, columns=merged_df.columns)
+            split_df.to_pickle(out_paths[i])
+            print(f"[INFO] Saved split {i+1}/{n_splits} with {split_df.shape[0]} rows to {out_paths[i]}")
+    else:
+        merged_df.to_pickle(f'merged_dataframe_{batchID}-00000.pkl')
+        print(f"[INFO] Saved merged dataframe to merged_dataframe_{batchID}-00000.pkl")
 
     # Print basename and number of columns for each file
     for file in files:
