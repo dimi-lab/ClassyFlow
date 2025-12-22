@@ -342,7 +342,7 @@ workflow {
         }
         .groupTuple()  
 
-        merged_groups.view()
+        // merged_groups.view()
         mergeResult = MERGE_BACK_LARGE_TABLES(merged_groups)
         normalizedDataFrames = mergeResult.merged_tables
 
