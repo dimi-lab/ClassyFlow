@@ -1,1 +1,0 @@
-println "DEBUG: input_dirs = ${params.input_dirs} (${params.input_dirs.getClass()})"
