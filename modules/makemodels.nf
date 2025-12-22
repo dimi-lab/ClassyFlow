@@ -161,15 +161,18 @@ process MERGE_HOLDOUT_CSV {
 process SELECT_BEST_MODEL {
     input:
     path csv_file
+    path first_model
+    path second_model
+    path classes_file
 
     output:
-    path("best_model_info.txt"), emit: outfile
+    tuple path("selected_*.pkl"), path(classes_file), emit: best_model
 
     script:
     """
-    best_model=\$(awk -F, 'NR > 1 { if(\$2 > max) { max=\$2; model=\$1 } } END { print model }' ${csv_file})
-    best_model_path="${params.output_dir}/models/\${best_model}"
-    echo "\$best_model,\$best_model_path" > best_model_info.txt
+    # Find best model
+    best_model_name=\$(awk -F, 'NR > 1 { if(\$2 > max) { max=\$2; model=\$1 } } END { print model }' ${csv_file})
+    cp \${best_model_name} "selected_\${best_model_name}"
     """
 }
 
@@ -261,22 +264,22 @@ workflow modelling_wf {
     )
     
     holdoutEval = MERGE_HOLDOUT_CSV(allHoldoutResults.eval.collect())
-    selected = SELECT_BEST_MODEL(holdoutEval.table)
+    selected = SELECT_BEST_MODEL(holdoutEval.table, xgbModels.m1, xgbModels.m2, xgbModels.classes)
     
-    selected.outfile.subscribe { println "Selected outfile: $it" }
-    xgbModels.classes.subscribe { println "Classes file: $it" }
+    // selected.outfile.subscribe { println "Selected outfile: $it" }
+    // xgbModels.classes.subscribe { println "Classes file: $it" }
 
-    best_model_info = selected.outfile.map { line -> 
-        def (name, path) = line.text.split(',')
-        tuple(name.trim(), file(path.trim()), xgbModels.classes.value)
-    }
+    // best_model_info = selected.outfile.map { line -> 
+    //     def (name, path) = line.text.split(',')
+    //     tuple(name.trim(), file(path.trim()), xgbModels.classes.value)
+    // }
 
-    best_model_info.subscribe { println "Best Model: $it" }
+    // best_model_info.subscribe { println "Best Model: $it" }
 
-    list_channel = celltypeCsv
-        .splitCsv(header: false, sep: ',').flatten()
+    // list_channel = celltypeCsv
+    //     .splitCsv(header: false, sep: ',').flatten()
 
-    list_channel.subscribe { println "Label: $it" }
+    // list_channel.subscribe { println "Label: $it" }
 
 
     // glmtrans_results = GLMTRANS_MODEL(
@@ -298,7 +301,7 @@ workflow modelling_wf {
     model_report = GENERATE_MODEL_REPORT(xgb_results, holdout_evals, xgbconfig.training_df, xgbconfig.holdout_df, params.html_template)
 
     emit:
-    best_model_results = best_model_info
+    best_model_results = selected.best_model
     report = model_report.model_html
     model_summary = model_report.model_summary
 }

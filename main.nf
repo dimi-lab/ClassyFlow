@@ -155,7 +155,7 @@ process GENERATE_TRAINING_N_HOLDOUT{
 process PREDICT_ALL_CELLS_XGB{
     
 	input:
-	tuple val(model_name), path(model_path), path(leEncoderFile)
+	tuple path(model_path), path(leEncoderFile)
 	tuple val(batchID), path(pickleTable)
 	
 	output:
