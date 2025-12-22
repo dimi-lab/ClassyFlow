@@ -2,6 +2,9 @@
 .envrc
 conf/ahn2.config
 
+### Avoid project specific configs
+nextflow.*.config
+
 # Nexflow items
 .nextflow*
 public

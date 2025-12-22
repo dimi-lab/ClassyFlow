@@ -66,179 +66,75 @@ def create_class_distribution_plot(unique_names, counts, output_path):
     plt.close(fig)
     print(f"Class distribution plot saved: {output_path}")
 
-def create_confusion_matrix_plot(cm_df, class_names, output_path):
-    """Create larger, improved confusion matrix heatmap and save to file with percentile-based color scaling"""
+
+def create_confusion_matrix_div(cm_df, class_names, output_path):
+    """Create Plotly confusion matrix and save div to file"""
     import numpy as np
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    from matplotlib.colors import LinearSegmentedColormap, Normalize
-
-    # Enhanced figure size for better page utilization
-    base_size = 3.0
+    import plotly.graph_objects as go
+    
     n_classes = len(class_names)
-    figsize = (max(16, base_size * n_classes), max(12, base_size * n_classes))
-
-    fig, ax = plt.subplots(figsize=figsize)
-
-
-    colors = ['#ffffff', '#9ecae1', '#08519c']  # white → light blue → dark blue
-    cmap = LinearSegmentedColormap.from_list('white_to_blue', colors, N=256)
-
-    # Compute vmax as the 90th percentile of the matrix (excluding zeros for better scaling)
-    non_zero_values = cm_df.values[cm_df.values > 0]
-    if len(non_zero_values) > 0:
-        vmax = np.percentile(non_zero_values, 90)
+    values = cm_df.values
+    
+    vmax = values.max() if values.max() > 0 else 1
+    use_log = vmax > 100
+    
+    if use_log:
+        color_values = np.log10(np.maximum(values, 0.1))
+        colorbar_title = 'Count (log₁₀)'
     else:
-        vmax = cm_df.values.max()
+        color_values = values
+        colorbar_title = 'Count'
     
-    # Ensure vmax is at least 1 to avoid issues
-    vmax = max(vmax, 1)
-    norm = Normalize(vmin=0, vmax=vmax)
-
-    # Determine annotation font size dynamically
-    annot_font = max(12, 18 - n_classes // 2)
-
-    # Create heatmap
-    sns.heatmap(
-        cm_df,
-        annot=True,
-        fmt='d',
-        cmap=cmap,
-        norm=norm,  # <- Use normalization
-        xticklabels=class_names,
-        yticklabels=class_names,
-        ax=ax,
-        cbar_kws={'label': 'Number of Predictions', 'shrink': 0.8},
-        square=True,
-        linewidths=0.5,
-        linecolor='white',
-        annot_kws={
-            'fontsize': annot_font,
-            'fontweight': 'bold',
-            'color': '#2c3e50'
-        }
-    )
-
-    # Colorbar
-    cbar = ax.collections[0].colorbar
-    cbar.set_label('Number of Predictions', size=16, weight='bold', color='#2c3e50')
-    cbar.ax.set_yticks([])
-
-    # Labels and title
-    ax.set_xlabel('Predicted Class', fontsize=16, fontweight='bold', color='#2c3e50')
-    ax.set_ylabel('Actual Class', fontsize=16, fontweight='bold', color='#2c3e50')
-    ax.set_title('Confusion Matrix', fontsize=20, fontweight='bold', color='#2c3e50', pad=25)
-
-    # Rotate labels if needed
-    if n_classes > 8:
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
-        ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
+    if n_classes <= 25:
+        text = [[str(v) if v > 0 else '' for v in row] for row in values]
+        texttemplate = '%{text}'
     else:
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=0)
-        ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
+        text = None
+        texttemplate = None
+    
+    fig = go.Figure(data=go.Heatmap(
+        z=color_values,
+        x=class_names,
+        y=class_names,
+        text=text,
+        texttemplate=texttemplate,
+        textfont={'size': max(8, min(14, 16 - n_classes // 3))},
+        colorscale='Blues',
+        hovertemplate='Actual: %{y}<br>Predicted: %{x}<br>Count: %{text}<extra></extra>' if text else
+                      'Actual: %{y}<br>Predicted: %{x}<extra></extra>',
+        colorbar=dict(title=colorbar_title, thickness=15),
+    ))
+    
+    fig_width = max(700, n_classes * 50)
+    fig_height = max(600, n_classes * 40)
+    max_label_len = max(len(str(name)) for name in class_names)
+    bottom_margin = max(120, max_label_len * 6)
+    
+    fig.update_layout(
+    title=dict(text='Confusion Matrix', x=0.5, font=dict(size=16)),
+    xaxis=dict(
+        title=dict(text='Predicted', standoff=20),
+        tickangle=-45,
+        tickfont=dict(size=max(8, min(12, 14 - n_classes // 4))),
+        side='bottom'
+    ),
+    yaxis=dict(
+        title='Actual',
+        tickfont=dict(size=max(8, min(12, 14 - n_classes // 4))),
+        autorange='reversed'
+    ),
+    margin=dict(l=100, r=40, t=60, b=bottom_margin),
+    plot_bgcolor='white',
+    autosize=True
+)
+    
+    div_html = fig.to_html(full_html=False, include_plotlyjs=False, config={'responsive': True})
+    
+    with open(output_path, 'w') as f:
+        f.write(div_html)
+    
+    print(f"Confusion matrix div saved: {output_path}")
 
-    # Tick styling
-    tick_fontsize = max(10, 16 - n_classes // 4)
-    ax.tick_params(axis='both', which='major', labelsize=tick_fontsize, colors='#2c3e50')
-
-    # Background and layout
-    fig.patch.set_facecolor('white')
-    plt.tight_layout()
-
-    # Save
-    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
-    plt.close(fig)
-    print(f"Confusion matrix plot saved: {output_path}")
-
-
-
-def create_roc_curves_plot(y_true_binarized, y_pred_scores, label_hash, n_classes, auc_scores, output_path):
-    """Create improved ROC curves for all classes and save to file"""
-    fig, ax = plt.subplots(figsize=(16, 12))
-    
-    if len(auc_scores) == 0:
-        ax.text(0.5, 0.5, 'No ROC curves available\nCheck class distribution', 
-                ha='center', va='center', transform=ax.transAxes, fontsize=14,
-                bbox=dict(boxstyle='round,pad=0.5', facecolor='#f8f9fa', edgecolor='#bdc3c7'))
-    else:
-        # Sort by AUC score (descending)
-        sorted_auc_scores = sorted(auc_scores.items(), key=lambda x: x[1], reverse=True)
-        
-        # Use better color palette
-        colors = plt.cm.tab10(np.linspace(0, 1, min(10, len(sorted_auc_scores))))
-        if len(sorted_auc_scores) > 10:
-            # Use viridis for more classes
-            colors = plt.cm.viridis(np.linspace(0.1, 0.9, len(sorted_auc_scores)))
-        
-        for (class_index, roc_auc), color in zip(sorted_auc_scores, colors):
-            if class_index in label_hash:
-                fpr, tpr, _ = roc_curve(y_true_binarized[:, class_index], y_pred_scores[:, class_index])
-                ax.plot(fpr, tpr, color=color, lw=2.5, 
-                       label=f'{label_hash[class_index]} (AUC = {roc_auc:.3f})')
-    
-    # Add reference line
-    ax.plot([0, 1], [0, 1], 'k--', lw=2, alpha=0.6, label='Random Classifier')
-    
-    # Styling
-    ax.set_xlim([0.0, 1.0])
-    ax.set_ylim([0.0, 1.05])
-    ax.set_xlabel('False Positive Rate', fontsize=14, fontweight='bold', color='#2c3e50')
-    ax.set_ylabel('True Positive Rate', fontsize=14, fontweight='bold', color='#2c3e50')
-    ax.set_title('Receiver Operating Characteristic (ROC) Curves', 
-                 fontsize=16, fontweight='bold', color='#2c3e50', pad=20)
-    
-    # Grid and legend
-    ax.grid(True, alpha=0.3, linestyle='-', color='#bdc3c7')
-    ax.set_axisbelow(True)
-    
-    # Improved legend
-    legend = ax.legend(loc="lower right", fontsize=10, frameon=True, 
-                      fancybox=True, shadow=True, framealpha=0.9)
-    legend.get_frame().set_facecolor('#f8f9fa')
-    legend.get_frame().set_edgecolor('#bdc3c7')
-    
-    # Style axes
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_color('#bdc3c7')
-    ax.spines['bottom'].set_color('#bdc3c7')
-    ax.tick_params(axis='both', which='major', labelsize=12, colors='#2c3e50')
-    
-    # Background
-    fig.patch.set_facecolor('white')
-    ax.set_facecolor('#f8f9fa')
-    
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
-    plt.close(fig)
-    print(f"ROC curves plot saved: {output_path}")
-
-def create_auc_rankings_table(sorted_auc_scores, label_hash, output_path):
-    """Create AUC rankings table and save to CSV"""
-    rankings_data = []
-    for rank, (class_index, auc_score) in enumerate(sorted_auc_scores, 1):
-        if class_index in label_hash:
-            # Determine performance level
-            if auc_score >= 0.9:
-                performance = 'Excellent'
-            elif auc_score >= 0.8:
-                performance = 'Good'
-            elif auc_score >= 0.7:
-                performance = 'Fair'
-            else:
-                performance = 'Poor'
-            
-            rankings_data.append({
-                'Rank': rank,
-                'Class': label_hash[class_index],
-                'AUC_Score': round(auc_score, 3),
-                'Performance': performance
-            })
-    
-    rankings_df = pd.DataFrame(rankings_data)
-    rankings_df.to_csv(output_path, index=False)
-    print(f"AUC rankings table saved: {output_path}")
-    return rankings_df
 
 def detect_class_imbalance(counts, threshold=0.1):
     """Detect if there's significant class imbalance"""
@@ -297,9 +193,9 @@ def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
     cm = confusion_matrix(y_holdout, y_pred)
     cm_df = pd.DataFrame(cm, columns=uniqNames, index=uniqNames)
 
-    confusion_matrix_plot = f"{output_prefix}_confusion_matrix.png"
-    create_confusion_matrix_plot(cm_df, uniqNames, confusion_matrix_plot)
-    results['confusion_matrix_csv_path'] = confusion_matrix_plot
+    confusion_matrix_plot = f"{output_prefix}_confusion_matrix.html"
+    create_confusion_matrix_div(cm_df, uniqNames, confusion_matrix_plot)
+    results['confusion_matrix_html_path'] = confusion_matrix_plot
 
     # Multiclass ROC/AUC computation and plotting
     def compute_multiclass_roc_auc(y_true, y_proba, n_classes):
@@ -322,56 +218,226 @@ def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
     sorted_auc_scores = sorted(auc_scores.items(), key=lambda x: x[1], reverse=True)
 
     def export_roc_plot(y_true_bin, y_pred_proba, label_hash, n_classes, auc_scores, output_path):
-        plt.figure(figsize=(14, 10))
-        colors = plt.cm.tab10(np.linspace(0, 1, n_classes))
-        for i, color in zip(range(n_classes), colors):
+        """Create interactive ROC curves using Plotly"""
+        import numpy as np
+        import plotly.graph_objects as go
+        from sklearn.metrics import roc_curve, auc
+        
+        fig = go.Figure()
+        
+        # Generate colors
+        colors = [f'hsl({int(i * 360 / n_classes)}, 70%, 50%)' for i in range(n_classes)]
+        
+        for i in range(n_classes):
             fpr, tpr, _ = roc_curve(y_true_bin[:, i], y_pred_proba[:, i])
             roc_auc = auc(fpr, tpr)
-            plt.plot(fpr, tpr, color=color, lw=2, label=f'{label_hash[i]} (AUC={roc_auc:.2f})')
-        plt.plot([0, 1], [0, 1], 'k--', lw=2, alpha=0.5, label='Random Classifier')
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title('Receiver Operating Characteristic (ROC) Curves')
-        plt.legend(loc="lower right", fontsize=9)
-        plt.grid(True, alpha=0.3)
-        plt.tight_layout()
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        plt.close()
+            
+            fig.add_trace(go.Scatter(
+                x=fpr,
+                y=tpr,
+                mode='lines',
+                name=f'{label_hash[i]} (AUC={roc_auc:.2f})',
+                line=dict(color=colors[i], width=2),
+                hovertemplate='FPR: %{x:.3f}<br>TPR: %{y:.3f}<extra>%{fullData.name}</extra>'
+            ))
+        
+        # Random classifier diagonal
+        fig.add_trace(go.Scatter(
+            x=[0, 1],
+            y=[0, 1],
+            mode='lines',
+            name='Random Classifier',
+            line=dict(color='black', width=2, dash='dash'),
+            opacity=0.5
+        ))
+        
+        fig.update_layout(
+            title=dict(text='Receiver Operating Characteristic (ROC) Curves', x=0.5, font=dict(size=16)),
+            xaxis=dict(
+                title='False Positive Rate',
+                range=[0, 1],
+                gridcolor='lightgray',
+                gridwidth=1
+            ),
+            yaxis=dict(
+                title='True Positive Rate',
+                range=[0, 1.05],
+                gridcolor='lightgray',
+                gridwidth=1
+            ),
+            legend=dict(
+                x=1.02,
+                y=0.5,
+                yanchor='middle',
+                font=dict(size=10)
+            ),
+            margin=dict(l=60, r=200, t=60, b=60),
+            plot_bgcolor='white',
+            autosize=True
+        )
+        
+        div_html = fig.to_html(
+            full_html=False,
+            include_plotlyjs=False,
+            config={'responsive': True}
+        )
+        
+        with open(output_path, 'w') as f:
+            f.write(div_html)
+        
         print(f"ROC curves plot saved: {output_path}")
 
-    roc_curves_plot = f"{output_prefix}_roc_curves.png"
+    roc_curves_plot = f"{output_prefix}_roc_curves.html"
     export_roc_plot(y_true_binarized, y_pred_proba, lableHash, n_classes, auc_scores, roc_curves_plot)
     results['roc_curves_plot_path'] = roc_curves_plot
 
-    def export_auc_table(sorted_auc_scores, label_hash, output_path):
+    def export_pr_plot(y_true_bin, y_pred_proba, label_hash, n_classes, output_path):
+        """Create interactive Precision-Recall curves using Plotly"""
+        import numpy as np
+        import plotly.graph_objects as go
+        from sklearn.metrics import precision_recall_curve, average_precision_score
+        
+        fig = go.Figure()
+        
+        colors = [f'hsl({int(i * 360 / n_classes)}, 70%, 50%)' for i in range(n_classes)]
+        
+        ap_scores = {}
+        for i in range(n_classes):
+            precision, recall, _ = precision_recall_curve(y_true_bin[:, i], y_pred_proba[:, i])
+            ap = average_precision_score(y_true_bin[:, i], y_pred_proba[:, i])
+            ap_scores[i] = ap
+            
+            fig.add_trace(go.Scatter(
+                x=recall,
+                y=precision,
+                mode='lines',
+                name=f'{label_hash[i]} (AP={ap:.2f})',
+                line=dict(color=colors[i], width=2),
+                hovertemplate='Recall: %{x:.3f}<br>Precision: %{y:.3f}<extra>%{fullData.name}</extra>'
+            ))
+        
+        fig.update_layout(
+            title=dict(text='Precision-Recall Curves', x=0.5, font=dict(size=16)),
+            xaxis=dict(
+                title='Recall',
+                range=[0, 1],
+                gridcolor='lightgray',
+                gridwidth=1
+            ),
+            yaxis=dict(
+                title='Precision',
+                range=[0, 1.05],
+                gridcolor='lightgray',
+                gridwidth=1
+            ),
+            legend=dict(
+                x=1.02,
+                y=0.5,
+                yanchor='middle',
+                font=dict(size=10)
+            ),
+            margin=dict(l=60, r=200, t=60, b=60),
+            plot_bgcolor='white',
+            autosize=True
+        )
+        
+        div_html = fig.to_html(
+            full_html=False,
+            include_plotlyjs=False,
+            config={'responsive': True}
+        )
+        
+        with open(output_path, 'w') as f:
+            f.write(div_html)
+        
+        print(f"PR curves plot saved: {output_path}")
+        
+        return ap_scores
+    
+    pr_curves_plot = f"{output_prefix}_pr_curves.html"
+    ap_scores = export_pr_plot(y_true_binarized, y_pred_proba, lableHash, n_classes, pr_curves_plot)
+    results['pr_curves_plot_path'] = pr_curves_plot
+
+    # def export_auc_table(sorted_auc_scores, label_hash, output_path):
+    #     rankings_data = []
+    #     for rank, (class_index, auc_score) in enumerate(sorted_auc_scores, 1):
+    #         if class_index in label_hash:
+    #             if auc_score >= 0.9:
+    #                 performance = 'Excellent'
+    #             elif auc_score >= 0.8:
+    #                 performance = 'Good'
+    #             elif auc_score >= 0.7:
+    #                 performance = 'Fair'
+    #             else:
+    #                 performance = 'Poor'
+    #             rankings_data.append({
+    #                 'Rank': rank,
+    #                 'Class': label_hash[class_index],
+    #                 'AUC_Score': round(auc_score, 3),
+    #                 'Performance': performance
+    #             })
+    #     rankings_df = pd.DataFrame(rankings_data)
+    #     rankings_df.to_csv(output_path, index=False)
+    #     print(f"AUC rankings table saved: {output_path}")
+    #     return rankings_df
+
+    # auc_table_path = f"{output_prefix}_auc_rankings.csv"
+    # auc_df = export_auc_table(sorted_auc_scores, lableHash, auc_table_path)
+    # results['auc_rankings_csv_path'] = auc_table_path
+
+    def export_auc_table(sorted_auc_scores, ap_scores, label_hash, class_prevalence, output_path):
+        """Export AUC and AP scores with context-aware performance labels"""
         rankings_data = []
         for rank, (class_index, auc_score) in enumerate(sorted_auc_scores, 1):
             if class_index in label_hash:
+                ap = ap_scores.get(class_index, None)
+                prevalence = class_prevalence.get(class_index, 0)
+                
+                # AUC performance (fixed thresholds)
                 if auc_score >= 0.9:
-                    performance = 'Excellent'
+                    auc_perf = 'Excellent'
                 elif auc_score >= 0.8:
-                    performance = 'Good'
+                    auc_perf = 'Good'
                 elif auc_score >= 0.7:
-                    performance = 'Fair'
+                    auc_perf = 'Fair'
                 else:
-                    performance = 'Poor'
+                    auc_perf = 'Poor'
+                
+                # AP performance (relative to baseline)
+                # AP baseline for random classifier = prevalence
+                if ap is not None and prevalence > 0:
+                    ap_lift = ap / prevalence  # How much better than random
+                    if ap_lift >= 10:
+                        ap_perf = 'Excellent'
+                    elif ap_lift >= 5:
+                        ap_perf = 'Good'
+                    elif ap_lift >= 2:
+                        ap_perf = 'Fair'
+                    else:
+                        ap_perf = 'Poor'
+                else:
+                    ap_perf = 'N/A'
+                
                 rankings_data.append({
                     'Rank': rank,
                     'Class': label_hash[class_index],
-                    'AUC_Score': round(auc_score, 3),
-                    'Performance': performance
+                    'Prevalence': round(prevalence, 3),
+                    'AUC': round(auc_score, 3),
+                    'AUC_Performance': auc_perf,
+                    'AP': round(ap, 3) if ap else None,
+                    'AP_Performance': ap_perf
                 })
+
         rankings_df = pd.DataFrame(rankings_data)
         rankings_df.to_csv(output_path, index=False)
-        print(f"AUC rankings table saved: {output_path}")
+        print(f"AUC/AP rankings table saved: {output_path}")
         return rankings_df
 
-    auc_table_path = f"{output_prefix}_auc_rankings.csv"
-    auc_df = export_auc_table(sorted_auc_scores, lableHash, auc_table_path)
-    results['auc_rankings_csv_path'] = auc_table_path
+    class_prevalence = {i: count / len(y_holdout) for i, count in zip(unique_values, counts)}
 
+    auc_table_path = f"{output_prefix}_auc_rankings.csv"
+    auc_df = export_auc_table(sorted_auc_scores, ap_scores, lableHash, class_prevalence, auc_table_path)
+    
     # Prepare results data
     results.update({
         'max_auc': {'class_index': sorted_auc_scores[0][0], 'class_name': lableHash[sorted_auc_scores[0][0]], 'auc': float(sorted_auc_scores[0][1])},
@@ -381,7 +447,8 @@ def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
         'class_names': uniqNames.tolist(),
         'class_counts': counts.tolist(),
         'auc_scores': [{'class_index': int(idx), 'class_name': lableHash[idx], 'auc': float(score)} 
-                      for idx, score in sorted_auc_scores]
+                      for idx, score in sorted_auc_scores],
+        'ap_scores': [{'class_name': lableHash[k], 'ap': float(v)} for k, v in ap_scores.items()]
     })
     
     return results

@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import pandas as pd
 
 def parse_args():
     import argparse
@@ -9,6 +10,32 @@ def parse_args():
     parser.add_argument('--input_files', nargs='+', required=True, help='List of input TSV files to merge')
     parser.add_argument('--output_file', required=True, help='Output TSV file name')
     return parser.parse_args()
+
+def validate_originalBatchID(input_files):
+    batch_ids = {}
+
+    for file in input_files:
+        df = pd.read_csv(file, sep='\t')
+        
+        if 'original_batchID' not in df.columns:
+            raise ValueError(f"Column 'original_batchID' not found in {file}")
+        
+        unique_ids = df['original_batchID'].unique()
+        if len(unique_ids) != 1:
+            raise ValueError(f"File {file} contains {len(unique_ids)} unique batch IDs: {unique_ids.tolist()}."
+                             f"Expected exatly 1 batch ID")
+        
+        batch_ids[file] = unique_ids[0]
+
+    #Check that all files being merged have the exact same original batchID
+    unique_batch_ids = set(batch_ids.values())
+    if len(unique_batch_ids) != 1:
+        error_msg = "Input files have different original_BatchID values:\n"
+        for file, batch_id in batch_ids.items():
+            error_msg += f"   {os.path.basename(file)}: {batch_id}\n"
+        raise ValueError(error_msg)
+    
+    print(f"All files have passed batchID validation and are ok to merge!")
 
 def write_header(input_file, output_file):
     with open(input_file, 'r') as fin, open(output_file, 'w') as fout:
@@ -30,6 +57,9 @@ def main():
     if not input_files:
         raise ValueError("No input files provided.")
 
+    # Validate that all files have the same original Batch ID:
+    validate_originalBatchID(input_files)
+    
     # Write header from the first file
     write_header(input_files[0], output_file)
 

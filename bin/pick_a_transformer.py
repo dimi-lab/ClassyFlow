@@ -186,35 +186,44 @@ def create_plot_for_column(df_original, df_transformed, col, transformation_type
     # Calculate correlation
     paired = pd.concat([df_original[col], df_transformed[col]], axis=1, join='inner').dropna()
     
-    try:
-        correlation, _ = pearsonr(paired.iloc[:, 0], paired.iloc[:, 1])
-    except TypeError as e:
-        print(f"\n[ERROR] TypeError while computing pearsonr for column '{col}': {e}")
-        print(f"Column '{col}' original dtype: {df_original[col].dtype}")
-        print(f"Column '{col}' transformed dtype: {df_transformed[col].dtype}")
+    # Check for sufficient data for correlation
+    if paired.shape[0] < 2:
+        print(f"[WARNING] Skipping correlation for column '{col}': not enough valid data points (n={paired.shape[0]}). Branch: insufficient value variability.")
+        correlation = float('nan')
+    else:
+        try:
+            correlation, _ = pearsonr(paired.iloc[:, 0], paired.iloc[:, 1])
+        except TypeError as e:
+            print(f"\n[ERROR] TypeError while computing pearsonr for column '{col}': {e}")
+            print(f"Column '{col}' original dtype: {df_original[col].dtype}")
+            print(f"Column '{col}' transformed dtype: {df_transformed[col].dtype}")
 
-        # Find and print problematic values in both columns
-        orig_non_float = df_original[col][~df_original[col].apply(lambda x: isinstance(x, (int, float, float, complex)) or pd.isna(x))]
-        trans_non_float = df_transformed[col][~df_transformed[col].apply(lambda x: isinstance(x, (int, float, float, complex)) or pd.isna(x))]
+            # Find and print problematic values in both columns
+            orig_non_float = df_original[col][~df_original[col].apply(lambda x: isinstance(x, (int, float, float, complex)) or pd.isna(x))]
+            trans_non_float = df_transformed[col][~df_transformed[col].apply(lambda x: isinstance(x, (int, float, float, complex)) or pd.isna(x))]
 
-        if not orig_non_float.empty:
-            print(f"\n[DEBUG] Non-numeric values in original column '{col}':")
-            print(orig_non_float.head(10))
-        if not trans_non_float.empty:
-            print(f"\n[DEBUG] Non-numeric values in transformed column '{col}':")
-            print(trans_non_float.head(10))
+            if not orig_non_float.empty:
+                print(f"\n[DEBUG] Non-numeric values in original column '{col}':")
+                print(orig_non_float.head(10))
+            if not trans_non_float.empty:
+                print(f"\n[DEBUG] Non-numeric values in transformed column '{col}':")
+                print(trans_non_float.head(10))
 
-        # Show a sample of the paired data that caused the error
-        print("\n[DEBUG] Sample of paired data (first 10 rows):")
-        print(paired.head(10))
+            # Show a sample of the paired data that caused the error
+            print("\n[DEBUG] Sample of paired data (first 10 rows):")
+            print(paired.head(10))
 
-        # Optionally, show all unique non-numeric values
-        print("\n[DEBUG] Unique non-numeric values in original column:")
-        print(orig_non_float.unique())
-        print("\n[DEBUG] Unique non-numeric values in transformed column:")
-        print(trans_non_float.unique())
+            # Optionally, show all unique non-numeric values
+            print("\n[DEBUG] Unique non-numeric values in original column:")
+            print(orig_non_float.unique())
+            print("\n[DEBUG] Unique non-numeric values in transformed column:")
+            print(trans_non_float.unique())
 
-        raise  # Re-raise the error after printing
+            correlation = float('nan')
+            print(f"[WARNING] Skipping correlation for column '{col}' due to TypeError. Branch: type error.")
+        except ValueError as e:
+            print(f"[WARNING] Skipping correlation for column '{col}': {e}. Branch: insufficient value variability.")
+            correlation = float('nan')
     
     # Create plot
     plt.style.use('default')
@@ -242,7 +251,7 @@ def create_plot_for_column(df_original, df_transformed, col, transformation_type
     ax.grid(True, alpha=0.3)
     
     # Add stats box
-    textstr = f'{param_info["name"]}: {param_info["value"]}\nr = {correlation:.3f}'
+    textstr = f'{param_info["name"]}: {param_info["value"]}\nr = {correlation if not np.isnan(correlation) else "N/A"}'
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
     ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=9,
             verticalalignment='top', bbox=props)

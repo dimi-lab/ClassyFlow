@@ -220,7 +220,7 @@ process CLASSIFIED_REPORT_PER_SLIDE {
 
 process GENERATE_FINAL_REPORT {
     publishDir "${params.output_dir}/final_reports", pattern: "*.html", mode: 'copy', overwrite: true
-    publishDir "${params.output_dir}/final_reports/plots/", pattern: "prediction_abundance_plot.png", mode: 'copy', overwrite: true
+    publishDir "${params.output_dir}/final_reports/plots/", pattern: "prediction_abundance_plot*.png", mode: 'copy', overwrite: true
     publishDir "${params.output_dir}/final_reports/pages/", pattern: "nextflow.config", mode: 'copy', overwrite: true
     
     input:
@@ -237,7 +237,7 @@ process GENERATE_FINAL_REPORT {
 
     output:
     path("classyflow_report.html"), emit: report_done
-    path("prediction_abundance_plot.png")
+    path("prediction_abundance_plot*.png")
     path("nextflow.config")
 
     script:
@@ -334,8 +334,7 @@ workflow {
         bestModel = modeling_results.best_model_results
         
         // If large file splitting is enabled, merge back the normalized tables
-        //if (params.enable_large_file_splitting) {
-            // Group normalizedDataFrames by removing hyphen and last 5 chars from key
+        // Group normalizedDataFrames by removing hyphen and last 5 chars from key
         merged_groups = normalizedDataFrames
         .map { item ->
             def key = item[0].replaceFirst(/-[^-]{5}$/, '')
@@ -343,7 +342,7 @@ workflow {
         }
         .groupTuple()  
 
-
+        // merged_groups.view()
         mergeResult = MERGE_BACK_LARGE_TABLES(merged_groups)
         normalizedDataFrames = mergeResult.merged_tables
 

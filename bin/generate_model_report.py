@@ -150,6 +150,10 @@ def setup_jinja_environment(template_dir: str):
     
     return jinja_env
 
+def load_plot_div(path):
+                with open(path, 'r') as f:
+                    return f.read()
+                
 
 def read_holdout_evaluation_results(modeling_dir: Path) -> List[Dict[str, Any]]:
     """
@@ -180,19 +184,20 @@ def read_holdout_evaluation_results(modeling_dir: Path) -> List[Dict[str, Any]]:
             
             # Update plot paths to use plots subdirectory
             plot_fields = [
-                'class_distribution_plot_path',
-                'confusion_matrix_csv_path',
-                'roc_curves_plot_path'
+                'class_distribution_plot_path'
             ]
             
             for field in plot_fields:
                 if field in data and data[field]:
                     filename = os.path.basename(data[field])
                     data[field] = f"plots/{filename}"
-            
+
             result = {
                 'model_name': model_name,
-                'data': data
+                'data': data,
+                'confusion_html': load_plot_div(data['confusion_matrix_html_path']),
+                'roc_curves_html': load_plot_div(data['roc_curves_plot_path']),
+                'pr_curves_html': load_plot_div(data['pr_curves_plot_path'])
             }
             
             results.append(result)
@@ -226,14 +231,15 @@ def read_model_comparison_results(modeling_dir: Path) -> Optional[Dict[str, Any]
         
         # Update plot paths to use plots subdirectory
         plot_fields = [
-            'class_distribution_plot_path',
-            'parameter_search_plot_path'
+            'class_distribution_plot_path'
         ]
         
         for field in plot_fields:
             if field in data and data[field]:
                 filename = os.path.basename(data[field])
                 data[field] = f"plots/{filename}"
+
+        data['param_search_html'] = load_plot_div(data["parameter_search_plot_path"])
         
         # Update CSV paths to use plots subdirectory
         csv_fields = [

@@ -92,7 +92,8 @@ process XGBOOSTING_FINAL_MODEL {
 	path("XGBoost_Model_First.pkl"), emit: m1
 	path("XGBoost_Model_Second.pkl"), emit: m2
 	path("classes.npy"), emit: classes
-    tuple path("xgbWinners_*.png"), path("xgbWinners_*.csv"), path("xgbWinners_results.json"), emit: xgboost_results
+    path("*.png")
+    tuple path("xgbWinners_*.png"), path("xgbWinners_*.html"), path("xgbWinners_*.csv"), path("xgbWinners_results.json"), emit: xgboost_results
 	
 	script:
     """
@@ -119,7 +120,8 @@ publishDir(
 	path(leEncoderFile)
 
 	output:
-	tuple path("holdoutEval_XGBoost_Model_*.png"), path("holdoutEval_XGBoost_Model_*_auc_rankings.csv"), path("holdoutEval_XGBoost_Model_*_results.json"), emit: holdoutEval_results
+	tuple path("holdoutEval_XGBoost_Model_*.png"), path("holdoutEval_XGBoost_Model_*.html"), path("holdoutEval_XGBoost_Model_*_auc_rankings.csv"), path("holdoutEval_XGBoost_Model_*_results.json"), emit: holdoutEval_results
+    path("*.png")
     path("holdout_*.csv"), emit: eval
 
 	
