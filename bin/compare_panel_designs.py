@@ -12,10 +12,14 @@ def compare_headers(pickle_files):
         df = pd.read_pickle(file)
         filtered_cols = [h.split(":")[0] for h in df.filter(regex='(Mean)', axis=1).columns]
         headers.append(set(filtered_cols))
-        # Remove "-#####" suffix if present
-        base = os.path.basename(file).replace('.pkl','').replace('merged_dataframe_','')
-        if len(base) > 6 and base[-6] == '-' and base[-5:].isalnum():
-            base = base[:-6]
+        # # Remove "-#####" suffix if present
+        # base = os.path.basename(file).replace('.pkl','').replace('merged_dataframe_','')
+        # if len(base) > 6 and base[-6] == '-' and base[-5:].isalnum():
+        #     base = base[:-6]
+
+        #Assert that this df only has 1 unique batchID
+        assert df["original_batchID"].nunique(dropna=False) == 1
+        base = str(df["original_batchID"].dropna().unique().item())
         dataframe_names.append(base)
 
     # Union of all headers

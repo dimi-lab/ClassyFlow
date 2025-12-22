@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="https://cdn.plot.ly/plotly-2.29.1.min.js"></script> 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Cell Type Classification Report{% endblock %}</title>
@@ -243,6 +244,19 @@
 
         .page-section:hover {
             box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+
+        /* Plotly wrapper */
+        .plotly-wrapper {
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+            min-height: 500px;
+        }
+
+        .plotly-wrapper .plotly-graph-div {
+            width: 100% !important;
+            height: 600px !important;
         }
 
         /* Typography - Enhanced hierarchy */

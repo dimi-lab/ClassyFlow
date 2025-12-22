@@ -234,6 +234,8 @@ def collect_pred_results(df, input_dir):
     print("Creating abundance visualization...")
     create_abundance_plot(df, abundance_plot_name)
 
+    create_abundance_plot_heatmap(df, "prediction_abundance_plot_heatmap.png")
+
     cell_type_counts = df['CellTypePrediction'].value_counts()
     cell_type_percentages = df['CellTypePrediction'].value_counts(normalize=True) * 100
     cell_type_percentages = cell_type_percentages.round(1)
@@ -361,6 +363,82 @@ def create_abundance_plot(df, output_file):
 
     # Save figure
     plt.savefig(output_file, dpi=300, bbox_inches='tight', facecolor='white')
+
+def create_abundance_plot_heatmap(df, output_file):
+    """Create clustered heatmap of cell type composition by sample with batch annotation"""
+    import pandas as pd
+    import numpy as np
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    
+    n_samples = df['Sample'].nunique()
+    
+    # Calculate proportions and pivot to samples × cell types matrix
+    proportions = (
+        df.groupby(['Sample', 'CellTypePrediction'])
+        .size()
+        .unstack(fill_value=0)
+    )
+    proportions = proportions.div(proportions.sum(axis=1), axis=0) * 100
+    
+    # Sort columns by overall abundance
+    col_order = df['CellTypePrediction'].value_counts().index.tolist()
+    proportions = proportions.reindex(columns=col_order, fill_value=0)
+    
+    # Build batch color annotation if Batch column exists
+    row_colors = None
+    if 'Batch' in df.columns:
+        batch_map = df.drop_duplicates('Sample').set_index('Sample')['Batch']
+        batch_map = batch_map.reindex(proportions.index)
+        batch_palette = dict(zip(batch_map.unique(), sns.color_palette('tab20', batch_map.nunique())))
+        row_colors = batch_map.map(batch_palette)
+        row_colors.name = 'Batch'
+    
+    # Dynamic sizing
+    fig_height = np.clip(6 + n_samples * 0.02, 8, 24)
+    fig_width = max(10, 6 + len(col_order) * 0.5)
+    
+    # Clustering and dendrogram settings based on dataset size
+    show_row_dendrogram = n_samples <= 500
+    
+    g = sns.clustermap(
+        proportions,
+        row_colors=row_colors,
+        col_cluster=True,
+        row_cluster=True,
+        dendrogram_ratio=(0.15 if show_row_dendrogram else 0.001, 0.15),
+        cmap='Blues',
+        figsize=(fig_width, fig_height),
+        xticklabels=True,
+        yticklabels=n_samples <= 100,
+        cbar_kws={'label': 'Percentage (%)'},
+        linewidths=0 if n_samples > 200 else 0.1,
+    )
+    
+    # Hide row dendrogram for large datasets (still clusters, just doesn't show tree)
+    if not show_row_dendrogram:
+        g.ax_row_dendrogram.set_visible(False)
+    
+    g.ax_heatmap.set_xlabel('Cell Type', fontsize=11, fontweight='bold')
+    g.ax_heatmap.set_ylabel('Sample' if n_samples <= 100 else '', fontsize=11, fontweight='bold')
+    g.figure.suptitle('Predicted Cell Type Composition by Sample', fontsize=14, fontweight='bold', y=1.02)
+    
+    # Rotate column labels for readability
+    plt.setp(g.ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontsize=10)
+    
+    # Add batch legend if applicable
+    if row_colors is not None:
+        for batch, color in batch_palette.items():
+            g.ax_col_dendrogram.bar(0, 0, color=color, label=batch, linewidth=0)
+        g.ax_col_dendrogram.legend(
+            title='Batch', 
+            loc='upper left', 
+            bbox_to_anchor=(1.05, 1),
+            fontsize=9
+        )
+    
+    plt.savefig(output_file, dpi=300, bbox_inches='tight', facecolor='white')
+    plt.close()
 
 def csv_to_dict(csv_file_path, max_rows=None):
     """Convert CSV to dictionary for Jinja2 templates."""

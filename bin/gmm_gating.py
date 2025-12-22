@@ -104,7 +104,12 @@ def main():
     
     for col in target_cols:
         values = df[col].values.astype(float)
-        X = values.reshape(-1, 1)
+        # Skip columns with all NaN or fewer than 2 valid values
+        valid_values = values[~np.isnan(values)]
+        if valid_values.size < 2:
+            print(f"[WARNING] Skipping column '{col}' for GMM gating: not enough valid (non-NaN) values.")
+            continue
+        X = valid_values.reshape(-1, 1)
         # Fit 1- and 2-component GMMs
         gmm1 = GaussianMixture(n_components=1, random_state=0).fit(X)
         gmm2 = GaussianMixture(n_components=2, random_state=0).fit(X)
