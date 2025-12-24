@@ -192,7 +192,6 @@ process QC_DENSITY {
     calculate_bin_density.py --input_tsv ${prediction_tsv} \
         --bin_size 120 \
         --density_cutoff 3
-    touch ${prediction_tsv}
     """
 }
 
