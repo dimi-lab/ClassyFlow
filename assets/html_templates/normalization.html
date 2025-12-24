@@ -291,37 +291,6 @@
                     </tbody>
                 </table>
                 
-                {% elif batch_result.data.transformation_type == "minmax" %}
-                <table>
-                    <thead>
-                        <tr>
-                            <th colspan="2">MinMax Scaling Details</th>
-                        </tr>
-                        <tr>
-                            <th>Parameter</th>
-                            <th>Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Feature Range</td>
-                            <td>(-2, 2)</td>
-                        </tr>
-                        <tr>
-                            <td>Features Scaled</td>
-                            <td>{{ batch_result.data.minmax_metrics.total_features_transformed | default("All") }}</td>
-                        </tr>
-                        <tr>
-                            <td>Min Value Achieved</td>
-                            <td>{{ "%.3f" | format(batch_result.data.minmax_metrics.scaling_stats.min_transformed_value) if batch_result.data.minmax_metrics else "N/A" }}</td>
-                        </tr>
-                        <tr>
-                            <td>Max Value Achieved</td>
-                            <td>{{ "%.3f" | format(batch_result.data.minmax_metrics.scaling_stats.max_transformed_value) if batch_result.data.minmax_metrics else "N/A" }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-                
                 {% elif batch_result.data.transformation_type == "log" %}
                 <table>
                     <thead>
