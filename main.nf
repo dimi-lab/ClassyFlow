@@ -82,10 +82,16 @@ process CHECK_PANEL_DESIGN {
 
     output:
     path 'panel_design.csv', emit: paneldesignfile
+    path 'input_batch_metrics.json', emit: input_metrics
 
     script:
     """
-    compare_panel_designs.py ${tables_pkl_collected.join(' ')}
+    compare_panel_designs.py \
+        ${tables_pkl_collected.join(' ')} \
+        -o panel_design.csv \
+        -m input_batch_metrics.json \
+        -t ${params.minimum_label_count} \
+        -c ${params.classifed_column_name}
     """
 }
 
@@ -223,12 +229,12 @@ process GENERATE_FINAL_REPORT {
     publishDir "${params.output_dir}/final_reports/pages/", pattern: "nextflow.config", mode: 'copy', overwrite: true
     
     input:
+    path(input_metrics_json)
     path(split_jsons)
     path(norm_html)
     path(fs_html) 
     path(model_html)
     path(model_summary_json)
-    path(classified_results, stageAs: "pred_results/*")
     path(prediction_results, stageAs: "pred_results/*")
     path(template_dir)
     path(letterhead_file)
@@ -364,22 +370,21 @@ workflow {
         predictions_for_report = qc_density.qc_predictions
     
         // Generate a comprehensive HTML report for each prediction file
-        classified_report = CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
+        CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
 
         // Generate final HTML report for the whole run
         split_outputs = labledDataFrames.training_holdout_results.flatten().collect()
         prediction_results = predictions_for_report.map {id, file -> file }.collect()
-        classified_results = classified_report.slide_results.collect()
 
 
         // Pass all to reporting including summary JSONs
         final_report = GENERATE_FINAL_REPORT(
+            CHECK_PANEL_DESIGN.output.input_metrics,
             split_outputs,
             normalized_output.report,
             feature_selection_results.report, 
             modeling_results.report,
             modeling_results.model_summary,
-            classified_results,
             prediction_results,
             params.html_template,
             params.letterhead,

@@ -173,7 +173,8 @@ def collect_html_content(input_dir):
 def collect_metric_data(input_dir):
     input_dir = Path(input_dir)
     all_jsons = {
-        'input_metrics': load_metrics_json(input_dir / "training_split_report.json"),
+        'input_metrics': load_metrics_json(input_dir / "input_batch_metrics.json"),
+        'split_metrics': load_metrics_json(input_dir / "training_split_report.json"),
         'model_metrics': load_metrics_json(input_dir / "model_summary.json")
         }
 
