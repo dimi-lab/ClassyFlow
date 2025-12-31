@@ -23,6 +23,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+import plotly.graph_objects as go
 from typing import Any, Dict, Union
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -159,6 +160,92 @@ def read_html_chunk(file_path):
     return html_content
 
 
+def create_synthetic_marker_heatmap(input_metrics):
+    """
+    Create plotly heatmap from input_metrics marker_status_matrix.
+    Green = real data, Orange = synthetic data.
+    
+    Returns HTML string of the plotly figure.
+    """
+    marker_status_matrix = input_metrics.get('marker_status_matrix', {})
+    all_markers = input_metrics.get('all_markers', [])
+    
+    if not marker_status_matrix or not all_markers:
+        return None
+    
+    # Get batch IDs from first marker's status
+    first_marker = all_markers[0] if all_markers else None
+    if not first_marker:
+        return None
+    batch_ids = sorted(marker_status_matrix.get(first_marker, {}).keys())
+    
+    if not batch_ids:
+        return None
+    
+    # Build matrix: 1 = synthetic, 0 = real
+    matrix = []
+    hover_text = []
+    for marker in all_markers:
+        row = []
+        hover_row = []
+        for batch in batch_ids:
+            status = marker_status_matrix.get(marker, {}).get(batch, 'real')
+            is_synthetic = status == 'synthetic'
+            row.append(1 if is_synthetic else 0)
+            hover_row.append(f"Marker: {marker}<br>Batch: {batch}<br>Status: {status}")
+        matrix.append(row)
+        hover_text.append(hover_row)
+    
+    fig = go.Figure(data=go.Heatmap(
+        z=matrix,
+        x=batch_ids,
+        y=all_markers,
+        hovertext=hover_text,
+        hoverinfo='text',
+        colorscale=[
+            [0, '#4ade80'],  # Green for real
+            [1, '#fb923c']   # Orange for synthetic
+        ],
+        showscale=False,
+        xgap=1,
+        ygap=1
+    ))
+    
+    fig.update_layout(
+        title={
+            'text': 'Marker Data Status by Batch',
+            'x': 0.5,
+            'xanchor': 'center',
+            'font': {'size': 16, 'family': 'Segoe UI, sans-serif'}
+        },
+        xaxis={
+            'title': 'Batch',
+            'tickangle': 45,
+            'side': 'bottom'
+        },
+        yaxis={
+            'title': 'Marker',
+            'autorange': 'reversed'
+        },
+        autosize=True,
+        margin=dict(l=120, r=40, t=60, b=100),
+        plot_bgcolor='white'
+    )
+    
+    fig.add_annotation(
+        x=1.02, y=1,
+        xref='paper', yref='paper',
+        text='<span style="color:#4ade80">■</span> Real  <span style="color:#fb923c">■</span> Synthetic',
+        showarrow=False,
+        font=dict(size=12),
+        align='left'
+    )
+    
+    return fig.to_html(full_html=False, 
+                       include_plotlyjs=False,
+                       config={'responsive': True})
+
+
 def collect_html_content(input_dir):
     input_dir = Path(input_dir)
     all_jsons = {
@@ -172,11 +259,23 @@ def collect_html_content(input_dir):
 
 def collect_metric_data(input_dir):
     input_dir = Path(input_dir)
+    input_metrics = load_metrics_json(input_dir / "input_batch_metrics.json")
+    
+    # Generate heatmap HTML from input_metrics
+    heatmap_html = None
+    if input_metrics.get('marker_status_matrix'):
+        heatmap_html = create_synthetic_marker_heatmap(input_metrics)
+    
+    # Check for warnings (any batch >25% synthetic)
+    any_warnings = any(b.get('percent_synthetic', 0) > 25 for b in input_metrics.get('batches', []))
+    input_metrics['synthetic_heatmap_html'] = heatmap_html
+    input_metrics['any_synthetic_warnings'] = any_warnings
+    
     all_jsons = {
-        'input_metrics': load_metrics_json(input_dir / "input_batch_metrics.json"),
+        'input_metrics': input_metrics,
         'split_metrics': load_metrics_json(input_dir / "training_split_report.json"),
         'model_metrics': load_metrics_json(input_dir / "model_summary.json")
-        }
+    }
 
     return all_jsons
 

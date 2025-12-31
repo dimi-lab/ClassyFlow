@@ -152,7 +152,7 @@
                                 {% elif c.percentage < 10 %}badge-warning
                                 {% elif c.percentage > 40 %}badge-info
                                 {% else %}badge-success{% endif %}">
-                                {% if c.percentage < 5 %}Severe{% elif c.percentage < 10 %}Under{% elif c.percentage > 40 %}Dom{% else %}OK{% endif %}
+                                {% if c.percentage < 5 %}Severe{% elif c.percentage < 10 %}Underrepresented{% elif c.percentage > 40 %}Dominant{% else %}Balanced{% endif %}
                             </span>
                         </td>
                         <td>
@@ -169,7 +169,7 @@
                                 {% elif c.auc_value >= 0.8 %}badge-info
                                 {% elif c.auc_value >= 0.7 %}badge-warning
                                 {% else %}badge-danger{% endif %}">
-                                {% if c.auc_value >= 0.9 %}Exc{% elif c.auc_value >= 0.8 %}Good{% elif c.auc_value >= 0.7 %}Mod{% else %}Poor{% endif %}
+                                {% if c.auc_value >= 0.9 %}Excellent{% elif c.auc_value >= 0.8 %}Good{% elif c.auc_value >= 0.7 %}Moderate{% else %}Poor{% endif %}
                             </span>
                             {% endif %}
                         </td>
@@ -187,7 +187,7 @@
                                 {% elif c.ap_lift >= 5 %}badge-info
                                 {% elif c.ap_lift >= 2 %}badge-warning
                                 {% else %}badge-danger{% endif %}">
-                                {% if c.ap_lift >= 10 %}Exc{% elif c.ap_lift >= 5 %}Good{% elif c.ap_lift >= 2 %}Mod{% else %}Poor{% endif %}
+                                {% if c.ap_lift >= 10 %}Excellent{% elif c.ap_lift >= 5 %}Good{% elif c.ap_lift >= 2 %}Moderate{% else %}Poor{% endif %}
                             </span>
                             {% endif %}
                         </td>

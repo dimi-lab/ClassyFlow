@@ -351,7 +351,7 @@ def build_results(transformation_type, batch_name, df_original, df_transformed, 
         'transformation_type': transformation_type,
         'batch_name': batch_name,
         'total_markers': len(target_cols),
-        'total_slides': df_original['Slide'].nunique(),
+        'total_slides': df_original['Image'].nunique(),
         'total_cells': len(df_original),
         'skewness_metrics': {
             'mean_reduction_ratio': float(skewness_df['reduction_ratio'].mean()),
