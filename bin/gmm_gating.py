@@ -2,6 +2,8 @@
 
 import sys, os
 import argparse
+import json
+import time
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,10 +14,10 @@ from scipy.signal import argrelextrema
 from jinja2 import Template
 import base64
 from io import BytesIO
-from pathlib import Path
 
 # Static field to be applied as a fixed heuristic for marker columns
 markerColumnBase = 'Mean'
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="GMM gating for normalized tables with HTML report.")
@@ -23,12 +25,12 @@ def parse_args():
     parser.add_argument('--output', required=True, help='Output TSV file (gated)')
     parser.add_argument('--html_report', default='gmm_gating_report.html', help='Output HTML report file')
     parser.add_argument('--target-feature', dest='targetFeature', default='Cell: Mean',
-                       help='Comma-separated list of column name patterns to process (e.g., "Cell: Mean,Cell: Max"). If not specified, all Mean columns are processed.')
+                       help='Comma-separated list of column name patterns to process')
     parser.add_argument('--batch-name', dest='batchName', default='Unknown', help='Batch name for the report')
     return parser.parse_args()
 
 
-def plot_histogram_and_gmm(col, values, threshold, gmm, outdir, prefix):
+def plot_histogram_and_gmm(col, values, threshold, gmm):
     fig, ax = plt.subplots(figsize=(8, 4))
     sns.histplot(values, bins=50, kde=True, ax=ax, color='skyblue', stat='density')
     x = np.linspace(values.min(), values.max(), 1000)
@@ -47,7 +49,7 @@ def plot_histogram_and_gmm(col, values, threshold, gmm, outdir, prefix):
     return img_b64
 
 
-def plot_delta_scatter(pre, post, col, outdir):
+def plot_delta_scatter(pre, post, col):
     fig, ax = plt.subplots(figsize=(5, 5))
     ax.scatter(pre, post, alpha=0.3, s=1)
     ax.set_xlabel('Pre-Gating')
@@ -69,9 +71,7 @@ def plot_delta_scatter(pre, post, col, outdir):
 
 
 def get_target_columns(df, target_features):
-    """Get columns matching target features"""
     if target_features:
-        # Parse comma-separated target features
         target_list = [f.strip() for f in target_features.split(',')]
         
         # Find all columns that match any of the target features
@@ -95,11 +95,8 @@ def main():
     gating_results = []
     plots = []
     delta_plots = []
-    outdir = '.'
 
-    # Get columns to process based on target features
     target_cols = get_target_columns(df, args.targetFeature)
-    
     print(f"Found {len(target_cols)} columns for GMM gating")
     
     for col in target_cols:
@@ -109,6 +106,7 @@ def main():
         if valid_values.size < 2:
             print(f"[WARNING] Skipping column '{col}' for GMM gating: not enough valid (non-NaN) values.")
             continue
+            
         X = valid_values.reshape(-1, 1)
         # Fit 1- and 2-component GMMs
         gmm1 = GaussianMixture(n_components=1, random_state=0).fit(X)
@@ -177,13 +175,35 @@ def main():
             'cells_gated': int((pre_vals < threshold).sum()),
             'percent_gated': float((pre_vals < threshold).mean() * 100)
         })
-        plots.append({'column': col, 'img': plot_histogram_and_gmm(col, values, threshold, best_gmm, outdir, prefix)})
-        delta_plots.append({'column': col, 'img': plot_delta_scatter(pre_vals, post_vals, col, outdir)})
+        plots.append({'column': col, 'img': plot_histogram_and_gmm(col, values, threshold, best_gmm)})
+        delta_plots.append({'column': col, 'img': plot_delta_scatter(pre_vals, post_vals, col)})
 
-    # Save output
+    # Save gated output
     df_gated.to_csv(args.output, sep='\t', index=False)
 
-    # Generate styled HTML report
+    # Save JSON results for report integration
+    json_results = {
+        'batch_name': args.batchName,
+        'total_features': len(gating_results),
+        'avg_percent_gated': float(np.mean([r['percent_gated'] for r in gating_results])) if gating_results else 0,
+        'avg_cells_gated': int(np.mean([r['cells_gated'] for r in gating_results])) if gating_results else 0,
+        'per_marker': [
+            {
+                'marker': r['column'],
+                'threshold': r['threshold'],
+                'percent_gated': r['percent_gated'],
+                'cells_gated': r['cells_gated']
+            }
+            for r in gating_results
+        ]
+    }
+    
+    json_output = f"gmm_results_{args.batchName}.json"
+    with open(json_output, 'w') as f:
+        json.dump(json_results, f, indent=2)
+    print(f"JSON results saved to {json_output}")
+
+    # Generate HTML report
     html_template = Template('''<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -191,120 +211,27 @@ def main():
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GMM Gating Report - {{ batch_name }}</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f5f5f5;
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 10px;
-        }
-        h2 {
-            color: #333;
-            margin-top: 30px;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-        }
-        .metadata {
-            text-align: center;
-            color: #666;
-            margin-bottom: 20px;
-        }
-        .summary-stats {
-            background-color: white;
-            padding: 20px;
-            border-radius: 5px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin-top: 20px;
-        }
-        .stat-item {
-            text-align: center;
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-        }
-        .stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #667eea;
-        }
-        .stat-label {
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background-color: white;
-            margin: 20px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        th {
-            background-color: #f8f9fa;
-            color: #333;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            border-bottom: 2px solid #dee2e6;
-        }
-        td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #dee2e6;
-        }
-        tr:hover {
-            background-color: #f8f9fa;
-        }
-        .plot-section {
-            background-color: white;
-            padding: 20px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .plot-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-        .plot-item {
-            background-color: white;
-            padding: 15px;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .plot-item h3 {
-            margin-top: 0;
-            color: #333;
-            font-size: 14px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-        }
-        .plot-item img {
-            width: 100%;
-            height: auto;
-        }
-        .good-threshold {
-            color: #28a745;
-            font-weight: bold;
-        }
-        .moderate-threshold {
-            color: #ffc107;
-            font-weight: bold;
-        }
-        .poor-threshold {
-            color: #dc3545;
-            font-weight: bold;
-        }
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        h1 { color: #333; text-align: center; margin-bottom: 10px; }
+        h2 { color: #333; margin-top: 30px; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+        .metadata { text-align: center; color: #666; margin-bottom: 20px; }
+        .summary-stats { background-color: white; padding: 20px; border-radius: 5px; margin-bottom: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px; }
+        .stat-item { text-align: center; background-color: #f8f9fa; padding: 15px; border-radius: 5px; }
+        .stat-value { font-size: 24px; font-weight: bold; color: #667eea; }
+        .stat-label { font-size: 12px; color: #666; margin-top: 5px; }
+        table { width: 100%; border-collapse: collapse; background-color: white; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        th { background-color: #f8f9fa; color: #333; padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6; }
+        td { padding: 10px 12px; border-bottom: 1px solid #dee2e6; }
+        tr:hover { background-color: #f8f9fa; }
+        .plot-section { background-color: white; padding: 20px; border-radius: 5px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .plot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 20px; margin-top: 20px; }
+        .plot-item { background-color: white; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .plot-item h3 { margin-top: 0; color: #333; font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .plot-item img { width: 100%; height: auto; }
+        .good-threshold { color: #28a745; font-weight: bold; }
+        .moderate-threshold { color: #ffc107; font-weight: bold; }
+        .poor-threshold { color: #dc3545; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -390,11 +317,9 @@ def main():
 </html>
     ''')
     
-    # Calculate summary statistics
-    import time
     total_features = len(gating_results)
-    avg_cells_gated = int(np.mean([r['cells_gated'] for r in gating_results]))
-    avg_percent_gated = round(np.mean([r['percent_gated'] for r in gating_results]), 1)
+    avg_cells_gated = int(np.mean([r['cells_gated'] for r in gating_results])) if gating_results else 0
+    avg_percent_gated = round(np.mean([r['percent_gated'] for r in gating_results]), 1) if gating_results else 0
     
     # Write HTML report
     with open(args.html_report, 'w') as f:
@@ -411,6 +336,7 @@ def main():
     
     print(f"GMM gating complete. Output saved to {args.output}")
     print(f"HTML report saved to {args.html_report}")
+
 
 if __name__ == "__main__":
     main()

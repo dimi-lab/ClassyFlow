@@ -63,6 +63,7 @@ process GMM_GATING {
     output:
     tuple val(batchID), path("gmm_gated_${batchID}.tsv"), emit: norm_df
     tuple val(batchID), path("gmm_gated_${batchID}.html"), emit: gmm_html
+    path("gmm_results_${batchID}.json"), emit: gmm_json
     
     script:
     """
@@ -80,12 +81,12 @@ process GENERATE_NORM_REPORT {
     //publishDir "${params.output_dir}/final_reports/", pattern: "normalization_report.html", mode: 'copy'
 
     input:
-    path(files)
+    path(norm_files)
+    path(gmm_files)
     path(html_template)
 
     output:
     path("normalization_report.html"), emit: norm_html
-    path("normalization_summary.json"), emit: norm_summary
 
     script:
     """
@@ -123,7 +124,8 @@ workflow normalization_wf {
 
     //norm_outputs = norm_results.norm_results.map { batchID, file -> file }.collect()
     norm_outputs = norm_results.norm_results.collect()
-    norm_report = GENERATE_NORM_REPORT(norm_outputs, "${params.html_template}")
+    gmm_outputs = gmm_gated.gmm_json.collect()
+    norm_report = GENERATE_NORM_REPORT(norm_outputs, gmm_outputs, "${params.html_template}")
 
     emit:
     normalized = final_ch
