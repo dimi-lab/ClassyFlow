@@ -8,7 +8,7 @@ println "Active profile: ${workflow.profile}"
 // Users can override this in their own config or with --input_dirs
 params.output_dir = "${workflow.projectDir}/output"
 //Static Assests for beautification
-params.letterhead = file("${projectDir}/assets/images/ClassyFlow_Letterhead.PNG", checkIfExists: true)
+params.letterhead = file("${projectDir}/assets/images/Classyflow_banner_1600_220px.png", checkIfExists: true)
 params.html_template = file("${projectDir}/assets/html_templates", checkIfExists: true)
 params.pipeline_version = "1.0"
 params.reports_dir = "${params.output_dir}/final_reports"
@@ -110,8 +110,7 @@ process ADD_EMPTY_MARKER_NOISE {
 
     output:
     tuple val(batchID), path("merged_dataframe_${batchID}_mod.pkl"), emit: modbatchtables
-    path("missing_data_fill_report_${batchID}.json"), emit: empty_marker_results
-
+    
     script:
     """
     add_empty_marker_noise.py \
@@ -390,7 +389,7 @@ workflow {
             params.letterhead,
             params.config_file
         )
-        ZIP_PUBLISHED(final_report.report_done.map {"done"}, file("${params.output_dir}/final_reports"))
+        // ZIP_PUBLISHED(final_report.report_done.map {"done"}, file("${params.output_dir}/final_reports"))
     }
     
 }

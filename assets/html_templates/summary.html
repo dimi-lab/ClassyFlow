@@ -66,6 +66,83 @@
     {% endif %}
 </section>
 
+{% if input_metrics.batches %}
+<section class="page-section">
+    <h2>Batch Summary</h2>
+    
+    <p style="color: #6c757d; margin-bottom: 1.5rem;">
+        Overview of each batch including cell counts, ROI counts, and marker coverage. 
+        Batches missing certain markers have synthetic noise data generated for those features.
+    </p>
+
+    {% if input_metrics.any_synthetic_warnings %}
+    <div class="alert alert-warning">
+        <strong>Warning:</strong> One or more batches have >25% synthetic data. This may impact model reliability for those batches.
+    </div>
+    {% endif %}
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-value">{{ input_metrics.total_batches }}</div>
+            <div class="metric-label">Total Batches</div>
+        </div>
+        <div class="metric-card {% if input_metrics.batches_with_synthetic > 0 %}warning{% else %}success{% endif %}">
+            <div class="metric-value">{{ input_metrics.batches_with_synthetic | default(0) }}</div>
+            <div class="metric-label">Batches with Synthetic Data</div>
+        </div>
+    </div>
+
+    <h3>Per-Batch Details</h3>
+    
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Batch</th>
+                    <th>Number of Cells</th>
+                    <th>Number of ROIs</th>
+                    <th>Number of Features</th>
+                    <th>Missing Features</th>
+                    <th>Synthetic %</th>
+                    <th>Missing Markers</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for batch in input_metrics.batches %}
+                <tr {% if batch.percent_synthetic > 25 %}style="background-color: #fff3cd;"{% endif %}>
+                    <td><strong>{{ batch.batch_id }}</strong></td>
+                    <td>{{ batch.num_cells | number_format }}</td>
+                    <td>{{ batch.num_rois | number_format }}</td>
+                    <td>{{ batch.num_features | number_format }}</td>
+                    <td>{{ batch.missing_features | number_format }}</td>
+                    <td>
+                        <span style="font-weight: 600; color: {% if batch.percent_synthetic > 25 %}#b45309{% elif batch.percent_synthetic > 0 %}#d97706{% else %}#059669{% endif %};">
+                            {{ batch.percent_synthetic }}%
+                        </span>
+                    </td>
+                    <td style="font-size: 0.9em; color: #6c757d;">
+                        {{ batch.missing_markers | join(', ') if batch.missing_markers else '—' }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if input_metrics.synthetic_heatmap_html %}
+    <h3>Marker Coverage Heatmap</h3>
+    <p style="color: #6c757d; margin-bottom: 1rem;">
+        Visual overview of which markers have real data vs synthetic data across all batches.
+    </p>
+    <div class="plot-container">
+        <div class="plotly-wrapper">
+            {{ input_metrics.synthetic_heatmap_html | safe }}
+        </div>
+    </div>
+    {% endif %}
+</section>
+{% endif %}
+
 <section class="page-section">
     <h2>Report Sections</h2>
     
