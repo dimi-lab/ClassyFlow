@@ -7,14 +7,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import argparse
-from pprint import pprint
-from scipy.stats import pearsonr, boxcox
+from scipy.stats import pearsonr, boxcox, skew
 from sklearn.preprocessing import QuantileTransformer, MinMaxScaler
 from pathlib import Path
 import base64
 from io import BytesIO
 
-# Set style for professional plots
 plt.style.use('default')
 sns.set_palette("husl")
 
@@ -57,8 +55,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .plot-item h3 {{ margin-top: 0; color: #333; font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 10px; }}
         .plot-item img {{ width: 100%; height: auto; }}
         .plot-stats {{ display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; font-size: 12px; color: #666; }}
-        .good-correlation {{ color: #4CAF50; font-weight: bold; }}
-        .poor-correlation {{ color: #f44336; font-weight: bold; }}
     </style>
 </head>
 <body>
@@ -110,13 +106,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 # =============================================================================
 
 def clean_image_names(df):
-    """Clean image names by removing .ome.tiff extension"""
     df = df.copy()
     df['Image'] = df['Image'].str.replace('.ome.tiff', '', regex=False)
     return df
 
+
 def get_target_columns(df, target_feature):
-    """Get columns matching the target feature patterns"""
     target_list = [f.strip() for f in target_feature.split(',')]
     target_cols = []
     
@@ -124,11 +119,10 @@ def get_target_columns(df, target_feature):
         matching_cols = [col for col in df.columns if target in col]
         target_cols.extend(matching_cols)
     
-    # Remove duplicates while preserving order
     return list(dict.fromkeys(target_cols))
 
+
 def organize_columns_by_groups(target_cols):
-    """Organize columns into groups based on their suffix"""
     feature_groups = {}
     
     for col in target_cols:
@@ -143,90 +137,67 @@ def organize_columns_by_groups(target_cols):
     
     return feature_groups
 
-def calculate_cv_metrics(df_original, df_transformed, target_cols):
-    """Calculate coefficient of variation for each marker by slide"""
-    cv_data = []
+
+def calculate_skewness_metrics(df_original, df_transformed, target_cols):
+    skewness_data = []
     
     for col in target_cols:
-        for slide in df_original['Slide'].unique():
-            slide_data_orig = df_original[df_original['Slide'] == slide][col]
-            slide_data_trans = df_transformed[df_transformed['Slide'] == slide][col]
-            
-            # Calculate CV (std/mean) if mean > 0
-            cv_orig = slide_data_orig.std() / slide_data_orig.mean() if slide_data_orig.mean() > 0 else np.nan
-            cv_trans = slide_data_trans.std() / slide_data_trans.mean() if slide_data_trans.mean() > 0 else np.nan
-            
-            marker_name = col.replace('Cell: ', '').replace(': Mean', '')
-            
-            cv_data.append({
-                'marker': marker_name,
-                'slide': slide,
-                'cv_original': cv_orig,
-                'cv_transformed': cv_trans,
-                'cv_improvement': cv_orig - cv_trans if not (np.isnan(cv_orig) or np.isnan(cv_trans)) else np.nan
-            })
-    
-    return pd.DataFrame(cv_data)
-
-def get_worst_performing_markers(cv_df, n_markers=5):
-    """Identify markers with worst CV performance"""
-    if cv_df.empty:
-        return []
+        skew_before = skew(df_original[col].dropna())
+        skew_after = skew(df_transformed[col].dropna())
         
-    marker_performance = cv_df.groupby('marker').agg({
-        'cv_improvement': 'mean',
-        'cv_transformed': 'mean'
-    }).reset_index()
+        # Reduction ratio >1 means improvement (less skewed)
+        if abs(skew_after) > 0.01:
+            reduction_ratio = abs(skew_before) / abs(skew_after)
+        else:
+            reduction_ratio = abs(skew_before) / 0.01 if abs(skew_before) > 0.01 else 1.0
+        
+        skewness_data.append({
+            'marker': col,
+            'skewness_before': skew_before,
+            'skewness_after': skew_after,
+            'reduction_ratio': reduction_ratio
+        })
     
-    worst_markers = marker_performance.nsmallest(n_markers, 'cv_improvement')['marker'].tolist()
-    return worst_markers
+    return pd.DataFrame(skewness_data)
+
+
+def calculate_outlier_metrics(df_original, df_transformed, target_cols, threshold=3.0):
+    outlier_data = []
+    
+    for col in target_cols:
+        # Before transformation
+        orig_values = df_original[col].dropna()
+        orig_mean, orig_std = orig_values.mean(), orig_values.std()
+        if orig_std > 0:
+            outliers_before = ((orig_values - orig_mean).abs() > threshold * orig_std).sum()
+        else:
+            outliers_before = 0
+        
+        # After transformation
+        trans_values = df_transformed[col].dropna()
+        trans_mean, trans_std = trans_values.mean(), trans_values.std()
+        if trans_std > 0:
+            outliers_after = ((trans_values - trans_mean).abs() > threshold * trans_std).sum()
+        else:
+            outliers_after = 0
+        
+        # Reduction ratio >1 means improvement (fewer outliers)
+        if outliers_after > 0:
+            reduction_ratio = outliers_before / outliers_after
+        else:
+            reduction_ratio = outliers_before if outliers_before > 0 else 1.0
+        
+        outlier_data.append({
+            'marker': col,
+            'outliers_before': int(outliers_before),
+            'outliers_after': int(outliers_after),
+            'reduction_ratio': reduction_ratio
+        })
+    
+    return pd.DataFrame(outlier_data)
+
 
 def create_plot_for_column(df_original, df_transformed, col, transformation_type, param_info):
-    """Create a single transformation plot for a column"""
-    # Calculate correlation
-    paired = pd.concat([df_original[col], df_transformed[col]], axis=1, join='inner').dropna()
-    
-    # Check for sufficient data for correlation
-    if paired.shape[0] < 2:
-        print(f"[WARNING] Skipping correlation for column '{col}': not enough valid data points (n={paired.shape[0]}). Branch: insufficient value variability.")
-        correlation = float('nan')
-    else:
-        try:
-            correlation, _ = pearsonr(paired.iloc[:, 0], paired.iloc[:, 1])
-        except TypeError as e:
-            print(f"\n[ERROR] TypeError while computing pearsonr for column '{col}': {e}")
-            print(f"Column '{col}' original dtype: {df_original[col].dtype}")
-            print(f"Column '{col}' transformed dtype: {df_transformed[col].dtype}")
-
-            # Find and print problematic values in both columns
-            orig_non_float = df_original[col][~df_original[col].apply(lambda x: isinstance(x, (int, float, float, complex)) or pd.isna(x))]
-            trans_non_float = df_transformed[col][~df_transformed[col].apply(lambda x: isinstance(x, (int, float, float, complex)) or pd.isna(x))]
-
-            if not orig_non_float.empty:
-                print(f"\n[DEBUG] Non-numeric values in original column '{col}':")
-                print(orig_non_float.head(10))
-            if not trans_non_float.empty:
-                print(f"\n[DEBUG] Non-numeric values in transformed column '{col}':")
-                print(trans_non_float.head(10))
-
-            # Show a sample of the paired data that caused the error
-            print("\n[DEBUG] Sample of paired data (first 10 rows):")
-            print(paired.head(10))
-
-            # Optionally, show all unique non-numeric values
-            print("\n[DEBUG] Unique non-numeric values in original column:")
-            print(orig_non_float.unique())
-            print("\n[DEBUG] Unique non-numeric values in transformed column:")
-            print(trans_non_float.unique())
-
-            correlation = float('nan')
-            print(f"[WARNING] Skipping correlation for column '{col}' due to TypeError. Branch: type error.")
-        except ValueError as e:
-            print(f"[WARNING] Skipping correlation for column '{col}': {e}. Branch: insufficient value variability.")
-            correlation = float('nan')
-    
-    # Create plot
-    plt.style.use('default')
     fig, ax = plt.subplots(figsize=PLOT_CONFIG['figsize'])
     plt.rcParams.update({
         'font.size': PLOT_CONFIG['font_size'],
@@ -234,31 +205,26 @@ def create_plot_for_column(df_original, df_transformed, col, transformation_type
         'axes.linewidth': PLOT_CONFIG['linewidth']
     })
     
-    # Scatter plot
     ax.scatter(df_original[col], df_transformed[col], 
               alpha=PLOT_CONFIG['alpha'], s=PLOT_CONFIG['point_size'], color='blue')
     
-    # Add reference line
     max_orig = df_original[col].max()
     max_trans = df_transformed[col].max()
     if max_orig > 0 and max_trans > 0:
         ax.plot([0, max_orig], [0, max_trans], 'r--', alpha=0.7, linewidth=2)
     
-    # Formatting
     ax.set_title(f'{transformation_type} Transform: {col}', fontweight='bold', fontsize=PLOT_CONFIG['title_size'])
     ax.set_xlabel('Original Value', fontsize=PLOT_CONFIG['font_size'])
     ax.set_ylabel('Transformed Value', fontsize=PLOT_CONFIG['font_size'])
     ax.grid(True, alpha=0.3)
     
-    # Add stats box
-    textstr = f'{param_info["name"]}: {param_info["value"]}\nr = {correlation if not np.isnan(correlation) else "N/A"}'
+    textstr = f'{param_info["name"]}: {param_info["value"]}'
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
     ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=9,
             verticalalignment='top', bbox=props)
     
     plt.tight_layout()
     
-    # Convert to base64
     buf = BytesIO()
     plt.savefig(buf, format='png', dpi=PLOT_CONFIG['dpi'], bbox_inches='tight')
     plt.close()
@@ -268,12 +234,11 @@ def create_plot_for_column(df_original, df_transformed, col, transformation_type
     return {
         'marker_name': col,
         'img_b64': img_b64,
-        'param_value': param_info['value'],
-        'correlation': correlation
+        'param_value': param_info['value']
     }
 
+
 def create_all_plots(df_original, df_transformed, target_cols, transformation_type, param_info_func):
-    """Create plots for all target columns organized by groups"""
     feature_groups = organize_columns_by_groups(target_cols)
     all_plot_data = {}
     
@@ -293,25 +258,21 @@ def create_all_plots(df_original, df_transformed, target_cols, transformation_ty
     
     return all_plot_data
 
+
 def generate_html_report(all_plot_data, batch_name, transformation_type, transform_function, method_specific_stats=None):
-    """Generate HTML report for transformation results"""
-    # Create group options
     group_options = []
     for group_name, group_data in all_plot_data.items():
         group_options.append(f'<option value="{group_name}">{group_name} ({group_data["total"]} features)</option>')
     
-    # Create group content
     group_content = []
     for group_name, group_data in all_plot_data.items():
         safe_group_name = group_name.replace(' ', '_').replace(':', '_')
         
-        # Stats section
         stats_items = [
             f'<div class="stat-item"><div class="stat-value">{group_data["total"]}</div><div class="stat-label">Total Features</div></div>',
             f'<div class="stat-item"><div class="stat-value">{transform_function}</div><div class="stat-label">Transform Function</div></div>'
         ]
         
-        # Add method-specific stats
         if method_specific_stats and group_name in method_specific_stats:
             for stat_name, stat_value in method_specific_stats[group_name].items():
                 stats_items.append(f'<div class="stat-item"><div class="stat-value">{stat_value}</div><div class="stat-label">{stat_name}</div></div>')
@@ -324,18 +285,14 @@ def generate_html_report(all_plot_data, batch_name, transformation_type, transfo
         </div>
     </div>'''
         
-        # Plots section
         plot_items = []
         for plot in group_data['plots']:
-            correlation_class = 'good-correlation' if plot['correlation'] > 0.8 else 'poor-correlation' if plot['correlation'] < 0.5 else ''
-            
             plot_items.append(f'''
         <div class="plot-item">
             <h3>{plot['marker_name']}</h3>
             <img src="data:image/png;base64,{plot['img_b64']}" alt="{plot['marker_name']} transformation">
             <div class="plot-stats">
                 <span>Param: {plot['param_value']}</span>
-                <span class="{correlation_class}">Correlation: {plot['correlation']:.3f}</span>
             </div>
         </div>''')
         
@@ -346,7 +303,6 @@ def generate_html_report(all_plot_data, batch_name, transformation_type, transfo
         
         group_content.append(stats_html + plots_html)
     
-    # Fill template
     html_content = HTML_TEMPLATE.format(
         transformation_type=transformation_type,
         batch_name=batch_name,
@@ -356,7 +312,6 @@ def generate_html_report(all_plot_data, batch_name, transformation_type, transfo
         group_content='\n'.join(group_content)
     )
     
-    # Save HTML
     method_name = transformation_type.lower().replace('-', '').replace(' ', '')
     html_filename = f'{method_name}_all_plots_{batch_name}.html'
     with open(html_filename, 'w') as f:
@@ -365,13 +320,70 @@ def generate_html_report(all_plot_data, batch_name, transformation_type, transfo
     print(f"Combined HTML report generated: {html_filename}")
     return html_filename
 
+
+def build_results(transformation_type, batch_name, df_original, df_transformed, target_cols, html_file, extra_data=None):
+    skewness_df = calculate_skewness_metrics(df_original, df_transformed, target_cols)
+    outlier_df = calculate_outlier_metrics(df_original, df_transformed, target_cols)
+    
+    # Build per-marker skewness data
+    skewness_per_marker = [
+        {
+            'marker': row['marker'],
+            'before': float(row['skewness_before']),
+            'after': float(row['skewness_after']),
+            'ratio': float(row['reduction_ratio'])
+        }
+        for _, row in skewness_df.iterrows()
+    ]
+    
+    # Build per-marker outlier data
+    outlier_per_marker = [
+        {
+            'marker': row['marker'],
+            'before': int(row['outliers_before']),
+            'after': int(row['outliers_after']),
+            'ratio': float(row['reduction_ratio'])
+        }
+        for _, row in outlier_df.iterrows()
+    ]
+    
+    results = {
+        'transformation_type': transformation_type,
+        'batch_name': batch_name,
+        'total_markers': len(target_cols),
+        'total_slides': df_original['Slide'].nunique(),
+        'total_cells': len(df_original),
+        'skewness_metrics': {
+            'mean_reduction_ratio': float(skewness_df['reduction_ratio'].mean()),
+            'median_reduction_ratio': float(skewness_df['reduction_ratio'].median()),
+            'mean_skewness_before': float(skewness_df['skewness_before'].mean()),
+            'mean_skewness_after': float(skewness_df['skewness_after'].mean()),
+            'markers_improved': int((skewness_df['reduction_ratio'] > 1).sum()),
+            'markers_worsened': int((skewness_df['reduction_ratio'] < 1).sum()),
+            'per_marker': skewness_per_marker
+        },
+        'outlier_metrics': {
+            'mean_reduction_ratio': float(outlier_df['reduction_ratio'].mean()),
+            'total_outliers_before': int(outlier_df['outliers_before'].sum()),
+            'total_outliers_after': int(outlier_df['outliers_after'].sum()),
+            'markers_improved': int((outlier_df['reduction_ratio'] > 1).sum()),
+            'markers_worsened': int((outlier_df['reduction_ratio'] < 1).sum()),
+            'per_marker': outlier_per_marker
+        },
+        'html_report': html_file,
+        'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
+    }
+    
+    if extra_data:
+        results.update(extra_data)
+    
+    return results
+
+
 def save_results(df_transformed, results, batch_name, method):
-    """Save transformed data and results"""
-    # Save transformed data
     output_file = f"{method}_transformed_{batch_name}.tsv"
     df_transformed.to_csv(output_file, sep="\t", index=False)
     
-    # Save results JSON
     if results is not None:
         json_file = f'{method}_results_{batch_name}.json'
         with open(json_file, 'w') as f:
@@ -383,7 +395,6 @@ def save_results(df_transformed, results, batch_name, method):
 # =============================================================================
 
 def apply_log_transform(df, batch_name, target_feature):
-    """Apply log transformation"""
     target_cols = get_target_columns(df, target_feature)
     
     # Apply log transformation
@@ -399,31 +410,11 @@ def apply_log_transform(df, batch_name, target_feature):
     # Generate HTML
     html_file = generate_html_report(all_plot_data, batch_name, 'Log', 'log(x + 1)')
     
-    # Calculate metrics
-    cv_df = calculate_cv_metrics(df, df_transformed, target_cols)
-    worst_markers = get_worst_performing_markers(cv_df)
-    
-    results = {
-        'transformation_type': 'log',
-        'batch_name': batch_name,
-        'total_markers': len(target_cols),
-        'total_slides': df['Slide'].nunique(),
-        'total_cells': len(df),
-        'worst_performing_markers': worst_markers,
-        'cv_metrics': {
-            'mean_cv_improvement': cv_df['cv_improvement'].mean(),
-            'median_cv_improvement': cv_df['cv_improvement'].median(),
-            'markers_improved': (cv_df['cv_improvement'] > 0).sum(),
-            'markers_worsened': (cv_df['cv_improvement'] < 0).sum()
-        },
-        'html_report': html_file,
-        'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
-    }
-    
+    results = build_results('log', batch_name, df, df_transformed, target_cols, html_file)
     return df_transformed, results
 
+
 def apply_quantile_transform(df, batch_name, target_feature, quantile_split):
-    """Apply quantile transformation"""
     target_cols = get_target_columns(df, target_feature)
     
     # Apply quantile transformation
@@ -441,32 +432,12 @@ def apply_quantile_transform(df, batch_name, target_feature, quantile_split):
     # Generate HTML
     html_file = generate_html_report(all_plot_data, batch_name, 'Quantile', f'Quantile (n={quantile_split})')
     
-    # Calculate metrics
-    cv_df = calculate_cv_metrics(df, df_transformed, target_cols)
-    worst_markers = get_worst_performing_markers(cv_df)
-    
-    results = {
-        'transformation_type': 'quantile',
-        'batch_name': batch_name,
-        'quantile_splits': quantile_split,
-        'total_markers': len(target_cols),
-        'total_slides': df['Slide'].nunique(),
-        'total_cells': len(df),
-        'worst_performing_markers': worst_markers,
-        'cv_metrics': {
-            'mean_cv_improvement': cv_df['cv_improvement'].mean(),
-            'median_cv_improvement': cv_df['cv_improvement'].median(),
-            'markers_improved': (cv_df['cv_improvement'] > 0).sum(),
-            'markers_worsened': (cv_df['cv_improvement'] < 0).sum()
-        },
-        'html_report': html_file,
-        'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
-    }
-    
+    extra_data = {'quantile_splits': quantile_split}
+    results = build_results('quantile', batch_name, df, df_transformed, target_cols, html_file, extra_data)
     return df_transformed, results
 
+
 def apply_minmax_transform(df, batch_name, target_feature):
-    """Apply MinMax transformation"""
     target_cols = get_target_columns(df, target_feature)
     
     # Apply MinMax transformation
@@ -484,28 +455,9 @@ def apply_minmax_transform(df, batch_name, target_feature):
     # Generate HTML
     html_file = generate_html_report(all_plot_data, batch_name, 'MinMax', 'MinMax (-2, 2)')
     
-    # Calculate metrics
-    cv_df = calculate_cv_metrics(df, df_transformed, target_cols)
-    worst_markers = get_worst_performing_markers(cv_df)
-    
-    results = {
-        'transformation_type': 'minmax',
-        'batch_name': batch_name,
-        'total_markers': len(target_cols),
-        'total_slides': df['Slide'].nunique(),
-        'total_cells': len(df),
-        'worst_performing_markers': worst_markers,
-        'cv_metrics': {
-            'mean_cv_improvement': cv_df['cv_improvement'].mean(),
-            'median_cv_improvement': cv_df['cv_improvement'].median(),
-            'markers_improved': (cv_df['cv_improvement'] > 0).sum(),
-            'markers_worsened': (cv_df['cv_improvement'] < 0).sum()
-        },
-        'html_report': html_file,
-        'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
-    }
-    
+    results = build_results('minmax', batch_name, df, df_transformed, target_cols, html_file)
     return df_transformed, results
+
 
 def apply_boxcox_transform(df, batch_name, target_feature):
     """Apply Box-Cox transformation"""
@@ -571,70 +523,44 @@ def apply_boxcox_transform(df, batch_name, target_feature):
     # Generate HTML
     html_file = generate_html_report(all_plot_data, batch_name, 'Box-Cox', 'Box-Cox (λ varies)', method_stats)
     
-    # Calculate metrics
-    cv_df = calculate_cv_metrics(df, df_transformed, target_cols)
-    worst_markers = get_worst_performing_markers(cv_df)
-    
-    results = {
-        'transformation_type': 'boxcox',
-        'batch_name': batch_name,
-        'total_markers': len(target_cols),
-        'total_slides': df['Slide'].nunique(),
-        'total_cells': len(df),
-        'worst_performing_markers': worst_markers,
+    extra_data = {
         'boxcox_metrics': {
             'total_features': len(boxcox_metrics),
             'successful_transforms': len(boxcox_metrics[~boxcox_metrics['Lambda'].isin(['Failed', 'SkippedEmpty'])]),
             'failed_transforms': len(boxcox_metrics[boxcox_metrics['Lambda'].isin(['Failed', 'SkippedEmpty'])]),
-            'mean_lambda': boxcox_metrics[~boxcox_metrics['Lambda'].isin(['Failed', 'SkippedEmpty'])]['Lambda'].astype(float).mean(),
-            'median_lambda': boxcox_metrics[~boxcox_metrics['Lambda'].isin(['Failed', 'SkippedEmpty'])]['Lambda'].astype(float).median()
-        },
-        'cv_metrics': {
-            'mean_cv_improvement': cv_df['cv_improvement'].mean(),
-            'median_cv_improvement': cv_df['cv_improvement'].median(),
-            'markers_improved': (cv_df['cv_improvement'] > 0).sum(),
-            'markers_worsened': (cv_df['cv_improvement'] < 0).sum()
-        },
-        'html_report': html_file,
-        'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
+            'mean_lambda': float(boxcox_metrics[~boxcox_metrics['Lambda'].isin(['Failed', 'SkippedEmpty'])]['Lambda'].astype(float).mean()),
+            'median_lambda': float(boxcox_metrics[~boxcox_metrics['Lambda'].isin(['Failed', 'SkippedEmpty'])]['Lambda'].astype(float).median())
+        }
     }
-    
+    results = build_results('boxcox', batch_name, df, df_transformed, target_cols, html_file, extra_data)
     return df_transformed, results
+
 
 # =============================================================================
 # MAIN FUNCTION
 # =============================================================================
 
 def main():
-    """Main function with unified argument parser and method dispatcher"""
     parser = argparse.ArgumentParser(description="Apply normalization transformations to quantification data.")
-    
-    # Common arguments for all methods
     parser.add_argument('--pickleTable', required=True, help='Input pickle file')
     parser.add_argument('--batchID', required=True, help='Batch ID for output file naming')
     parser.add_argument('--method', required=True, choices=['log', 'quantile', 'minmax', 'boxcox', 'none'],
                        help='Transformation method to apply')
     parser.add_argument('--target-feature', dest='targetFeature', default='Cell: Mean',
-                       help='Comma-separated list of column name patterns to target (required for all methods)')
-    
-    # Method-specific arguments
+                       help='Comma-separated list of column name patterns to target')
     parser.add_argument('--quantileSplit', type=int, 
                        help='Number of quantiles for QuantileTransformer (required for quantile method)')
     
     args = parser.parse_args()
     
-    # Validate method-specific arguments
     if args.method == 'quantile' and args.quantileSplit is None:
         parser.error("--quantileSplit is required when using quantile method")
     
-    # Load data
     print(f"Loading data from {args.pickleTable}...")
     df = pd.read_pickle(args.pickleTable)
     df = clean_image_names(df)
     
-    # Convert statistical columns to numeric if they are not
     sts = ["Min", "Max", "Median", "Mean", "Std.Dev.", "Variance"]
-
     for col in df.columns:
         if any(s in col for s in sts):
             if not pd.api.types.is_numeric_dtype(df[col]):
@@ -645,7 +571,6 @@ def main():
                     print(f"[INFO] Filled {n_nans} NaN values in '{col}' with 0 after conversion.")
                     df[col] = df[col].fillna(0)
     
-    # Apply transformation
     print(f"Applying {args.method} transformation...")
     
     if args.method == 'log':
@@ -658,11 +583,12 @@ def main():
         df_transformed, results = apply_boxcox_transform(df, args.batchID, args.targetFeature)
     elif args.method == 'none':
         df_transformed = df
-        results = "{}"   
+        results = None
     else:
         raise ValueError(f"Unknown method: {args.method}")
     
-    # Save results
     save_results(df_transformed, results, args.batchID, args.method)
+
+
 if __name__ == "__main__":
     main()
