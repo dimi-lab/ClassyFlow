@@ -2,6 +2,11 @@
 
 <section class="page-section">
     <h2>Feature Selection</h2>
+    
+    <p>
+        This step identifies which markers are most useful for distinguishing each cell type. 
+        Using fewer, more informative markers improves prediction accuracy.
+    </p>
 
     {% if feature_selection_data.summary_statistics %}
     <div class="metrics-grid">
@@ -38,7 +43,7 @@
         <div class="tab-btn {% if loop.first %}active{% endif %} {% if celltype_result.rfe_warning %}warning-tab{% endif %}" 
              onclick="showCellType('celltype-{{ loop.index0 }}', this)">
             {{ celltype_result.celltype }}
-            {% if celltype_result.rfe_warning %}<span style="color: #f59e0b;"> ⚠</span>{% endif %}
+            {% if celltype_result.rfe_warning %}<span class="warning-icon"> ⚠</span>{% endif %}
         </div>
         {% endfor %}
     </div>
@@ -95,7 +100,7 @@
         
         <div class="flex flex-wrap gap-1">
             {% if celltype_result.data.feature_ranking_plot_path %}
-            <div class="plot-container" style="flex: 1; min-width: 400px;">
+            <div class="plot-container plot-flex-half">
                 <div class="plot-title">Feature Ranking</div>
                 <img src="plots/{{ celltype_result.data.feature_ranking_plot_path }}" alt="Feature Ranking" />
                 <div class="plot-caption">Blue = selected, Gray = not selected</div>
@@ -103,7 +108,7 @@
             {% endif %}
 
             {% if celltype_result.data.rfe_plot_path %}
-            <div class="plot-container" style="flex: 1; min-width: 400px;">
+            <div class="plot-container plot-flex-half">
                 <div class="plot-title">Recursive Feature Elimination</div>
                 <img src="plots/{{ celltype_result.data.rfe_plot_path }}" alt="RFE Analysis" />
                 <div class="plot-caption">Optimal feature count analysis</div>
@@ -113,14 +118,14 @@
 
         <div class="flex flex-wrap gap-1">
             {% if celltype_result.data.correlation_matrix_path %}
-            <div class="plot-container" style="flex: 1; min-width: 400px;">
+            <div class="plot-container plot-flex-half">
                 <div class="plot-title">Feature Correlation Matrix</div>
                 <img src="plots/{{ celltype_result.data.correlation_matrix_path }}" alt="Correlation Matrix" />
             </div>
             {% endif %}
 
             {% if celltype_result.data.tile_plot_path %}
-            <div class="plot-container" style="flex: 1; min-width: 400px;">
+            <div class="plot-container plot-flex-half">
                 <div class="plot-title">Selected Features Heatmap</div>
                 <img src="plots/{{ celltype_result.data.tile_plot_path }}" alt="Feature Heatmap" />
             </div>

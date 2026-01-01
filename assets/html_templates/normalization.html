@@ -24,7 +24,11 @@
     
     {% else %}
     
-    <!-- Section A: Aggregate Summary -->
+    <p>
+        Normalization adjusts marker values to ensure consistent measurements across batches. 
+        Gating filters out cells with background-level signals that may not represent true marker expression.
+    </p>
+
     <div class="metrics-grid">
         <div class="metric-card">
             <div class="metric-value">{{ normalization_data.aggregate.method }}</div>
@@ -42,8 +46,8 @@
             <div class="metric-description">Lower is better</div>
         </div>
         {% if normalization_data.aggregate.flagged_count > 0 %}
-        <div class="metric-card" style="border-left-color: #dc3545;">
-            <div class="metric-value" style="color: #dc3545;">{{ normalization_data.aggregate.flagged_count }}</div>
+        <div class="metric-card warning">
+            <div class="metric-value">{{ normalization_data.aggregate.flagged_count }}</div>
             <div class="metric-label">Flagged Batches</div>
             <div class="metric-description">>{{ normalization_data.aggregate.gating_threshold }}% gated</div>
         </div>
@@ -62,50 +66,52 @@
         </span>
     </div>
 
-    <!-- Section B: Forest Plots -->
     {% if normalization_data.forest_plots %}
     <h3>Per-Marker Quality</h3>
     
     <!-- GMM Gating Plot (Primary - Always Visible) -->
     {% if normalization_data.forest_plots.gmm %}
-    <div class="forest-plot-section">
-        <h4>GMM Gating by Marker</h4>
-        <p class="plot-description">Average % of cells gated per marker across all batches. Markers above the threshold may indicate background issues.</p>
-        <div class="forest-plot">
+    <div class="plot-container">
+        <div class="plot-title">GMM Gating by Marker</div>
+        <div class="plotly-wrapper">
             {{ normalization_data.forest_plots.gmm | safe }}
         </div>
+        <div class="plot-caption">Average % of cells gated per marker across all batches. Markers above the threshold may indicate background issues.</div>
     </div>
     {% endif %}
     
     <!-- Skewness & Outlier Plots (Collapsed) -->
     <details class="collapsible-section">
-        <summary>Skewness & Outlier Reduction Plots (click to expand)</summary>
-        <div class="forest-plots-container">
+        <summary>Skewness & Outlier Reduction Plots</summary>
+        <div class="forest-plots-grid">
             {% if normalization_data.forest_plots.skewness %}
-            <div class="forest-plot">
-                <h4>Skewness Reduction</h4>
-                <p class="plot-description">Ratio >1 means normalization reduced skewness.</p>
-                {{ normalization_data.forest_plots.skewness | safe }}
+            <div class="plot-container">
+                <div class="plot-title">Skewness Reduction</div>
+                <div class="plotly-wrapper">
+                    {{ normalization_data.forest_plots.skewness | safe }}
+                </div>
+                <div class="plot-caption">Ratio >1 means normalization reduced skewness.</div>
             </div>
             {% endif %}
             
             {% if normalization_data.forest_plots.outlier %}
-            <div class="forest-plot">
-                <h4>Outlier Reduction</h4>
-                <p class="plot-description">Ratio >1 means normalization reduced outliers.</p>
-                {{ normalization_data.forest_plots.outlier | safe }}
+            <div class="plot-container">
+                <div class="plot-title">Outlier Reduction</div>
+                <div class="plotly-wrapper">
+                    {{ normalization_data.forest_plots.outlier | safe }}
+                </div>
+                <div class="plot-caption">Ratio >1 means normalization reduced outliers.</div>
             </div>
             {% endif %}
         </div>
     </details>
     {% endif %}
 
-    <!-- Section C: Per-Batch Table -->
     {% if normalization_data.batches %}
     <h3>Per-Batch Summary</h3>
     
     <details class="table-legend">
-        <summary>Column Descriptions (click to expand)</summary>
+        <summary>Column Descriptions</summary>
         <ul>
             <li><strong>Status:</strong> ✓ = % gated below threshold; ⚠ = % gated above {{ normalization_data.aggregate.gating_threshold }}% (investigate)</li>
             <li><strong>Cells:</strong> Total cells processed in batch</li>
@@ -186,7 +192,6 @@
         </table>
     </div>
 
-    <!-- Pagination -->
     <div class="pagination-controls">
         <button onclick="prevPage()" id="prevBtn" disabled>← Previous</button>
         <span id="pageInfo">Page 1 of 1</span>
@@ -196,259 +201,6 @@
     
     {% endif %}
 </section>
-
-<style>
-.text-danger {
-    color: #dc3545 !important;
-}
-
-.secondary-metrics {
-    display: flex;
-    gap: 2rem;
-    margin: 1rem 0 1.5rem;
-    padding: 0.75rem 1rem;
-    background: #f8f9fa;
-    border-radius: 6px;
-    font-size: 0.85rem;
-}
-
-.secondary-metric {
-    color: #6c757d;
-}
-
-.secondary-label {
-    font-weight: 500;
-}
-
-.secondary-value {
-    margin-left: 0.25rem;
-}
-
-.forest-plot-section {
-    margin: 1.5rem 0;
-}
-
-.forest-plot-section h4 {
-    margin-bottom: 0.25rem;
-    color: #495057;
-}
-
-.plot-description {
-    color: #6c757d;
-    font-size: 0.85rem;
-    margin-bottom: 1rem;
-}
-
-.collapsible-section {
-    margin: 1.5rem 0;
-    border: 1px solid #e9ecef;
-    border-radius: 6px;
-}
-
-.collapsible-section summary {
-    padding: 1rem;
-    background: #f8f9fa;
-    cursor: pointer;
-    font-weight: 500;
-    color: #495057;
-    border-radius: 6px;
-}
-
-.collapsible-section summary:hover {
-    background: #e9ecef;
-}
-
-.collapsible-section[open] summary {
-    border-radius: 6px 6px 0 0;
-    border-bottom: 1px solid #e9ecef;
-}
-
-.collapsible-section .forest-plots-container {
-    padding: 1rem;
-}
-
-.forest-plots-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-    gap: 2rem;
-}
-
-.forest-plot {
-    background: white;
-    border-radius: 8px;
-    padding: 1rem;
-    overflow-x: auto;
-}
-
-.forest-plot h4 {
-    margin: 0 0 0.25rem 0;
-    color: #495057;
-    font-size: 1rem;
-}
-
-.table-legend {
-    background: #f8f9fa;
-    border-radius: 6px;
-    margin-bottom: 1rem;
-    border: 1px solid #e9ecef;
-}
-
-.table-legend summary {
-    padding: 0.75rem 1rem;
-    cursor: pointer;
-    font-weight: 500;
-    color: #495057;
-    font-size: 0.9rem;
-}
-
-.table-legend summary:hover {
-    background: #e9ecef;
-}
-
-.table-legend[open] summary {
-    border-bottom: 1px solid #e9ecef;
-}
-
-.table-legend ul {
-    margin: 0;
-    padding: 1rem 1rem 1rem 2.5rem;
-    font-size: 0.85rem;
-    color: #495057;
-}
-
-.table-legend li {
-    margin-bottom: 0.25rem;
-}
-
-.table-controls {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-    margin-bottom: 1rem;
-    flex-wrap: wrap;
-}
-
-.search-box {
-    padding: 0.5rem 1rem;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    width: 250px;
-}
-
-.search-box:focus {
-    outline: none;
-    border-color: #667eea;
-}
-
-.flagged-filter {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
-    color: #495057;
-    cursor: pointer;
-}
-
-.flagged-filter input {
-    cursor: pointer;
-}
-
-.table-info {
-    color: #6c757d;
-    font-size: 0.9rem;
-    margin-left: auto;
-}
-
-.status-cell {
-    text-align: center;
-}
-
-.status-icon {
-    font-size: 1.2rem;
-    cursor: help;
-}
-
-.status-good {
-    color: #28a745;
-}
-
-.status-danger {
-    color: #dc3545;
-}
-
-.batch-name {
-    font-weight: 500;
-}
-
-.gated-good {
-    color: #28a745;
-    font-weight: 500;
-}
-
-.gated-warning {
-    color: #ffc107;
-    font-weight: 500;
-}
-
-.gated-danger {
-    color: #dc3545;
-    font-weight: 500;
-}
-
-.deemphasized-col {
-    color: #6c757d;
-    font-size: 0.9rem;
-}
-
-.table-link {
-    color: #667eea;
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.table-link:hover {
-    text-decoration: underline;
-}
-
-.pagination-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
-    margin-top: 1rem;
-    padding: 1rem 0;
-}
-
-.pagination-controls button {
-    padding: 0.5rem 1rem;
-    border: 1px solid #d1d5db;
-    background: white;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-}
-
-.pagination-controls button:hover:not(:disabled) {
-    background: #f8f9fa;
-    border-color: #667eea;
-}
-
-.pagination-controls button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-#pageInfo {
-    color: #6c757d;
-    font-size: 0.9rem;
-}
-
-#batchTable tbody tr.hidden-row {
-    display: none;
-}
-</style>
 
 <script>
 (function() {

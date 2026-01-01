@@ -39,7 +39,7 @@
         .main-content {
             flex: 1;
             width: 90%;
-            max-width: 2000;
+            max-width: 2000px;
             margin: 0 auto;
             padding: 1.5rem 0 2rem;
         }
@@ -177,6 +177,10 @@
             font-style: italic;
         }
 
+        .text-danger {
+            color: #dc3545 !important;
+        }
+
         /* ==========================================================================
            6. Metrics Grid
            ========================================================================== */
@@ -222,6 +226,35 @@
             letter-spacing: 0.025em;
             font-weight: 600;
             margin-top: 0.25rem;
+        }
+
+        .metric-description {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+
+        /* Secondary metrics (inline, de-emphasized) */
+        .secondary-metrics {
+            display: flex;
+            gap: 2rem;
+            margin: 1rem 0 1.5rem;
+            padding: 0.75rem 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .secondary-metric {
+            color: #6c757d;
+        }
+
+        .secondary-label {
+            font-weight: 500;
+        }
+
+        .secondary-value {
+            margin-left: 0.25rem;
         }
 
         /* ==========================================================================
@@ -286,6 +319,7 @@
             align-items: center;
             margin-bottom: 0.75rem;
             gap: 1rem;
+            flex-wrap: wrap;
         }
 
         .search-box {
@@ -311,14 +345,52 @@
         /* Table cell helpers */
         .cell-count { font-weight: 600; color: #10b981; }
         .roi-name { font-weight: 600; color: #374151; }
+        .batch-name { font-weight: 500; color: #374151; }
         .percentage { font-weight: 500; color: #3b82f6; }
         .primary-class { font-weight: 600; color: #374151; }
         .secondary-class { color: #6b7280; }
+        .deemphasized-col { color: #6c757d; font-size: 0.9em; }
 
         .class-info {
             display: flex;
             flex-direction: column;
             gap: 0.125rem;
+        }
+
+        /* Status indicators */
+        .status-cell { text-align: center; }
+        .status-icon { font-size: 1.2rem; cursor: help; }
+        .status-good { color: #10b981; }
+        .status-danger { color: #dc3545; }
+
+        /* Gating color indicators */
+        .gated-good { color: #10b981; font-weight: 500; }
+        .gated-warning { color: #f59e0b; font-weight: 500; }
+        .gated-danger { color: #dc3545; font-weight: 500; }
+
+        /* Table links */
+        .table-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .table-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Flagged filter checkbox */
+        .flagged-filter {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: #4b5563;
+            cursor: pointer;
+        }
+
+        .flagged-filter input {
+            cursor: pointer;
         }
 
         /* ==========================================================================
@@ -383,7 +455,14 @@
             width: 100% !important;
             height: 100% !important;
         }
-        
+
+        /* Forest plots grid layout */
+        .forest-plots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 1.5rem;
+            margin: 1rem 0;
+        }
 
         /* ==========================================================================
            9. Badges & Alerts
@@ -428,109 +507,7 @@
         }
 
         /* ==========================================================================
-           10. Tooltips
-           ========================================================================== */
-        .tooltip-container {
-            position: relative;
-            display: inline-block;
-        }
-
-        .tooltip-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: #667eea;
-            color: white;
-            font-size: 10px;
-            font-weight: 600;
-            cursor: help;
-            margin-left: 0.25rem;
-            transition: background 0.2s;
-        }
-
-        .tooltip-icon:hover,
-        .tooltip-icon:focus {
-            background: #5a67d8;
-        }
-
-        .tooltip-popup {
-            visibility: hidden;
-            opacity: 0;
-            position: absolute;
-            bottom: calc(100% + 8px);
-            left: 50%;
-            transform: translateX(-50%);
-            width: 280px;
-            padding: 0.75rem;
-            background: #1f2937;
-            color: white;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            line-height: 1.4;
-            z-index: 1000;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            transition: opacity 0.2s, visibility 0.2s;
-        }
-
-        .tooltip-popup::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            margin-left: -5px;
-            border: 5px solid transparent;
-            border-top-color: #1f2937;
-        }
-
-        .tooltip-container:hover .tooltip-popup,
-        .tooltip-container:focus-within .tooltip-popup {
-            visibility: visible;
-            opacity: 1;
-        }
-
-        /* Legacy tooltip support */
-        .tooltip {
-            position: relative;
-        }
-
-        .tooltip .tooltiptext {
-            visibility: hidden;
-            opacity: 0;
-            position: absolute;
-            bottom: calc(100% + 8px);
-            left: 50%;
-            transform: translateX(-50%);
-            width: 280px;
-            padding: 0.75rem;
-            background: #1f2937;
-            color: white;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            line-height: 1.4;
-            z-index: 1000;
-            transition: opacity 0.2s, visibility 0.2s;
-        }
-
-        .tooltip .tooltiptext::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            margin-left: -5px;
-            border: 5px solid transparent;
-            border-top-color: #1f2937;
-        }
-
-        .tooltip:hover .tooltiptext {
-            visibility: visible;
-            opacity: 1;
-        }
-
-        /* ==========================================================================
-           11. Buttons & Links
+           10. Buttons & Links
            ========================================================================== */
         .btn {
             display: inline-block;
@@ -581,7 +558,7 @@
         }
 
         /* ==========================================================================
-           12. Tabs (Batch/CellType/Model)
+           11. Tabs (Batch/CellType/Model)
            ========================================================================== */
         .tab-navigation {
             display: flex;
@@ -617,6 +594,10 @@
             margin-bottom: -2px;
         }
 
+        .tab-btn.warning-tab {
+            border-left-color: #f59e0b;
+        }
+
         .tab-panel {
             display: none;
         }
@@ -637,7 +618,7 @@
         }
 
         /* ==========================================================================
-           13. Feature List
+           12. Feature List
            ========================================================================== */
         .feature-list {
             background: #f9fafb;
@@ -672,7 +653,7 @@
         .feature-score { color: #667eea; font-weight: 600; }
 
         /* ==========================================================================
-           14. Inline Tables Layout
+           13. Inline Tables Layout
            ========================================================================== */
         .tables-row {
             display: flex;
@@ -688,7 +669,145 @@
         }
 
         /* ==========================================================================
-           15. Footer
+           14. Collapsible Sections
+           ========================================================================== */
+        .collapsible-section {
+            margin: 1.5rem 0;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+        }
+
+        .collapsible-section summary {
+            padding: 1rem;
+            background: #f9fafb;
+            cursor: pointer;
+            font-weight: 500;
+            color: #4b5563;
+            border-radius: 6px;
+            list-style: none;
+        }
+
+        .collapsible-section summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .collapsible-section summary::before {
+            content: "▶ ";
+            font-size: 0.75rem;
+            margin-right: 0.5rem;
+        }
+
+        .collapsible-section[open] summary::before {
+            content: "▼ ";
+        }
+
+        .collapsible-section summary:hover {
+            background: #f3f4f6;
+        }
+
+        .collapsible-section[open] summary {
+            border-radius: 6px 6px 0 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .collapsible-section > div {
+            padding: 1rem;
+        }
+
+        /* Table legend (special collapsible for column descriptions) */
+        .table-legend {
+            background: #f9fafb;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            border: 1px solid #e5e7eb;
+        }
+
+        .table-legend summary {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            font-weight: 500;
+            color: #4b5563;
+            font-size: 0.9rem;
+            list-style: none;
+        }
+
+        .table-legend summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .table-legend summary::before {
+            content: "▶ ";
+            font-size: 0.7rem;
+            margin-right: 0.5rem;
+        }
+
+        .table-legend[open] summary::before {
+            content: "▼ ";
+        }
+
+        .table-legend summary:hover {
+            background: #f3f4f6;
+        }
+
+        .table-legend[open] summary {
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .table-legend ul {
+            margin: 0;
+            padding: 1rem 1rem 1rem 2.5rem;
+            font-size: 0.85rem;
+            color: #4b5563;
+        }
+
+        .table-legend li {
+            margin-bottom: 0.25rem;
+        }
+
+        /* ==========================================================================
+           15. Pagination
+           ========================================================================== */
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            padding: 1rem 0;
+        }
+
+        .pagination-controls button {
+            padding: 0.5rem 1rem;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .pagination-controls button:hover:not(:disabled) {
+            background: #f9fafb;
+            border-color: #667eea;
+        }
+
+        .pagination-controls button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination-controls span {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        /* Hidden row for pagination/filtering */
+        .hidden-row {
+            display: none !important;
+        }
+
+        /* ==========================================================================
+           16. Footer
            ========================================================================== */
         .footer {
             background: #1f2937;
@@ -721,10 +840,11 @@
         }
 
         /* ==========================================================================
-           16. Print Styles
+           17. Print Styles
            ========================================================================== */
         @media print {
-            .nav, .footer, .tab-navigation, .search-box, .view-plots-btn {
+            .nav, .footer, .tab-navigation, .search-box, .view-plots-btn,
+            .pagination-controls, .flagged-filter, .table-legend {
                 display: none !important;
             }
 
@@ -759,10 +879,47 @@
             .tab-panel {
                 display: block !important;
             }
+
+            .collapsible-section[open] > div,
+            .collapsible-section > div {
+                display: block !important;
+            }
         }
 
         /* ==========================================================================
-           17. Utility Classes
+           18. Row Highlighting
+           ========================================================================== */
+        .row-excluded { background-color: #fef2f2 !important; }
+        .row-warning { background-color: #fffbeb !important; }
+
+        /* ==========================================================================
+           19. Score Colors (AUC/AP values)
+           ========================================================================== */
+        .score-excellent { color: #10b981; font-weight: 600; }
+        .score-good { color: #3b82f6; font-weight: 600; }
+        .score-moderate { color: #f59e0b; font-weight: 600; }
+        .score-poor { color: #ef4444; font-weight: 600; }
+
+        /* ==========================================================================
+           20. Synthetic Data Percentage Colors
+           ========================================================================== */
+        .synthetic-none { color: #10b981; font-weight: 600; }
+        .synthetic-low { color: #f59e0b; font-weight: 600; }
+        .synthetic-high { color: #b45309; font-weight: 600; }
+
+        /* ==========================================================================
+           21. Warning Icon
+           ========================================================================== */
+        .warning-icon { color: #f59e0b; }
+
+        /* ==========================================================================
+           22. Flex Plot Layout
+           ========================================================================== */
+        .plot-flex-half { flex: 1; min-width: 400px; }
+        .plot-flex-half.wide { min-width: 500px; }
+
+        /* ==========================================================================
+           23. Utility Classes
            ========================================================================== */
         .mt-0 { margin-top: 0; }
         .mb-0 { margin-bottom: 0; }
@@ -848,19 +1005,6 @@
                 if (e.key === 'ArrowRight' && idx < tabs.length - 1) showTab(tabs[idx + 1]);
             }
         }
-    });
-
-    // Make tooltips clickable for touch devices
-    document.querySelectorAll('.tooltip-icon').forEach(icon => {
-        icon.setAttribute('tabindex', '0');
-        icon.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const popup = this.parentElement.querySelector('.tooltip-popup');
-            if (popup) {
-                popup.style.visibility = popup.style.visibility === 'visible' ? 'hidden' : 'visible';
-                popup.style.opacity = popup.style.opacity === '1' ? '0' : '1';
-            }
-        });
     });
 
     // Resize Plotly charts after page loads
