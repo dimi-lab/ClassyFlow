@@ -313,157 +313,245 @@ def compute_prediction_metrics_from_counts(counts_df):
     }
 
 
-def create_abundance_plot_from_counts(counts_df, output_file):
-    """Create stacked bar plot from pre-aggregated counts"""
+# Threshold for switching between per-sample and aggregated views
+STACKED_BAR_SAMPLE_THRESHOLD = 50
+# Threshold for hiding x-axis labels (when labels become unreadable)
+XAXIS_LABEL_THRESHOLD = 25
+
+
+def create_abundance_plot_from_counts(counts_df, output_html):
+    """
+    Create adaptive abundance visualization based on sample count.
+    
+    ≤ STACKED_BAR_SAMPLE_THRESHOLD: Interactive stacked bar per sample
+    > STACKED_BAR_SAMPLE_THRESHOLD: Batch-aggregated stacked bar + violin plots
+    
+    Returns HTML string of the Plotly figure(s).
+    """
+    n_samples = counts_df['sample_name'].nunique()
+    
+    if n_samples <= STACKED_BAR_SAMPLE_THRESHOLD:
+        html = _create_stacked_bar_per_sample(counts_df)
+    else:
+        html = _create_large_dataset_view(counts_df)
+    
+    # Write HTML to file
+    with open(output_html, 'w', encoding='utf-8') as f:
+        f.write(html)
+    
+    return html
+
+
+def _get_cell_type_colors(cell_types):
+    """Generate consistent color mapping for cell types"""
+    colors = sns.color_palette("Set2", len(cell_types)).as_hex()
+    return dict(zip(cell_types, colors))
+
+
+def _create_stacked_bar_per_sample(counts_df):
+    """Create interactive stacked bar chart for small datasets"""
     
     # Pivot to sample × cell_type matrix
     pivot_df = counts_df.pivot(
-        index='sample_name', 
-        columns='cell_type', 
+        index='sample_name',
+        columns='cell_type',
         values='count'
     ).fillna(0)
     
     # Convert to percentages
     pivot_df = pivot_df.div(pivot_df.sum(axis=1), axis=0) * 100
     
-    # Order columns by total abundance
+    # Order columns by total abundance (most abundant first)
     col_order = counts_df.groupby('cell_type')['count'].sum().sort_values(ascending=False).index
     pivot_df = pivot_df.reindex(columns=col_order, fill_value=0)
     
-    # Sizing
-    n_samples = len(pivot_df)
-    n_cell_types = len(pivot_df.columns)
-    plot_width = max(12, min(30, 10 + n_samples * 0.4))
-    plot_height = max(8, min(12, 7 + n_cell_types * 0.15))
-    
-    # Plot
-    plt.style.use('default')
-    fig, ax = plt.subplots(figsize=(plot_width, plot_height), dpi=300)
-    
-    colors = sns.color_palette("Set2", n_cell_types)
-    bottom = np.zeros(len(pivot_df))
-    
-    for i, cell_type in enumerate(pivot_df.columns):
-        ax.bar(
-            range(len(pivot_df)), 
-            pivot_df[cell_type], 
-            bottom=bottom,
-            label=cell_type,
-            color=colors[i % len(colors)],
-            alpha=0.85,
-            edgecolor='white',
-            linewidth=0.8
-        )
-        bottom += pivot_df[cell_type].values
-    
-    # Labels
-    fig.suptitle('Predicted Cell Type Composition by Sample', fontsize=15, fontweight='bold', y=1.02)
-    ax.set_xlabel('Sample', fontsize=11, fontweight='bold')
-    ax.set_ylabel('Percentage of Cells (%)', fontsize=11, fontweight='bold')
-    ax.set_ylim(0, 100)
-    
-    # X-axis
-    ax.set_xticks(range(len(pivot_df)))
-    rotation = 30 if n_samples <= 10 else 45 if n_samples <= 25 else 70
-    fontsize = 10 if n_samples <= 10 else 9 if n_samples <= 25 else 8
-    ax.set_xticklabels(pivot_df.index, rotation=rotation, ha='right', fontsize=fontsize)
-    
-    # Sample counts
+    # Get sample totals for hover
     sample_totals = counts_df.groupby('sample_name')['total_cells'].first()
-    for i, sample in enumerate(pivot_df.index):
-        ax.text(i, 104, f'n={sample_totals[sample]:,}', 
-                ha='center', va='bottom', fontsize=10, fontweight='bold',
-                rotation=0 if n_samples <= 15 else 30)
     
-    # Legend
-    handles, labels = ax.get_legend_handles_labels()
-    ax.legend(reversed(handles), reversed(labels),
-              bbox_to_anchor=(1.05, 1), loc='upper left',
-              title='Cell Type', title_fontsize=11, fontsize=10)
+    # Color mapping
+    color_map = _get_cell_type_colors(pivot_df.columns)
     
-    ax.grid(True, alpha=0.3)
-    sns.despine(top=True, right=True)
-    ax.set_facecolor('#fafafa')
+    n_samples = len(pivot_df)
     
-    plt.tight_layout()
-    plt.savefig(output_file, dpi=300, bbox_inches='tight', facecolor='white')
-    plt.close()
-
-
-def create_abundance_plot_heatmap_from_counts(counts_df, output_file):
-    """Create clustered heatmap of cell type composition from pre-aggregated counts"""
+    # Create stacked bar chart
+    fig = go.Figure()
     
-    n_samples = counts_df['sample_name'].nunique()
-    
-    # Pivot to sample × cell_type matrix
-    proportions = counts_df.pivot(
-        index='sample_name',
-        columns='cell_type',
-        values='count'
-    ).fillna(0)
-    proportions = proportions.div(proportions.sum(axis=1), axis=0) * 100
-    
-    # Sort columns by overall abundance
-    col_order = counts_df.groupby('cell_type')['count'].sum().sort_values(ascending=False).index
-    proportions = proportions.reindex(columns=col_order, fill_value=0)
-    
-    # Build batch color annotation if batch column exists and has values
-    row_colors = None
-    if 'batch' in counts_df.columns and counts_df['batch'].notna().any() and (counts_df['batch'] != '').any():
-        batch_map = counts_df.drop_duplicates('sample_name').set_index('sample_name')['batch']
-        batch_map = batch_map.reindex(proportions.index)
-        if batch_map.nunique() > 1:
-            batch_palette = dict(zip(batch_map.unique(), sns.color_palette('tab20', batch_map.nunique())))
-            row_colors = batch_map.map(batch_palette)
-            row_colors.name = 'Batch'
+    for cell_type in pivot_df.columns:
+        fig.add_trace(go.Bar(
+            name=cell_type,
+            x=pivot_df.index,
+            y=pivot_df[cell_type],
+            marker_color=color_map[cell_type],
+            hovertemplate=(
+                '<b>%{x}</b><br>'
+                f'{cell_type}: %{{y:.1f}}%<br>'
+                '<extra></extra>'
+            )
+        ))
     
     # Dynamic sizing
-    fig_height = np.clip(6 + n_samples * 0.02, 8, 24)
-    fig_width = max(10, 6 + len(col_order) * 0.5)
+    width = max(600, min(1400, 400 + n_samples * 20))
+    height = 500
     
-    # Clustering and dendrogram settings based on dataset size
-    show_row_dendrogram = n_samples <= 500
+    # Determine if x-axis labels should be shown
+    show_xaxis_labels = n_samples <= XAXIS_LABEL_THRESHOLD
     
-    g = sns.clustermap(
-        proportions,
-        row_colors=row_colors,
-        col_cluster=True,
-        row_cluster=True,
-        dendrogram_ratio=(0.15 if show_row_dendrogram else 0.001, 0.15),
-        cmap='Blues',
-        figsize=(fig_width, fig_height),
-        xticklabels=True,
-        yticklabels=n_samples <= 100,
-        cbar_kws={'label': 'Percentage (%)'},
-        linewidths=0 if n_samples > 200 else 0.1,
+    fig.update_layout(
+        barmode='stack',
+        title={
+            'text': f'Cell Type Composition by Sample (n={n_samples})',
+            'x': 0.5,
+            'xanchor': 'center',
+            'font': {'size': 16}
+        },
+        xaxis={
+            'title': 'Sample' if show_xaxis_labels else f'Samples (n={n_samples})',
+            'tickangle': 45 if show_xaxis_labels else 0,
+            'showticklabels': show_xaxis_labels,
+        },
+        yaxis={
+            'title': 'Percentage (%)',
+            'range': [0, 100]
+        },
+        legend={
+            'title': 'Cell Type',
+            'traceorder': 'normal'
+        },
+        width=width,
+        height=height,
+        hovermode='x unified',
+        plot_bgcolor='white'
     )
     
-    # Hide row dendrogram for large datasets (still clusters, just doesn't show tree)
-    if not show_row_dendrogram:
-        g.ax_row_dendrogram.set_visible(False)
+    fig.update_xaxes(gridcolor='#eee')
+    fig.update_yaxes(gridcolor='#eee')
     
-    g.ax_heatmap.set_xlabel('Cell Type', fontsize=11, fontweight='bold')
-    g.ax_heatmap.set_ylabel('Sample' if n_samples <= 100 else '', fontsize=11, fontweight='bold')
-    g.figure.suptitle('Predicted Cell Type Composition by Sample', fontsize=14, fontweight='bold', y=1.02)
+    return fig.to_html(full_html=False, include_plotlyjs='cdn')
+
+
+def _create_large_dataset_view(counts_df):
+    """Create batch-aggregated bar + violin plots for large datasets"""
+    from plotly.subplots import make_subplots
     
-    # Rotate column labels for readability
-    plt.setp(g.ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontsize=10)
+    has_batch = 'batch' in counts_df.columns and counts_df['batch'].notna().any() and (counts_df['batch'] != '').any()
     
-    # Add batch legend if applicable
-    if row_colors is not None:
-        batch_map = counts_df.drop_duplicates('sample_name').set_index('sample_name')['batch']
-        batch_palette = dict(zip(batch_map.unique(), sns.color_palette('tab20', batch_map.nunique())))
-        for batch, color in batch_palette.items():
-            g.ax_col_dendrogram.bar(0, 0, color=color, label=batch, linewidth=0)
-        g.ax_col_dendrogram.legend(
-            title='Batch', 
-            loc='upper left', 
-            bbox_to_anchor=(1.05, 1),
-            fontsize=9
+    # Get cell type order by overall abundance
+    col_order = counts_df.groupby('cell_type')['count'].sum().sort_values(ascending=False).index.tolist()
+    color_map = _get_cell_type_colors(col_order)
+    
+    # Calculate per-sample percentages for violin plots
+    sample_percentages = []
+    for sample_name, group in counts_df.groupby('sample_name'):
+        total = group['total_cells'].iloc[0]
+        batch = group['batch'].iloc[0] if has_batch else 'All'
+        for _, row in group.iterrows():
+            sample_percentages.append({
+                'sample_name': sample_name,
+                'batch': batch,
+                'cell_type': row['cell_type'],
+                'percentage': (row['count'] / total * 100) if total > 0 else 0
+            })
+    pct_df = pd.DataFrame(sample_percentages)
+    
+    n_samples = counts_df['sample_name'].nunique()
+    n_batches = pct_df['batch'].nunique() if has_batch else 1
+    
+    # Create subplots: top for stacked bar, bottom for violin
+    fig = make_subplots(
+        rows=2, cols=1,
+        row_heights=[0.4, 0.6],
+        vertical_spacing=0.12,
+        subplot_titles=(
+            f'Cell Type Composition by {"Batch" if has_batch else "Dataset"} (n={n_samples} samples)',
+            'Cell Type Distribution Across Samples'
+        )
+    )
+    
+    # === Top plot: Batch-aggregated stacked bar ===
+    if has_batch:
+        # Aggregate by batch
+        batch_counts = counts_df.groupby(['batch', 'cell_type'])['count'].sum().reset_index()
+        batch_totals = batch_counts.groupby('batch')['count'].transform('sum')
+        batch_counts['percentage'] = (batch_counts['count'] / batch_totals * 100)
+        
+        pivot_batch = batch_counts.pivot(index='batch', columns='cell_type', values='percentage').fillna(0)
+        pivot_batch = pivot_batch.reindex(columns=col_order, fill_value=0)
+        
+        x_labels = pivot_batch.index.tolist()
+    else:
+        # Single bar for entire dataset
+        total_counts = counts_df.groupby('cell_type')['count'].sum()
+        total_pct = (total_counts / total_counts.sum() * 100).reindex(col_order, fill_value=0)
+        
+        pivot_batch = pd.DataFrame({'All Samples': total_pct}).T
+        x_labels = ['All Samples']
+    
+    # Add stacked bars
+    for cell_type in col_order:
+        fig.add_trace(
+            go.Bar(
+                name=cell_type,
+                x=x_labels,
+                y=pivot_batch[cell_type] if cell_type in pivot_batch.columns else [0] * len(x_labels),
+                marker_color=color_map[cell_type],
+                legendgroup=cell_type,
+                hovertemplate=f'{cell_type}: %{{y:.1f}}%<extra></extra>'
+            ),
+            row=1, col=1
         )
     
-    plt.savefig(output_file, dpi=300, bbox_inches='tight', facecolor='white')
-    plt.close()
+    # === Bottom plot: Violin plots per cell type ===
+    for i, cell_type in enumerate(col_order):
+        ct_data = pct_df[pct_df['cell_type'] == cell_type]
+        
+        fig.add_trace(
+            go.Violin(
+                x=[cell_type] * len(ct_data),
+                y=ct_data['percentage'],
+                name=cell_type,
+                legendgroup=cell_type,
+                showlegend=False,
+                fillcolor=color_map[cell_type],
+                line_color=color_map[cell_type],
+                opacity=0.7,
+                box_visible=True,
+                meanline_visible=True,
+                points='outliers',
+                hovertemplate=(
+                    f'<b>{cell_type}</b><br>'
+                    'Percentage: %{y:.1f}%<br>'
+                    '<extra></extra>'
+                )
+            ),
+            row=2, col=1
+        )
+    
+    # Layout
+    fig.update_layout(
+        barmode='stack',
+        height=800,
+        width=max(800, min(1400, 400 + len(col_order) * 80)),
+        legend={
+            'title': 'Cell Type',
+            'traceorder': 'normal',
+            'orientation': 'v',
+            'yanchor': 'top',
+            'y': 1,
+            'xanchor': 'left',
+            'x': 1.02
+        },
+        plot_bgcolor='white',
+        hovermode='closest'
+    )
+    
+    # Update axes
+    fig.update_xaxes(title_text='Batch' if has_batch else '', row=1, col=1, gridcolor='#eee')
+    fig.update_yaxes(title_text='Percentage (%)', range=[0, 100], row=1, col=1, gridcolor='#eee')
+    fig.update_xaxes(title_text='Cell Type', tickangle=45, row=2, col=1, gridcolor='#eee')
+    fig.update_yaxes(title_text='Percentage (%)', row=2, col=1, gridcolor='#eee')
+    
+    return fig.to_html(full_html=False, include_plotlyjs='cdn')
+
 
 
 def generate_prediction_content(counts_tsv_path, plots_dir='.'):
@@ -474,15 +562,12 @@ def generate_prediction_content(counts_tsv_path, plots_dir='.'):
     # Compute metrics
     metrics = compute_prediction_metrics_from_counts(counts_df)
     
-    # Generate plots
-    abundance_plot_name = "prediction_abundance_plot.png"
+    # Generate abundance plot (now outputs HTML)
+    abundance_plot_name = "prediction_abundance_plot.html"
     abundance_plot_path = os.path.join(plots_dir, abundance_plot_name)
-    create_abundance_plot_from_counts(counts_df, abundance_plot_path)
+    abundance_html = create_abundance_plot_from_counts(counts_df, abundance_plot_path)
     metrics['abundance_plot'] = abundance_plot_name
-    
-    # Generate heatmap
-    heatmap_plot_path = os.path.join(plots_dir, "prediction_abundance_plot_heatmap.png")
-    create_abundance_plot_heatmap_from_counts(counts_df, heatmap_plot_path)
+    metrics['abundance_plot_html'] = abundance_html
     
     return {'prediction_metrics': metrics}
 
