@@ -3,43 +3,30 @@
 <section class="page-section">
     <h2>Cell Type Prediction Results</h2>
     
-    <div class="alert alert-info">
-        Overview of model predictions on the dataset, including cell type abundance distribution and key prediction metrics.
-    </div>
+    <p>
+        Summary of predicted cell types across all samples.
+    </p>
 
     <div class="metrics-grid">
         <div class="metric-card">
-            <div class="tooltip">
-                <div class="metric-value">{{ prediction_metrics.total_predicted_cells if prediction_metrics.total_predicted_cells else "N/A" }}</div>
-                <div class="metric-label">Total Predicted Cells</div>
-                <span class="tooltiptext">
-                    The total number of cells that got assigned a predicted cell type across all batches
-                </span>
-            </div>
+            <div class="metric-value">{{ prediction_metrics.total_predicted_cells if prediction_metrics.total_predicted_cells else "N/A" }}</div>
+            <div class="metric-label">Total Predicted Cells</div>
         </div>
 
         <div class="metric-card">
-            <div class="tooltip">
-                <div class="metric-value">{{ prediction_metrics.most_common_prediction if prediction_metrics.most_common_prediction else "N/A" }}</div>
-                <div class="metric-label">Most Abundant Cell Type</div>
-            </div>
+            <div class="metric-value">{{ prediction_metrics.most_common_prediction if prediction_metrics.most_common_prediction else "N/A" }}</div>
+            <div class="metric-label">Most Abundant Cell Type</div>
         </div>
 
         <div class="metric-card">
-            <div class="tooltip">
-                <div class="metric-value">{{ prediction_metrics.most_rare_prediction if prediction_metrics.most_rare_prediction else "N/A" }}</div>
-                <div class="metric-label">Least Abundant Cell Type</div>
-            </div>
+            <div class="metric-value">{{ prediction_metrics.most_rare_prediction if prediction_metrics.most_rare_prediction else "N/A" }}</div>
+            <div class="metric-label">Least Abundant Cell Type</div>
         </div>
 
         <div class="metric-card">
-            <div class="tooltip">
-                <div class="metric-value">{{ prediction_metrics.total_low_density_cells if prediction_metrics.total_low_density_cells else "N/A" }}</div>
-                <div class="metric-label">Number of Low Density Cells</div>
-                <span class="tooltiptext">
-                    This is the number of of cells in low density regions, or lonely cells.
-                </span>
-            </div>
+            <div class="metric-value">{{ prediction_metrics.total_low_density_cells if prediction_metrics.total_low_density_cells else "N/A" }}</div>
+            <div class="metric-label">Low Density Cells</div>
+            <div class="metric-description">Cells in sparse regions</div>
         </div>
     </div>
 
@@ -49,19 +36,19 @@
         <div class="plotly-wrapper">
             {{ prediction_metrics.abundance_plot_html | safe }}
         </div>
-        <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">
+        <div class="plot-caption">
             The proportion of predicted cell types per sample/slide.
-        </p>
+        </div>
     </div>
     {% endif %}
 </section>
 
 {% if prediction_metrics.samples %}
-<!-- ROI Summary Table Section -->
 <section class="page-section">
     <h3>ROI Summary</h3>
-    <p style="color: #6c757d; margin-bottom: 1.5rem;">
-        Click on any ROI row or "View Details" button to open a detailed analysis page in a new tab, including cell type distribution plots and spatial visualization.
+    <p>
+        Click on any ROI row or "View Details" button to open a detailed analysis page in a new tab, 
+        including cell type distribution plots and spatial visualization.
     </p>
 
     <div class="table-controls">
@@ -88,28 +75,28 @@
                 {% for thissample in prediction_metrics.samples %}
                 <tr onclick="window.open('pages/{{ thissample.roi_report }}', '_blank')">
                     <td class="roi-name">{{ thissample.sample_name }}</td>
-                    <td class="cell-count" data-cell-count="{{ thissample.total_cells if thissample.total_cells else 'N/A' }}">
+                    <td class="cell-count">
                         {{ "{:,}".format(thissample.total_cells) if thissample.total_cells else "N/A" }}
                     </td>
-                    <td data-unique-classes="{{ thissample.unique_classes if thissample.unique_classes else 'N/A' }}">
+                    <td>
                         {{ thissample.unique_classes if thissample.unique_classes else "N/A" }}
                     </td>
                     <td>
                         <div class="class-info">
-                            <div class="primary-class">{{ thissample.most_common_class if thissample.most_common_class else "N/A" }}</div>
-                            <div class="percentage">{{ "{:.1f}%".format(thissample.most_common_percentage) if thissample.most_common_percentage else "N/A" }}</div>
+                            <span class="primary-class">{{ thissample.most_common_class if thissample.most_common_class else "N/A" }}</span>
+                            <span class="percentage">{{ "{:.1f}%".format(thissample.most_common_percentage) if thissample.most_common_percentage else "" }}</span>
                         </div>
                     </td>
                     <td>
                         <div class="class-info">
-                            <div class="secondary-class">{{ thissample.second_common_class if thissample.second_common_class else "N/A" }}</div>
-                            <div class="percentage">{{ "{:.1f}%".format(thissample.second_common_percentage) if thissample.second_common_percentage else "N/A" }}</div>
+                            <span class="secondary-class">{{ thissample.second_common_class if thissample.second_common_class else "N/A" }}</span>
+                            <span class="percentage">{{ "{:.1f}%".format(thissample.second_common_percentage) if thissample.second_common_percentage else "" }}</span>
                         </div>
                     </td>
                     <td>
                         <div class="class-info">
-                            <div class="secondary-class">{{ thissample.least_common_class if thissample.least_common_class else "N/A" }}</div>
-                            <div class="percentage">{{ "{:.1f}%".format(thissample.least_common_percentage) if thissample.least_common_percentage else "N/A" }}</div>
+                            <span class="secondary-class">{{ thissample.least_common_class if thissample.least_common_class else "N/A" }}</span>
+                            <span class="percentage">{{ "{:.1f}%".format(thissample.least_common_percentage) if thissample.least_common_percentage else "" }}</span>
                         </div>
                     </td>
                     <td>
@@ -124,34 +111,16 @@
     </div>
 </section>
 
-
 <script>
-// ROI data for JavaScript access (simplified for search functionality)
-const roiData = [
-    {% for thissample in prediction_metrics.samples %}
-    {
-        sample: "{{ thissample.sample_name }}",
-        total_cells: {{ thissample.total_cells if thissample.total_cells else 0 }},
-        unique_classes: {{ thissample.unique_classes if thissample.unique_classes else 0 }},
-        most_common_class: "{{ thissample.most_common_class if thissample.most_common_class else 'N/A' }}",
-        most_common_percentage: {{ thissample.most_common_percentage if thissample.most_common_percentage else 0 }},
-        second_common_class: "{{ thissample.second_common_class if thissample.second_common_class else 'N/A' }}",
-        second_common_percentage: {{ thissample.second_common_percentage if thissample.second_common_percentage else 0 }},
-        least_common_class: "{{ thissample.least_common_class if thissample.least_common_class else 'N/A' }}",
-        least_common_percentage: {{ thissample.least_common_percentage if thissample.least_common_percentage else 0 }}
-    }{% if not loop.last %},{% endif %}
-    {% endfor %}
-];
-
-
 function filterROITable() {
     const input = document.getElementById('roiSearch');
     const filter = input.value.toLowerCase();
     const table = document.getElementById('roiTable');
     const rows = table.getElementsByTagName('tr');
+    const totalRows = rows.length - 1;
     let visibleCount = 0;
     
-    for (let i = 1; i < rows.length; i++) { // Skip header row
+    for (let i = 1; i < rows.length; i++) {
         const roiName = rows[i].getElementsByTagName('td')[0];
         if (roiName) {
             const textValue = roiName.textContent || roiName.innerText;
@@ -164,7 +133,7 @@ function filterROITable() {
         }
     }
     
-    document.getElementById('roiCount').textContent = `${visibleCount} of ${roiData.length}`;
+    document.getElementById('roiCount').textContent = `${visibleCount} of ${totalRows}`;
 }
 </script>
 {% endif %}

@@ -3,6 +3,10 @@
 <section class="page-section">
     <h2>Input Dataset</h2>
     
+    <p>
+        Overview of the data used for training, including the number of batches, samples, and cells analyzed.
+    </p>
+    
     <div class="metrics-grid">
         <div class="metric-card">
             <div class="metric-value">{{ input_metrics.total_batches | default("--") | number_format }}</div>
@@ -40,7 +44,7 @@
             </thead>
             <tbody>
                 {% for row in input_metrics.label_table.rows %}
-                <tr {% if row["Status"] == "Excluded" %}style="background-color: #fef2f2;"{% endif %}>
+                <tr {% if row["Status"] == "Excluded" %}class="row-excluded"{% endif %}>
                     <td><strong>{{ row["Label"] }}</strong></td>
                     <td>{{ "{:,}".format(row["Label Count"]) }}</td>
                     <td>{{ "%.2f"|format(row["Label Percent"]) }}%</td>
@@ -70,7 +74,7 @@
 <section class="page-section">
     <h2>Batch Summary</h2>
     
-    <p style="color: #6c757d; margin-bottom: 1.5rem;">
+    <p>
         Overview of each batch including cell counts, ROI counts, and marker coverage. 
         Batches missing certain markers have synthetic noise data generated for those features.
     </p>
@@ -109,18 +113,18 @@
             </thead>
             <tbody>
                 {% for batch in input_metrics.batches %}
-                <tr {% if batch.percent_synthetic > 25 %}style="background-color: #fff3cd;"{% endif %}>
+                <tr {% if batch.percent_synthetic > 25 %}class="row-warning"{% endif %}>
                     <td><strong>{{ batch.batch_id }}</strong></td>
                     <td>{{ batch.num_cells | number_format }}</td>
                     <td>{{ batch.num_rois | number_format }}</td>
                     <td>{{ batch.num_features | number_format }}</td>
                     <td>{{ batch.missing_features | number_format }}</td>
                     <td>
-                        <span style="font-weight: 600; color: {% if batch.percent_synthetic > 25 %}#b45309{% elif batch.percent_synthetic > 0 %}#d97706{% else %}#059669{% endif %};">
+                        <span class="{% if batch.percent_synthetic > 25 %}synthetic-high{% elif batch.percent_synthetic > 0 %}synthetic-low{% else %}synthetic-none{% endif %}">
                             {{ batch.percent_synthetic }}%
                         </span>
                     </td>
-                    <td style="font-size: 0.9em; color: #6c757d;">
+                    <td class="deemphasized-col">
                         {{ batch.missing_markers | join(', ') if batch.missing_markers else '—' }}
                     </td>
                 </tr>
@@ -131,7 +135,7 @@
 
     {% if input_metrics.synthetic_heatmap_html %}
     <h3>Marker Coverage Heatmap</h3>
-    <p style="color: #6c757d; margin-bottom: 1rem;">
+    <p>
         Visual overview of which markers have real data vs synthetic data across all batches.
     </p>
     <div class="plot-container">
@@ -146,12 +150,10 @@
 <section class="page-section">
     <h2>Report Sections</h2>
     
-    <div style="color: #4b5563;">
-        <p><strong>Normalization</strong> — Data preprocessing and batch correction methods</p>
-        <p><strong>Feature Selection</strong> — Important protein markers for distinguishing cell types</p>
-        <p><strong>Model Evaluation</strong> — Performance metrics and validation results</p>
-        <p><strong>Predictions</strong> — Cell type results and tissue composition by sample</p>
-    </div>
+    <p><strong>Normalization</strong> — Data preprocessing and batch correction methods</p>
+    <p><strong>Feature Selection</strong> — Important protein markers for distinguishing cell types</p>
+    <p><strong>Model Evaluation</strong> — Performance metrics and validation results</p>
+    <p><strong>Predictions</strong> — Cell type results and tissue composition by sample</p>
 </section>
 
 </div>

@@ -230,12 +230,9 @@ process GENERATE_FINAL_REPORT {
     input:
     path(input_metrics_json)
     path(aggregated_counts)
-    //path(split_jsons)
     path(norm_html)
     path(fs_html) 
     path(model_html)
-    //path(model_summary_json)
-    //path(prediction_results, stageAs: "pred_results/*")
     path(template_dir)
     path(letterhead_file)
     path(nf_config, stageAs: "nextflow.config")
@@ -247,6 +244,10 @@ process GENERATE_FINAL_REPORT {
     script:
     """
     generate_final_report.py \
+        --input-metrics ${input_metrics_json} \
+        --normalization-html ${norm_html} \
+        --feature-selection-html ${fs_html} \
+        --model-html ${model_html} \
         --counts-tsv ${aggregated_counts} \
         --template-dir ${template_dir} \
         --report-name classyflow_report.html \
@@ -353,15 +354,6 @@ workflow {
         // Run the best model on the full input batches/files 
         prediction_results = PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
 
-
-        // prediction_results.predictions
-        //     .flatten() 
-        //     .map { file ->
-        //         def sampleID = file.getBaseName().split('\\.')[0]
-        //         [sampleID, file]
-        //     }
-        //     .set { prediction_tuples }
-
         prediction_results.predictions
             .flatMap { batchID, files -> 
                 def fileList = files instanceof List ? files : [files]
@@ -387,21 +379,13 @@ workflow {
                 skip: 1
             )
 
-        // Generate final HTML report for the whole run
-        split_outputs = labledDataFrames.training_holdout_results.flatten().collect()
-        final_prediction_results = predictions_for_report.map { it[2] }.collect()
-
-
         // Pass all to reporting including summary JSONs
         final_report = GENERATE_FINAL_REPORT(
             CHECK_PANEL_DESIGN.output.input_metrics,
             aggregated_counts,
-            //split_outputs,
             normalized_output.report,
             feature_selection_results.report, 
             modeling_results.report,
-            //modeling_results.model_summary,
-            //final_prediction_results,
             params.html_template,
             params.letterhead,
             params.config_file
