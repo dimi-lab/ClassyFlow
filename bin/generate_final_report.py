@@ -90,35 +90,6 @@ def setup_jinja_environment(template_dir: str):
     return jinja_env
 
 
-def load_sample_jsons(json_directory):
-    """
-    Load all JSON files from a directory and organize by sample_name
-    
-    Args:
-        json_directory (str): Path to directory containing JSON files
-        
-    Returns:
-        dict: Dictionary with sample_name as keys and JSON data as values
-    """
-    samples = []
-    
-    # Find all JSON files in the directory
-    json_pattern = os.path.join(json_directory, "*.json")
-    json_files = glob.glob(json_pattern)
-    
-    for json_file in json_files:
-        try:
-            with open(json_file, 'r') as file:
-                data = json.load(file)
-                samples.append(data)
-                
-        except json.JSONDecodeError as e:
-            print(f"Error reading {json_file}: {e}")
-        except Exception as e:
-            print(f"Error processing {json_file}: {e}")
-    
-    return samples
-
 def load_metrics_json(json_file):
     """
     Load a single metrics JSON file
@@ -163,9 +134,6 @@ def read_html_chunk(file_path):
 def create_synthetic_marker_heatmap(input_metrics):
     """
     Create plotly heatmap from input_metrics marker_status_matrix.
-    Green = real data, Orange = synthetic data.
-    
-    Returns HTML string of the plotly figure.
     """
     marker_status_matrix = input_metrics.get('marker_status_matrix', {})
     all_markers = input_metrics.get('all_markers', [])
@@ -173,7 +141,6 @@ def create_synthetic_marker_heatmap(input_metrics):
     if not marker_status_matrix or not all_markers:
         return None
     
-    # Get batch IDs from first marker's status
     first_marker = all_markers[0] if all_markers else None
     if not first_marker:
         return None
@@ -182,7 +149,6 @@ def create_synthetic_marker_heatmap(input_metrics):
     if not batch_ids:
         return None
     
-    # Build matrix: 1 = synthetic, 0 = real
     matrix = []
     hover_text = []
     for marker in all_markers:
@@ -196,19 +162,45 @@ def create_synthetic_marker_heatmap(input_metrics):
         matrix.append(row)
         hover_text.append(hover_row)
     
-    fig = go.Figure(data=go.Heatmap(
+    n_markers = len(all_markers)
+    n_batches = len(batch_ids)
+    fig_height = max(400, min(800, 100 + n_markers * 20))
+    
+    min_col_width = 120
+    max_width = min(1200, 150 + n_batches * min_col_width)
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Heatmap(
         z=matrix,
         x=batch_ids,
         y=all_markers,
         hovertext=hover_text,
         hoverinfo='text',
         colorscale=[
-            [0, '#4ade80'],  # Green for real
-            [1, '#fb923c']   # Orange for synthetic
+            [0, '#e8f5e9'],
+            [1, '#fff3e0']
         ],
         showscale=False,
-        xgap=1,
-        ygap=1
+        xgap=2,
+        ygap=2
+    ))
+    
+    # Add invisible traces for legend
+    fig.add_trace(go.Scatter(
+        x=[None], y=[None],
+        mode='markers',
+        marker=dict(size=15, color='#e8f5e9', symbol='square', line=dict(color='#ccc', width=1)),
+        name='Real',
+        showlegend=True
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=[None], y=[None],
+        mode='markers',
+        marker=dict(size=15, color='#fff3e0', symbol='square', line=dict(color='#ccc', width=1)),
+        name='Synthetic',
+        showlegend=True
     ))
     
     fig.update_layout(
@@ -228,22 +220,20 @@ def create_synthetic_marker_heatmap(input_metrics):
             'autorange': 'reversed'
         },
         autosize=True,
-        margin=dict(l=120, r=40, t=60, b=100),
-        plot_bgcolor='white'
+        height=fig_height,
+        margin=dict(l=120, r=40, t=80, b=100),
+        plot_bgcolor='white',
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.02,
+            xanchor='center',
+            x=0.5
+        )
     )
     
-    fig.add_annotation(
-        x=1.02, y=1,
-        xref='paper', yref='paper',
-        text='<span style="color:#4ade80">■</span> Real  <span style="color:#fb923c">■</span> Synthetic',
-        showarrow=False,
-        font=dict(size=12),
-        align='left'
-    )
-    
-    return fig.to_html(full_html=False, 
-                       include_plotlyjs=False,
-                       config={'responsive': True})
+    html = fig.to_html(full_html=False, include_plotlyjs=False, config={'responsive': True})
+    return f'<div style="max-width: {max_width}px; margin: 0 auto;">{html}</div>'
 
 
 def collect_html_content(input_dir):
@@ -251,8 +241,7 @@ def collect_html_content(input_dir):
     all_jsons = {
         'normalization_html_content': read_html_chunk(input_dir / "normalization_report.html"),
         'feature_selection_html_content': read_html_chunk(input_dir / "feature_selection_report.html"),
-        'model_html_content': read_html_chunk(input_dir / "model_report.html"),
-        'cell_count_table': read_df(input_dir / "cell_count_table.csv")
+        'model_html_content': read_html_chunk(input_dir / "model_report.html")
         }
 
     return all_jsons
@@ -273,226 +262,160 @@ def collect_metric_data(input_dir):
     
     all_jsons = {
         'input_metrics': input_metrics,
-        'split_metrics': load_metrics_json(input_dir / "training_split_report.json"),
-        'model_metrics': load_metrics_json(input_dir / "model_summary.json")
     }
 
     return all_jsons
 
-def generate_prediction_content(pred_dir):
-    
-    df = read_prediction_files(pred_dir)
 
-    results = {
-        'prediction_metrics': collect_pred_results(df, pred_dir)
+def read_aggregated_counts(tsv_path):
+    """Read pre-aggregated counts from collectFile output"""
+    df = pd.read_csv(tsv_path, sep='\t')
+    return df
+
+
+def compute_prediction_metrics_from_counts(counts_df):
+    """Derive all prediction metrics from aggregated counts TSV"""
+    
+    # Global stats
+    total_cells = counts_df.groupby('sample_name')['total_cells'].first().sum()
+    total_low_density = counts_df.groupby('sample_name')['low_density_cells'].first().sum()
+    
+    # Overall cell type abundance
+    global_counts = counts_df.groupby('cell_type')['count'].sum().sort_values(ascending=False)
+    
+    # Per-sample stats for the ROI table
+    samples = []
+    for sample_name, group in counts_df.groupby('sample_name'):
+        sample_total = group['total_cells'].iloc[0]
+        cell_counts = group.set_index('cell_type')['count'].sort_values(ascending=False)
+        percentages = (cell_counts / sample_total * 100).round(1)
+        
+        samples.append({
+            'sample_name': sample_name,
+            'total_cells': int(sample_total),
+            'unique_classes': len(cell_counts),
+            'low_density_cells': int(group['low_density_cells'].iloc[0]),
+            'most_common_class': cell_counts.index[0] if len(cell_counts) > 0 else None,
+            'most_common_percentage': float(percentages.iloc[0]) if len(percentages) > 0 else None,
+            'second_common_class': cell_counts.index[1] if len(cell_counts) > 1 else None,
+            'second_common_percentage': float(percentages.iloc[1]) if len(percentages) > 1 else None,
+            'least_common_class': cell_counts.index[-1] if len(cell_counts) > 0 else None,
+            'least_common_percentage': float(percentages.iloc[-1]) if len(percentages) > 0 else None,
+            'roi_report': group['roi_report'].iloc[0]
+        })
+    
+    return {
+        'total_predicted_cells': int(total_cells),
+        'total_low_density_cells': int(total_low_density),
+        'most_common_prediction': global_counts.index[0] if len(global_counts) > 0 else None,
+        'most_rare_prediction': global_counts.index[-1] if len(global_counts) > 0 else None,
+        'samples': sorted(samples, key=lambda x: x['sample_name'])
     }
 
-    return results
 
-def read_prediction_files(input_dir, file_pattern="*qPRED.tsv"):
-    """Read all prediction files and combine into a single dataframe"""
-    prediction_files = glob.glob(os.path.join(input_dir, file_pattern))
+def create_abundance_plot_from_counts(counts_df, output_file):
+    """Create stacked bar plot from pre-aggregated counts"""
     
-    if not prediction_files:
-        raise ValueError(f"No files found matching pattern {file_pattern} in {input_dir}")
+    # Pivot to sample × cell_type matrix
+    pivot_df = counts_df.pivot(
+        index='sample_name', 
+        columns='cell_type', 
+        values='count'
+    ).fillna(0)
     
-    all_data = []
+    # Convert to percentages
+    pivot_df = pivot_df.div(pivot_df.sum(axis=1), axis=0) * 100
     
-    for file_path in prediction_files:
-        try:
-            df = pd.read_csv(file_path, sep='\t')
-            
-            # Extract sample name from filename
-            sample_name = Path(file_path).stem.replace('.ome.tiff_qPRED', '')
-            df['Sample'] = sample_name
-            
-            all_data.append(df)
-            
-            print(f"Loaded {len(df):,} cells from {sample_name}")
-            
-        except Exception as e:
-            print(f"Error reading {file_path}: {e}")
-            continue
+    # Order columns by total abundance
+    col_order = counts_df.groupby('cell_type')['count'].sum().sort_values(ascending=False).index
+    pivot_df = pivot_df.reindex(columns=col_order, fill_value=0)
     
-    if not all_data:
-        raise ValueError("No valid prediction files could be read")
-    
-    combined_df = pd.concat(all_data, ignore_index=True)
-    combined_df["Sample"] = combined_df["Image"].str.replace('.ome.tif', '')
-
-    return combined_df
-
-def collect_pred_results(df, input_dir):
-
-    total_low_density_cells = 0
-    # Add low density cells if available
-    if 'low_bin_density' in df.columns:
-        total_low_density_cells = df['low_bin_density'].sum()
-
-    abundance_plot_name = "prediction_abundance_plot.png"
-    # Create abundance plot
-    print("Creating abundance visualization...")
-    create_abundance_plot(df, abundance_plot_name)
-
-    create_abundance_plot_heatmap(df, "prediction_abundance_plot_heatmap.png")
-
-    cell_type_counts = df['CellTypePrediction'].value_counts()
-    cell_type_percentages = df['CellTypePrediction'].value_counts(normalize=True) * 100
-    cell_type_percentages = cell_type_percentages.round(1)
-
-    results = {
-        'total_predicted_cells': len(df),
-        'most_common_prediction': cell_type_counts.index[0] if len(cell_type_counts) > 0 else None,
-        'most_common_percentage': cell_type_percentages.iloc[0] if len(cell_type_percentages) > 0 else None,
-        'most_rare_prediction': cell_type_counts.index[-1] if len(cell_type_counts) > 0 else None,
-        'most_rare_percentage': cell_type_percentages.iloc[-1] if len(cell_type_percentages) > 2 else None,
-        'abundance_plot': abundance_plot_name,
-        'total_low_density_cells': total_low_density_cells,
-        'samples': load_sample_jsons(input_dir)
-    }
-    
-    return results
-
-def create_abundance_plot(df, output_file):
-    """Create stacked bar plot with simplified dynamic sizing"""
-    # Calculate dataset characteristics for sizing
-    n_samples = df['Sample'].nunique()
-    n_cell_types = df['CellTypePrediction'].nunique()
-    
-    # Enhanced dynamic sizing for large datasets
+    # Sizing
+    n_samples = len(pivot_df)
+    n_cell_types = len(pivot_df.columns)
     plot_width = max(12, min(30, 10 + n_samples * 0.4))
     plot_height = max(8, min(12, 7 + n_cell_types * 0.15))
     
-    # Calculate proportions and pivot
-    proportions_list = []
-    for sample in sorted(df['Sample'].unique()):
-        sample_df = df[df['Sample'] == sample]
-        proportions = sample_df['CellTypePrediction'].value_counts(normalize=True) * 100
-        for cell_type, percentage in proportions.items():
-            proportions_list.append({
-                'Sample': sample,
-                'CellType': cell_type,
-                'Percentage': percentage
-            })
-    
-    proportions_df = pd.DataFrame(proportions_list)
-    pivot_df = proportions_df.pivot(index='Sample', columns='CellType', values='Percentage').fillna(0)
-    print(pivot_df)
-    # Get overall cell type order (most abundant first)
-    overall_abundance = df['CellTypePrediction'].value_counts()
-    cell_type_order = overall_abundance.index.tolist()
-    
-    # Reorder columns to match abundance order
-    pivot_df = pivot_df.reindex(columns=cell_type_order, fill_value=0)
-    
-    # Create plot with standardized styling
+    # Plot
     plt.style.use('default')
     fig, ax = plt.subplots(figsize=(plot_width, plot_height), dpi=300)
-    plt.rcParams.update({
-        'font.size': 11,
-        'font.family': 'sans-serif',
-        'axes.linewidth': 1
-    })
     
-    # Generate colors
     colors = sns.color_palette("Set2", n_cell_types)
-    
-    # Create stacked bars in order
     bottom = np.zeros(len(pivot_df))
+    
     for i, cell_type in enumerate(pivot_df.columns):
         ax.bar(
             range(len(pivot_df)), 
             pivot_df[cell_type], 
             bottom=bottom,
             label=cell_type,
-            color=colors[i],
+            color=colors[i % len(colors)],
             alpha=0.85,
             edgecolor='white',
             linewidth=0.8
         )
-        bottom += pivot_df[cell_type]
-        
-    # Enhanced title with better positioning
+        bottom += pivot_df[cell_type].values
+    
+    # Labels
     fig.suptitle('Predicted Cell Type Composition by Sample', fontsize=15, fontweight='bold', y=1.02)
     ax.set_xlabel('Sample', fontsize=11, fontweight='bold')
     ax.set_ylabel('Percentage of Cells (%)', fontsize=11, fontweight='bold')
-    
-    # X-axis labels - dynamic rotation based on sample count
-    ax.set_xticks(range(len(pivot_df)))
-    if n_samples <= 10:
-        rotation = 30
-        fontsize = 10
-    elif n_samples <= 25:
-        rotation = 45
-        fontsize = 9
-    else:
-        rotation = 70
-        fontsize = 8
-    ax.set_xticklabels(pivot_df.index, rotation=rotation, ha='right', fontsize=fontsize)
-    
-    # Y-axis
     ax.set_ylim(0, 100)
     
-    # Add sample counts above bars with improved rotation and positioning
-    sample_counts = df.groupby('Sample').size()
-    count_rotation = 0 if n_samples <= 15 else 30 if n_samples <= 30 else 45
+    # X-axis
+    ax.set_xticks(range(len(pivot_df)))
+    rotation = 30 if n_samples <= 10 else 45 if n_samples <= 25 else 70
+    fontsize = 10 if n_samples <= 10 else 9 if n_samples <= 25 else 8
+    ax.set_xticklabels(pivot_df.index, rotation=rotation, ha='right', fontsize=fontsize)
+    
+    # Sample counts
+    sample_totals = counts_df.groupby('sample_name')['total_cells'].first()
     for i, sample in enumerate(pivot_df.index):
-        ax.text(i, 104, f'n={sample_counts[sample]:,}', 
+        ax.text(i, 104, f'n={sample_totals[sample]:,}', 
                 ha='center', va='bottom', fontsize=10, fontweight='bold',
-                rotation=count_rotation)
+                rotation=0 if n_samples <= 15 else 30)
     
-    # Legend (matching bar order - bottom to top)
+    # Legend
     handles, labels = ax.get_legend_handles_labels()
-    # Reverse to match visual stacking order (bottom to top)
-    legend = ax.legend(
-        reversed(handles), reversed(labels),
-        bbox_to_anchor=(1.05, 1), 
-        loc='upper left',
-        frameon=True,
-        title='Cell Type',
-        title_fontsize=11,
-        fontsize=10
-    )
+    ax.legend(reversed(handles), reversed(labels),
+              bbox_to_anchor=(1.05, 1), loc='upper left',
+              title='Cell Type', title_fontsize=11, fontsize=10)
     
-    # Clean styling
     ax.grid(True, alpha=0.3)
     sns.despine(top=True, right=True)
     ax.set_facecolor('#fafafa')
     
     plt.tight_layout()
-
-    # Save figure
     plt.savefig(output_file, dpi=300, bbox_inches='tight', facecolor='white')
+    plt.close()
 
-def create_abundance_plot_heatmap(df, output_file):
-    """Create clustered heatmap of cell type composition by sample with batch annotation"""
-    import pandas as pd
-    import numpy as np
-    import seaborn as sns
-    import matplotlib.pyplot as plt
+
+def create_abundance_plot_heatmap_from_counts(counts_df, output_file):
+    """Create clustered heatmap of cell type composition from pre-aggregated counts"""
     
-    n_samples = df['Sample'].nunique()
+    n_samples = counts_df['sample_name'].nunique()
     
-    # Calculate proportions and pivot to samples × cell types matrix
-    proportions = (
-        df.groupby(['Sample', 'CellTypePrediction'])
-        .size()
-        .unstack(fill_value=0)
-    )
+    # Pivot to sample × cell_type matrix
+    proportions = counts_df.pivot(
+        index='sample_name',
+        columns='cell_type',
+        values='count'
+    ).fillna(0)
     proportions = proportions.div(proportions.sum(axis=1), axis=0) * 100
     
     # Sort columns by overall abundance
-    col_order = df['CellTypePrediction'].value_counts().index.tolist()
+    col_order = counts_df.groupby('cell_type')['count'].sum().sort_values(ascending=False).index
     proportions = proportions.reindex(columns=col_order, fill_value=0)
     
-    # Build batch color annotation if Batch column exists
+    # Build batch color annotation if batch column exists and has values
     row_colors = None
-    if 'Batch' in df.columns:
-        batch_map = df.drop_duplicates('Sample').set_index('Sample')['Batch']
+    if 'batch' in counts_df.columns and counts_df['batch'].notna().any() and (counts_df['batch'] != '').any():
+        batch_map = counts_df.drop_duplicates('sample_name').set_index('sample_name')['batch']
         batch_map = batch_map.reindex(proportions.index)
-        batch_palette = dict(zip(batch_map.unique(), sns.color_palette('tab20', batch_map.nunique())))
-        row_colors = batch_map.map(batch_palette)
-        row_colors.name = 'Batch'
+        if batch_map.nunique() > 1:
+            batch_palette = dict(zip(batch_map.unique(), sns.color_palette('tab20', batch_map.nunique())))
+            row_colors = batch_map.map(batch_palette)
+            row_colors.name = 'Batch'
     
     # Dynamic sizing
     fig_height = np.clip(6 + n_samples * 0.02, 8, 24)
@@ -528,6 +451,8 @@ def create_abundance_plot_heatmap(df, output_file):
     
     # Add batch legend if applicable
     if row_colors is not None:
+        batch_map = counts_df.drop_duplicates('sample_name').set_index('sample_name')['batch']
+        batch_palette = dict(zip(batch_map.unique(), sns.color_palette('tab20', batch_map.nunique())))
         for batch, color in batch_palette.items():
             g.ax_col_dendrogram.bar(0, 0, color=color, label=batch, linewidth=0)
         g.ax_col_dendrogram.legend(
@@ -540,20 +465,27 @@ def create_abundance_plot_heatmap(df, output_file):
     plt.savefig(output_file, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
-def csv_to_dict(csv_file_path, max_rows=None):
-    """Convert CSV to dictionary for Jinja2 templates."""
-    try:
-        data = {'headers': [], 'rows': []}
-        with open(csv_file_path, 'r', newline='', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            data['headers'] = reader.fieldnames or []
-            for i, row in enumerate(reader):
-                if max_rows and i >= max_rows:
-                    break
-                data['rows'].append(row)
-        return data
-    except:
-        return {'headers': [], 'rows': []}
+
+def generate_prediction_content(counts_tsv_path, plots_dir='.'):
+    """Generate prediction content from aggregated counts TSV"""
+    
+    counts_df = read_aggregated_counts(counts_tsv_path)
+    
+    # Compute metrics
+    metrics = compute_prediction_metrics_from_counts(counts_df)
+    
+    # Generate plots
+    abundance_plot_name = "prediction_abundance_plot.png"
+    abundance_plot_path = os.path.join(plots_dir, abundance_plot_name)
+    create_abundance_plot_from_counts(counts_df, abundance_plot_path)
+    metrics['abundance_plot'] = abundance_plot_name
+    
+    # Generate heatmap
+    heatmap_plot_path = os.path.join(plots_dir, "prediction_abundance_plot_heatmap.png")
+    create_abundance_plot_heatmap_from_counts(counts_df, heatmap_plot_path)
+    
+    return {'prediction_metrics': metrics}
+
 
 def generate_report(all_data, output_file, jinja_env, letterhead, pipeline_version, template_name = "base.html"):
     try:
@@ -588,7 +520,7 @@ def main():
     """Main function to parse arguments and generate report."""
     parser = argparse.ArgumentParser(description="Generate HTML report from pipeline outputs")
     parser.add_argument('--input-dir', default="./", help='Directory containing pipeline outputs (default: ./)')
-    parser.add_argument('--pred-dir', default='./', help='Directory to save the generated report (default: ./)')
+    parser.add_argument('--counts-tsv', required=True, help='Aggregated cell counts TSV from collectFile')
     parser.add_argument('--template-dir', default='templates', help='Directory containing Jinja2 templates (default: templates)')
     parser.add_argument('--report-name', default='cell_classification_report.html', help='Name of the output report file (default: cell_classification_report.html)')
     parser.add_argument('--letterhead', help='Path to header logo image (will be embedded in report)')
@@ -604,7 +536,7 @@ def main():
 
     all_data.update(collect_metric_data(args.input_dir))
 
-    all_data.update(generate_prediction_content(args.pred_dir))
+    all_data.update(generate_prediction_content(args.counts_tsv))
 
     generate_report(
         all_data=all_data, 

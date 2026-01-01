@@ -23,6 +23,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Generate HTML report for cell type predictions.")
     parser.add_argument('--input_tsv', required=True, help='Input prediction TSV file')
     parser.add_argument('--output_html', required=True, help='Output HTML report file')
+    parser.add_argument('--batch', default='', help='Batch ID for this sample')
     return parser.parse_args()
 
 
@@ -99,6 +100,25 @@ def calculate_roi_summary_stats(df):
     }
     
     return summary_stats
+
+def write_counts_tsv(df, sample_name, summary_stats, output_file, batch_id=None):
+    """Write cell type counts in long format for collectFile aggregation"""
+    cell_counts = df['CellTypePrediction'].value_counts()
+    
+    rows = []
+    for cell_type, count in cell_counts.items():
+        rows.append({
+            'sample_name': sample_name,
+            'batch': batch_id or '',
+            'cell_type': cell_type,
+            'count': count,
+            'total_cells': summary_stats['total_cells'],
+            'low_density_cells': summary_stats['low_density_cells'],
+            'roi_report': f"{sample_name}.html"
+        })
+    
+    counts_df = pd.DataFrame(rows)
+    counts_df.to_csv(output_file, sep='\t', index=False)
 
 def plot_spatial(df, color_map, slide_name, output_file):
     mx = df["Centroid Y µm"].max() + 1
@@ -232,6 +252,10 @@ def main():
 
     # Calculate summary statistics for the ROI table
     summary_stats = calculate_roi_summary_stats(df)
+
+    # Write counts TSV for aggregation
+    counts_output = f"{slide_name}_counts.tsv"
+    write_counts_tsv(df, slide_name, summary_stats, counts_output, batch_id=args.batch)
 
     results = {
         'sample_name': slide_name, 

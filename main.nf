@@ -110,7 +110,7 @@ process ADD_EMPTY_MARKER_NOISE {
 
     output:
     tuple val(batchID), path("merged_dataframe_${batchID}_mod.pkl"), emit: modbatchtables
-    
+
     script:
     """
     add_empty_marker_noise.py \
@@ -164,7 +164,7 @@ process PREDICT_ALL_CELLS_XGB{
 	tuple val(batchID), path(pickleTable)
 	
 	output:
-	path("*.tsv"), emit: predictions
+	tuple val(batchID), path("*.tsv"), emit: predictions
 	
 	script:
     """
@@ -187,10 +187,10 @@ process QC_DENSITY {
     publishDir "${params.output_dir}/celltypes", pattern: "*_qPRED.tsv", mode: "copy", overwrite: true
 
     input:
-    tuple val(sampleID), path(prediction_tsv)    
+    tuple val(batchID), val(sampleID), path(prediction_tsv)    
 
     output:
-    tuple val(sampleID), path("*.tsv"), emit: qc_predictions
+    tuple val(batchID), val(sampleID), path("*_qPRED.tsv"), emit: qc_predictions
 
     script:
     """
@@ -208,17 +208,18 @@ process CLASSIFIED_REPORT_PER_SLIDE {
     )
     
     input:
-    tuple val(sampleID), path(prediction_tsv)
+    tuple val(batchID), val(sampleID), path(prediction_tsv)
 
     output:
     path("*_prediction_report.html")
-    path("*_classified.json"), emit: slide_results
+    path("*counts.tsv"), emit: classified_counts
 
     script:
     """
     generate_classified_report.py \
         --input_tsv ${prediction_tsv} \
-        --output_html ${sampleID}_prediction_report.html
+        --output_html ${sampleID}_prediction_report.html \
+        --batch ${batchID}
     """
 }
 
@@ -229,12 +230,13 @@ process GENERATE_FINAL_REPORT {
     
     input:
     path(input_metrics_json)
-    path(split_jsons)
+    path(aggregated_counts)
+    //path(split_jsons)
     path(norm_html)
     path(fs_html) 
     path(model_html)
-    path(model_summary_json)
-    path(prediction_results, stageAs: "pred_results/*")
+    //path(model_summary_json)
+    //path(prediction_results, stageAs: "pred_results/*")
     path(template_dir)
     path(letterhead_file)
     path(nf_config, stageAs: "nextflow.config")
@@ -247,7 +249,7 @@ process GENERATE_FINAL_REPORT {
     script:
     """
     generate_final_report.py \
-        --pred-dir ./pred_results \
+        --counts-tsv ${aggregated_counts} \
         --template-dir ${template_dir} \
         --report-name classyflow_report.html \
         --letterhead ${letterhead_file} \
@@ -354,14 +356,23 @@ workflow {
         prediction_results = PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
 
 
+        // prediction_results.predictions
+        //     .flatten() 
+        //     .map { file ->
+        //         def sampleID = file.getBaseName().split('\\.')[0]
+        //         [sampleID, file]
+        //     }
+        //     .set { prediction_tuples }
+
         prediction_results.predictions
-            .flatten() 
-            .map { file ->
-                def sampleID = file.getBaseName().split('\\.')[0]
-                [sampleID, file]
+            .flatMap { batchID, files -> 
+                def fileList = files instanceof List ? files : [files]
+                fileList.collect { file ->
+                    def sampleID = file.getBaseName().split('\\.')[0]
+                    [batchID, sampleID, file]
+                }
             }
             .set { prediction_tuples }
-
 
 
         qc_density = QC_DENSITY(prediction_tuples)
@@ -371,20 +382,28 @@ workflow {
         // Generate a comprehensive HTML report for each prediction file
         CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
 
+        aggregated_counts = CLASSIFIED_REPORT_PER_SLIDE.out.classified_counts
+            .collectFile(
+                name: 'all_cell_counts.tsv',
+                keepHeader: true, 
+                skip: 1
+            )
+
         // Generate final HTML report for the whole run
         split_outputs = labledDataFrames.training_holdout_results.flatten().collect()
-        prediction_results = predictions_for_report.map {id, file -> file }.collect()
+        final_prediction_results = predictions_for_report.map { it[2] }.collect()
 
 
         // Pass all to reporting including summary JSONs
         final_report = GENERATE_FINAL_REPORT(
             CHECK_PANEL_DESIGN.output.input_metrics,
-            split_outputs,
+            aggregated_counts,
+            //split_outputs,
             normalized_output.report,
             feature_selection_results.report, 
             modeling_results.report,
-            modeling_results.model_summary,
-            prediction_results,
+            //modeling_results.model_summary,
+            //final_prediction_results,
             params.html_template,
             params.letterhead,
             params.config_file
