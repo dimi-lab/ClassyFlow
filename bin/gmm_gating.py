@@ -121,6 +121,9 @@ def main():
         bg_std = stds[sorted_idx[0]]
         threshold = bg_mean + 2 * bg_std
 
+        if len(np.unique(values)) <= 1:
+            print(f"[WARNING] Skipping KDE for feature '{col}' due to insufficient unique values.", flush=True)
+            continue
         # KDE fallback
         kde = gaussian_kde(values)
         x_grid = np.linspace(values.min(), values.max(), 1000)
