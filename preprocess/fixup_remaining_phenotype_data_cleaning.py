@@ -2,6 +2,8 @@ import pandas as pd
 import sys
 import re
 
+upgradeMacs = True  # Set to False to downgrade M1/M2 to Macrophage
+
 def remove_dash_suffix(val):
     """Remove any values that end with '-' (even after '|'), converting them to blank."""
     if pd.isna(val):
@@ -13,22 +15,28 @@ def remove_dash_suffix(val):
 lookup = {
     "Ignore*": "",
     "Melanocytes": "Tumor",
-    "B cell": "B Cell",
+    "Tumor Cell": "Tumor",
     "Bcell": "B Cell",
     "CLT": "CytoT",
     "CTL": "CytoT",
+    "Cytotoxic T Cell": "CytoT",
     "Helper T": "HelperT",
+    "Helper T Cell": "HelperT",
     "M1": "M1 Macrophage",
     "M2": "M2 Macrophage",
     "MPO": "Neutro",
     "Neuto": "Neutro",
     "Neutro": "Neutro",
+    "Neutrophil": "Neutro",
     "Stroma": "Epithelial",
+    "SM": "Epithelial",
     "Treg": "T Reg",
+    "Regulatory T Cell": "T Reg",
     "TumC": "Tumor", 
     "TumGas": "Tumor",
-    "Vascul": "Endothelial",
+    "Vascul": "Vasculature",
     "Endo": "Endothelial",
+    "Dendritic Cell": "DC",
     "<TBD>": "",
     "B2M": "",
     "GZB": "",
@@ -77,6 +85,27 @@ lookup = {
     "ILT4+": ""
 }
 
+# Optionally upgrade "Macrophage" to M1/M2 based on CD163/CD206 medians
+def upgrade_macrophages(df):
+    # Find columns containing both 'CD163' & 'Median', and 'CD206' & 'Median'
+    cd163_col = next((col for col in df.columns if 'CD163' in col and 'Median' in col), None)
+    cd206_col = next((col for col in df.columns if 'CD206' in col and 'Median' in col), None)
+    if cd163_col and cd206_col:
+        def upgrade_row(row):
+            if row['Classification'] == 'Macrophage':
+                try:
+                    cd163 = float(row[cd163_col])
+                    cd206 = float(row[cd206_col])
+                    if cd206 > cd163:
+                        return 'M2 Macrophage'
+                    else:
+                        return 'M1 Macrophage'
+                except Exception:
+                    return row['Classification']
+            return row['Classification']
+        df['Classification'] = df.apply(upgrade_row, axis=1)
+    return df
+
 def main(tsv_path):
     df = pd.read_csv(tsv_path, sep='\t')
     if "Classification" not in df.columns:
@@ -108,9 +137,8 @@ def main(tsv_path):
 
     df["Classification"] = df["Classification"].apply(remap)
 
-    #print("Unique values in file not found in lookup dict:")
-    #for v in sorted(not_found):
-    #    print(f"  {v}")
+    if upgradeMacs:
+        df = upgrade_macrophages(df)
 
     print("\nUnique counts after remapping:")
     print(df["Classification"].value_counts())
