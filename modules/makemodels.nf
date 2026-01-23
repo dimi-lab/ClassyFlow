@@ -112,6 +112,12 @@ publishDir(
         overwrite: true,
         mode: "copy"
     )
+    publishDir(
+        path: "${params.output_dir}/models",
+        pattern: "*_sample_results.csv",
+        overwrite: true,
+        mode: "copy"
+    )
     
 	input:
 	path(holdoutDataframe)
@@ -123,6 +129,7 @@ publishDir(
 	tuple path("holdoutEval_XGBoost_Model_*.png"), path("holdoutEval_XGBoost_Model_*.html"), path("holdoutEval_XGBoost_Model_*_auc_rankings.csv"), path("holdoutEval_XGBoost_Model_*_results.json"), emit: holdoutEval_results
     path("*.png")
     path("holdout_*.csv"), emit: eval
+    path("*_sample_results.csv")
 
 	
 	script:

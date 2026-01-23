@@ -62,6 +62,7 @@ if __name__ == "__main__":
 
     #Create holdout df with selected features
     holdout = pd.read_pickle(args.holdoutDataframe)
+    holdout = holdout.set_index('Image')
     holdout = holdout[featureList]
 
     # Save to disk

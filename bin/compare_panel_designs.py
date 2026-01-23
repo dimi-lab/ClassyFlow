@@ -23,13 +23,17 @@ def compare_headers(pickle_files, output_file, metrics_output, threshold, class_
         base = str(df["original_batchID"].dropna().unique().item())
         dataframe_names.append(base)
 
-        # Per-batch metrics
-        batch_metrics[base] = {
-            "batch_id": base,
-            "num_cells": len(df),
-            "num_rois": df["Image"].nunique(),
-            "num_features": len(filtered_cols)
-        }
+        # Per-batch metrics (accumulate if batch appears in multiple files)
+        if base not in batch_metrics:
+            batch_metrics[base] = {
+                "batch_id": base,
+                "num_cells": 0,
+                "num_rois": 0,
+                "num_features": 0
+            }
+        batch_metrics[base]["num_cells"] += len(df)
+        batch_metrics[base]["num_rois"] += df["Image"].nunique()
+        batch_metrics[base]["num_features"] = max(batch_metrics[base]["num_features"], len(filtered_cols))
 
         # Global label counts
         global_labeled_cells += df[class_column].notna().sum()

@@ -114,7 +114,7 @@ def write_counts_tsv(df, sample_name, summary_stats, output_file, batch_id=None)
             'count': count,
             'total_cells': summary_stats['total_cells'],
             'low_density_cells': summary_stats['low_density_cells'],
-            'roi_report': f"{sample_name}.html"
+            'roi_report': summary_stats['roi_report']
         })
     
     counts_df = pd.DataFrame(rows)
@@ -253,10 +253,6 @@ def main():
     # Calculate summary statistics for the ROI table
     summary_stats = calculate_roi_summary_stats(df)
 
-    # Write counts TSV for aggregation
-    counts_output = f"{slide_name}_counts.tsv"
-    write_counts_tsv(df, slide_name, summary_stats, counts_output, batch_id=args.batch)
-
     results = {
         'sample_name': slide_name, 
         'celltype_barplot': f"{slide_name}_celltype_barplot.png",
@@ -266,6 +262,10 @@ def main():
     
     # Add summary statistics to results
     results.update(summary_stats)
+
+    # Write counts TSV for aggregation
+    counts_output = f"{slide_name}_counts.tsv"
+    write_counts_tsv(df, slide_name, results, counts_output, batch_id=args.batch)
 
     # Generate plots
     spatial_html = plot_spatial(df, color_map, slide_name, results["spatial_plot"])
