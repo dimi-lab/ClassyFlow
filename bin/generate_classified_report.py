@@ -150,10 +150,18 @@ def plot_umap(df, color_map):
     feature_cols = [col for col in df.columns if col not in ["Slide", "CellTypePrediction", "Centroid X µm", "Centroid Y µm", "invertY"] and pd.api.types.is_numeric_dtype(df[col])]
     if len(feature_cols) < 2:
         return ""
-    features = df[feature_cols].fillna(0)
+
+    # Downsample if too many data points
+    max_points = 50000
+    if len(df) > max_points:
+        df_sample = df.sample(n=max_points, random_state=42)
+    else:
+        df_sample = df
+
+    features = df_sample[feature_cols].fillna(0)
     scaler = StandardScaler()
     scaled = scaler.fit_transform(features)
-    # PCA to 90% variance
+    # PCA to 90% variance or max 30 components
     pca = PCA(n_components=min(30, scaled.shape[1]))
     pca_matrix = pca.fit_transform(scaled)
     explained = np.cumsum(pca.explained_variance_ratio_)
@@ -163,12 +171,12 @@ def plot_umap(df, color_map):
     reducer = umap.UMAP(random_state=42)
     umap_matrix = reducer.fit_transform(pca_matrix)
     umap_df = pd.DataFrame(umap_matrix, columns=["UMAP1", "UMAP2"])
-    umap_df["CellTypePrediction"] = df["CellTypePrediction"].values
+    umap_df["CellTypePrediction"] = df_sample["CellTypePrediction"].values
     fig = px.scatter(
         umap_df, x="UMAP1", y="UMAP2", color="CellTypePrediction",
         color_discrete_map=color_map,
         opacity=0.3,
-        title="UMAP of PCA-Reduced Quantification Data"
+        title=f"UMAP of PCA-Reduced Quantification Data (n={len(df_sample)})"
     )
     fig.update_layout(template="simple_white")
     return fig.to_html(full_html=False, include_plotlyjs=False)
@@ -246,7 +254,7 @@ def create_cell_type_bar_plot(df, sample_name, output_file):
 
 def main():
     args = parse_args()
-    df = pd.read_csv(args.input_tsv, sep='\t')
+    df = pd.read_csv(args.input_tsv, sep='\t', low_memory=False)
     slide_name = os.path.basename(args.input_tsv).split(".")[0]
     color_map = get_color_map(df["CellTypePrediction"].unique())
 

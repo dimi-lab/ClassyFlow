@@ -3,6 +3,7 @@
 import argparse
 import os
 import pandas as pd
+import gc
 
 def parse_args():
     import argparse
@@ -16,16 +17,19 @@ def validate_originalBatchID(input_files):
 
     for file in input_files:
         df = pd.read_csv(file, sep='\t')
-        
         if 'original_batchID' not in df.columns:
+            del df
+            gc.collect()
             raise ValueError(f"Column 'original_batchID' not found in {file}")
-        
         unique_ids = df['original_batchID'].unique()
         if len(unique_ids) != 1:
+            del df
+            gc.collect()
             raise ValueError(f"File {file} contains {len(unique_ids)} unique batch IDs: {unique_ids.tolist()}."
                              f"Expected exatly 1 batch ID")
-        
         batch_ids[file] = unique_ids[0]
+        del df
+        gc.collect()
 
     #Check that all files being merged have the exact same original batchID
     unique_batch_ids = set(batch_ids.values())
@@ -57,15 +61,21 @@ def main():
     if not input_files:
         raise ValueError("No input files provided.")
 
-    # Validate that all files have the same original Batch ID:
+    # Validate that all files have the same original Batch ID (using pandas, but only for validation)
     validate_originalBatchID(input_files)
-    
-    # Write header from the first file
-    write_header(input_files[0], output_file)
 
-    # Append all files, skipping header for each
-    for file in input_files:
-        append_file(file, output_file)
+    # Write header from the first file
+    with open(input_files[0], 'r') as fin:
+        header = fin.readline()
+
+    with open(output_file, 'w') as fout:
+        fout.write(header)
+        # Append all files, skipping header for each, line by line (low memory)
+        for file in input_files:
+            with open(file, 'r') as fin:
+                next(fin)  # skip header
+                for line in fin:
+                    fout.write(line)
 
 if __name__ == "__main__":
     main()
