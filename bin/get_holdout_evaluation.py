@@ -193,6 +193,19 @@ def check_holdout(toCheckDF, xgbM, classColumn, leEncoderFile, output_prefix):
     cm = confusion_matrix(y_holdout, y_pred)
     cm_df = pd.DataFrame(cm, columns=uniqNames, index=uniqNames)
 
+    # Per-sample classification results
+    sample_results = pd.DataFrame({
+        'true_label': le.inverse_transform(y_holdout),
+        'predicted_label': le.inverse_transform(y_pred),
+        'correct': y_pred == y_holdout,
+        'confidence': np.max(y_pred_proba, axis=1)
+    }, index=toCheckDF.index)
+
+    sample_results_path = f"{output_prefix}_sample_results.csv"
+    sample_results.to_csv(sample_results_path)
+    print(f"Per-sample results saved: {sample_results_path}")
+    results['sample_results_csv_path'] = sample_results_path
+
     confusion_matrix_plot = f"{output_prefix}_confusion_matrix.html"
     create_confusion_matrix_div(cm_df, uniqNames, confusion_matrix_plot)
     results['confusion_matrix_html_path'] = confusion_matrix_plot
