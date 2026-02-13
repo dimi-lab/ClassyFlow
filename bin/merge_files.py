@@ -101,6 +101,8 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
 
         if folder_is_slide:
             df['Image'] = directory_path+'-'+df['Image']
+        df = df.copy()
+
         dataframes.append(df)
 
     # Concatenate all DataFrames
@@ -183,9 +185,12 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
                 print(f"[ERROR] File '{fname}' has different columns than '{ref_file}'.")
                 print(f"  Missing = {missing}  & Extra = {extra}")
                 if missing:
-                    print(f"  Missing columns: {missing}")
+                    if len(missing) > 5:
+                        print(f" '{fname}' Missing columns (showing first 5 of {len(missing)}): {missing[:5]}")
+                    else:
+                        print(f" '{fname}' Missing columns: {missing}")
                 if extra:
-                    print(f"  Extra columns: {extra}")
+                    print(f" '{fname}' Extra columns: {extra}")
     if mismatch:
         sys.exit("[ERROR] Not all files have identical columns. Please fix the input files.")
 

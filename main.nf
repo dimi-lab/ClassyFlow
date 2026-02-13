@@ -130,8 +130,8 @@ process ADD_EMPTY_MARKER_NOISE {
  */
 process GENERATE_TRAINING_N_HOLDOUT{
 	publishDir(
-        path: "${params.output_dir}/celltype_reports",
-        pattern: "*.pdf",
+        path: "${params.output_dir}/annotation",
+        pattern: "*.csv",
         mode: "copy"
     )
     

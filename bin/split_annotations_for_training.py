@@ -159,6 +159,11 @@ def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegat
     freq_table = freq_table[['Label', 'Label Count', 'Label Percent', 'Training Set Count', 'Holdout Set Count']]
     freq_table.to_csv('cell_count_table.csv', index=False)
 
+    # Create and save per-batch label count crosstab
+    per_batch_label_count = pd.crosstab(merged_df[classColumn], merged_df[batchColumn])
+    per_batch_label_count.to_csv('per_batch_label_count.csv')
+
+
     # Save cell types that made it to holdout
     kept_cell_types = merged_df[merged_df['split'] != 'Not Used'][classColumn].unique()
     with open("celltypes.csv", 'w', newline='') as csvfile:

@@ -19,7 +19,8 @@ marker_map = {'ASMA': 'aSMA',
             'PANCK':'PanCK', 
             'GP100':'gp100',
             'B2MG' : 'B2M',
-            'GZB' : 'GzB'
+            'GZB' : 'GzB',
+            'tryptase' : 'TRYPTASE'
 }  # Add more as needed
 
 # --- Classification cleaning config ---
@@ -58,13 +59,13 @@ lookup = {
     "CD11c+": "DC",
     "Unclassified Immune":"",  # BE WARE - PROJECT SPECIFIC REMOVAL
     "Monocyte":"",  # BE WARE - PROJECT SPECIFIC REMOVAL
+    "MDSC" : "TAM", # BE WARE - PROJECT SPECIFIC Recodification
     "NK" : "NK Cell",
     "CD56" : "NK Cell",
     "<TBD>": "",
     "B2M": "",
     "GZB": "",
     "CD28": "",
-    "ExstdT": "",
     "FAP": "",
     "IDO": "",
     "NKG2D": "",
