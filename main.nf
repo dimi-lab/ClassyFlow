@@ -10,6 +10,7 @@ params.output_dir = "${workflow.projectDir}/output"
 //Static Assests for beautification
 params.letterhead = file("${projectDir}/assets/images/Classyflow_banner_purple.png", checkIfExists: true)
 params.html_template = file("${projectDir}/assets/html_templates", checkIfExists: true)
+params.rename_yaml = file("${projectDir}/assets/rename_columns.yaml", checkIfExists: true)
 params.pipeline_version = "1.0"
 params.reports_dir = "${params.output_dir}/final_reports"
 
@@ -67,6 +68,22 @@ process MERGE_TAB_DELIMITED_FILES {
         --input_delimiter '${params.quant_file_delimiter}' \
         --batchID ${batchID} \
         ${params.target_splitting_size ? "--target_size ${params.target_splitting_size}" : ""}
+    """
+}
+
+process COLUMN_FORMAT_AND_FIX {
+    input:
+    path tables_pkl
+    path rename_yaml
+
+    output:
+    path("*_fx.pkl"), emit: batchtables
+
+    script:
+    """
+    fixup_columns.py \
+        --input_table ${tables_pkl} \
+        --rename_yaml ${rename_yaml}
     """
 }
 
@@ -143,6 +160,7 @@ process GENERATE_TRAINING_N_HOLDOUT{
     path("training_dataframe.pkl"), emit: training
 	path("celltypes.csv"), emit: lableFile
     tuple path("training_split_report.json"), path("cell_count_table.csv"), emit: training_holdout_results
+    path("per_batch_label_count.csv"), emit: per_batch_label_count
 
     script:
     """
@@ -294,68 +312,58 @@ process ZIP_PUBLISHED {
 // -------------------------------------- //
 
 
-
 workflow {
-    // Show help message if the user specifies the --help flag at runtime
-    // or if any required params are not provided
-    if ( params.help || !params.input_dirs ){
-        // Invoke the function above which prints the help message
+    if ( params.help || !params.input_dirs ) {
         helpMessage()
-        // Exit out and do not run anything else
         exit 1
     } else {
-        // Pull channel object `batchDirs` from nextflow env - see top of file.
-        MERGE_TAB_DELIMITED_FILES(batchDirs)
-        CHECK_PANEL_DESIGN(MERGE_TAB_DELIMITED_FILES.output.batchtables.collect())  
+        // 1. Merge tab-delimited files
+        merged_pkl_ch = MERGE_TAB_DELIMITED_FILES(batchDirs)
 
-        // Create namedBatchtables channel from batchtables
-        namedBatchtables = MERGE_TAB_DELIMITED_FILES.output.batchtables
+        // 2. Optionally fix columns if enabled
+        if (params.batch_correct_column_names) {
+            // Pass static asset as path, like params.letterhead
+            rename_yaml_path = file(params.rename_yaml, checkIfExists: true)
+            fixed_pkl_ch = COLUMN_FORMAT_AND_FIX(merged_pkl_ch.flatten(), rename_yaml_path)
+            input_for_panel_design = fixed_pkl_ch
+        } else {
+            input_for_panel_design = merged_pkl_ch
+        }
+
+        // 3. CHECK_PANEL_DESIGN expects a list of files
+        input_for_panel_design_list = input_for_panel_design.collect()
+        CHECK_PANEL_DESIGN(input_for_panel_design_list)
+
+        // 4. Create namedBatchtables channel from whichever was used
+        namedBatchtables = input_for_panel_design
             .flatten()
             .map { file ->
                 def base = file.getBaseName()
-                def batchID = base.replaceFirst(/^merged_dataframe_/, '').replaceFirst(/\.pkl$/, '')
+                def batchID = base.replaceFirst(/^merged_dataframe_/, '').replaceFirst(/(_fx)?.pkl$/, '')
                 tuple(batchID, file)
             }
-        
+
+        // 5. Downstream unchanged
         ADD_EMPTY_MARKER_NOISE(namedBatchtables, CHECK_PANEL_DESIGN.output.paneldesignfile)
-        /*
-         * - Subworkflow to handle all Normalization/Standardization Tasks - 
-         */ 
         normalized_output = normalization_wf(ADD_EMPTY_MARKER_NOISE.output.modbatchtables)
         normalizedDataFrames = normalized_output.normalized
-        
         labledDataFrames = GENERATE_TRAINING_N_HOLDOUT(normalizedDataFrames.map{ it[1] }.collect())
-        
-        /*
-        * - Subworkflow to examine Cell Type Specific interpetability & Feature Selections - 
-        */ 
         feature_selection_results = featureselection_wf(labledDataFrames.training, labledDataFrames.lableFile)
         selectFeatures = feature_selection_results.mas_results
-        
-        /*
-        * - Subworkflow to generate models and then check them against the holdout - 
-        */ 
         modeling_results = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures, labledDataFrames.lableFile)
         bestModel = modeling_results.best_model_results
-        
-        // If large file splitting is enabled, merge back the normalized tables
-        // Group normalizedDataFrames by removing hyphen and last 5 chars from key
         merged_groups = normalizedDataFrames
-        .map { item ->
-            def key = item[0].replaceFirst(/-[^-]{5}$/, '')
-            [key, item[1]]
-        }
-        .groupTuple()  
-
+            .map { item ->
+                def key = item[0].replaceFirst(/-[^-]{5}$/, '')
+                [key, item[1]]
+            }
+            .groupTuple()
         merged_groups.view()
         mergeResult = MERGE_BACK_LARGE_TABLES(merged_groups)
         normalizedDataFrames = mergeResult.merged_tables
-
-        // Run the best model on the full input batches/files 
         prediction_results = PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
-
         prediction_results.predictions
-            .flatMap { batchID, files -> 
+            .flatMap { batchID, files ->
                 def fileList = files instanceof List ? files : [files]
                 fileList.collect { file ->
                     def sampleID = file.getBaseName().split('\\.')[0]
@@ -363,28 +371,20 @@ workflow {
                 }
             }
             .set { prediction_tuples }
-
-
         qc_density = QC_DENSITY(prediction_tuples)
-        // Overwrite predictions with QC-augmented files for downstream steps
         predictions_for_report = qc_density.qc_predictions
-    
-        // Generate a comprehensive HTML report for each prediction file
         CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
-
         aggregated_counts = CLASSIFIED_REPORT_PER_SLIDE.out.classified_counts
             .collectFile(
                 name: 'all_cell_counts.tsv',
-                keepHeader: true, 
+                keepHeader: true,
                 skip: 1
             )
-
-        // Pass all to reporting including summary JSONs
         final_report = GENERATE_FINAL_REPORT(
             CHECK_PANEL_DESIGN.output.input_metrics,
             aggregated_counts,
             normalized_output.report,
-            feature_selection_results.report, 
+            feature_selection_results.report,
             modeling_results.report,
             params.html_template,
             params.letterhead,
@@ -392,5 +392,4 @@ workflow {
         )
         // ZIP_PUBLISHED(final_report.report_done.map {"done"}, file("${params.output_dir}/final_reports"))
     }
-    
 }

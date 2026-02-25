@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # GCP_PATH="gs://<bucket_path>/Mel30/*" # Get from EXPORT environment
-LOCAL_TMP="tmp_gcp_dl"
+LOCAL_TMP="/fslustre/qhs/ext_moore_raymond_mayo_edu/tmp_gcp_d2"
 LOCAL_LOG="/home/ext_moore_raymond_mayo_edu/MyClassyConfigs/mixedLN_fixup.json"
 SCRIPT_PATH="/home/ext_moore_raymond_mayo_edu/ClassyFlow/preprocess/fixup_columns.py"
 

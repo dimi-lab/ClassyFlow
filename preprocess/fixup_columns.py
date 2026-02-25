@@ -24,7 +24,7 @@ marker_map = {'ASMA': 'aSMA',
 }  # Add more as needed
 
 # --- Classification cleaning config ---
-upgradeMacs = True  # Set to False to downgrade M1/M2 to Macrophage
+upgradeMacs = False  # Set to False to downgrade M1/M2 to Macrophage
 
 lookup = {
     "Ignore*": "",
@@ -36,7 +36,9 @@ lookup = {
     "Cytotoxic T Cell": "CytoT",
     "Helper T": "HelperT",
     "Helper T Cell": "HelperT",
+    "Helper T-cell": "HelperT",
     "M1": "M1 Macrophage",
+    "Macrophage": "M1 Macrophage",
     "M1 Macrophages": "M1 Macrophage",
     "M2": "M2 Macrophage",
     "MPO": "Neutro",
@@ -59,7 +61,8 @@ lookup = {
     "CD11c+": "DC",
     "Unclassified Immune":"",  # BE WARE - PROJECT SPECIFIC REMOVAL
     "Monocyte":"",  # BE WARE - PROJECT SPECIFIC REMOVAL
-    "MDSC" : "TAM", # BE WARE - PROJECT SPECIFIC Recodification
+    "TAM" : "M2 Macrophage", # BE WARE - PROJECT SPECIFIC Recodification
+    "MDSC" : "M2 Macrophage", # BE WARE - PROJECT SPECIFIC Recodification
     "NK" : "NK Cell",
     "CD56" : "NK Cell",
     "<TBD>": "",

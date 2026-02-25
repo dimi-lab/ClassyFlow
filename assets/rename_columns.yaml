@@ -1,0 +1,30 @@
+# --- Column cleaning config ---
+remove_columns:
+  - Batch
+  - Histology
+  - DAPI_R01
+  - DAPI_R08
+  - DAPI_R25
+  - DAPI_R27
+rename_columns:
+  OldName1: NewName1
+  # Add more renaming rules as needed
+marker_map:
+  ASMA: aSMA
+  CD11B: CD11b
+  CD11C: CD11c
+  CD3e: CD3
+  DAPI_AF_R01: DAPI
+  TenC: TENASCINC
+  Gal9: GALECTIN9
+  HLAI: HLA_I
+  HLAII: HLA_II
+  NAK: NAKATPASE
+  FOXP3: FoxP3
+  PANCK: PanCK
+  GP100: gp100
+  B2MG: B2M
+  tryptase: Tryptase
+  TRYPTASE: Tryptase
+  GZB: GzB
+  # Add more as needed
