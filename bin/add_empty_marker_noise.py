@@ -52,6 +52,10 @@ def resolve_batch_column(panelDesign, batchID_param):
         logging.debug(f"Using exact batchID column: {batch_col}")
         return batch_col, batch_prefix, batch_suffix
 
+    if '_fx' in batchID_param:
+        batchID_param = batchID_param.replace('(_fx)$', '')
+        logging.debug(f"Removed '_fx' from batchID, new value: {batchID_param}")
+
     # 2. Try to split batchID_param into prefix and suffix
     if '-' in batchID_param:
         batch_prefix = batchID_param.rsplit('-', 1)[0]
@@ -59,6 +63,9 @@ def resolve_batch_column(panelDesign, batchID_param):
     else:
         batch_prefix = batchID_param
         batch_suffix = ''
+
+ 
+
 
     # 3. Find all columns that start with the prefix
     prefix_matches = [col for col in panelDesign.columns if col.startswith(batch_prefix)]

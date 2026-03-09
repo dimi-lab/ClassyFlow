@@ -354,7 +354,7 @@ workflow {
         bestModel = modeling_results.best_model_results
         merged_groups = normalizedDataFrames
             .map { item ->
-                def key = item[0].replaceFirst(/-[^-]{5}$/, '')
+                def key = item[0].replaceFirst(/-[^-]{5}(_fx)?$/, '')
                 [key, item[1]]
             }
             .groupTuple()
