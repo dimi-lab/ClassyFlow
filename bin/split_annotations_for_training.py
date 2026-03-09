@@ -159,11 +159,14 @@ def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegat
     freq_table = freq_table[['Label', 'Label Count', 'Label Percent', 'Training Set Count', 'Holdout Set Count']]
     freq_table.to_csv('cell_count_table.csv', index=False)
 
+<<<<<<< HEAD
     # Create and save per-batch label count crosstab
     per_batch_label_count = pd.crosstab(merged_df[classColumn], merged_df[batchColumn])
     per_batch_label_count.to_csv('per_batch_label_count.csv')
 
 
+=======
+>>>>>>> origin/expansion_add_tabnet_model
     # Save cell types that made it to holdout
     kept_cell_types = merged_df[merged_df['split'] != 'Not Used'][classColumn].unique()
     with open("celltypes.csv", 'w', newline='') as csvfile:
@@ -181,6 +184,7 @@ def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegat
     holdout_df = holdout_df.drop('split', axis=1)
     train_df = train_df.drop('split', axis=1)
     
+<<<<<<< HEAD
     if holdout_df[classColumn].nunique() != train_df[classColumn].nunique():
         print("\n[ERROR] Training and holdout data have different number of classes!!!")
         print(f"Unique classes in training set ({train_df[classColumn].nunique()}): {sorted(train_df[classColumn].unique())}")
@@ -192,6 +196,9 @@ def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegat
         if missing_in_holdout:
             print(f"Classes in train but not in holdout: {sorted(missing_in_holdout)}")
         raise AssertionError("Training and holdout data have different number of classes!!!")
+=======
+    assert holdout_df[classColumn].nunique() == train_df[classColumn].nunique(), "Training and holdout data have different number of classes!!!"
+>>>>>>> origin/expansion_add_tabnet_model
     
     results['total_holdout'] = len(holdout_df)
     results['total_training'] = len(train_df)

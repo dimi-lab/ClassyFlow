@@ -8,9 +8,14 @@ println "Active profile: ${workflow.profile}"
 // Users can override this in their own config or with --input_dirs
 params.output_dir = "${workflow.projectDir}/output"
 //Static Assests for beautification
+<<<<<<< HEAD
 params.letterhead = file("${projectDir}/assets/images/Classyflow_banner_purple.png", checkIfExists: true)
 params.html_template = file("${projectDir}/assets/html_templates", checkIfExists: true)
 params.rename_yaml = file("${projectDir}/assets/rename_columns.yaml", checkIfExists: true)
+=======
+params.letterhead = file("${projectDir}/assets/images/Classyflow_banner_1600_220px.png", checkIfExists: true)
+params.html_template = file("${projectDir}/assets/html_templates", checkIfExists: true)
+>>>>>>> origin/expansion_add_tabnet_model
 params.pipeline_version = "1.0"
 params.reports_dir = "${params.output_dir}/final_reports"
 
@@ -71,6 +76,7 @@ process MERGE_TAB_DELIMITED_FILES {
     """
 }
 
+<<<<<<< HEAD
 process COLUMN_FORMAT_AND_FIX {
     input:
     path tables_pkl
@@ -87,6 +93,8 @@ process COLUMN_FORMAT_AND_FIX {
     """
 }
 
+=======
+>>>>>>> origin/expansion_add_tabnet_model
 /* 
  * For each input pickle file (merged quantification tables), extract all unique marker/channel names
  * (from columns containing 'Mean'), and generate a presence/absence matrix showing which markers
@@ -147,8 +155,13 @@ process ADD_EMPTY_MARKER_NOISE {
  */
 process GENERATE_TRAINING_N_HOLDOUT{
 	publishDir(
+<<<<<<< HEAD
         path: "${params.output_dir}/annotation",
         pattern: "*.csv",
+=======
+        path: "${params.output_dir}/celltype_reports",
+        pattern: "*.pdf",
+>>>>>>> origin/expansion_add_tabnet_model
         mode: "copy"
     )
     
@@ -160,7 +173,10 @@ process GENERATE_TRAINING_N_HOLDOUT{
     path("training_dataframe.pkl"), emit: training
 	path("celltypes.csv"), emit: lableFile
     tuple path("training_split_report.json"), path("cell_count_table.csv"), emit: training_holdout_results
+<<<<<<< HEAD
     path("per_batch_label_count.csv"), emit: per_batch_label_count
+=======
+>>>>>>> origin/expansion_add_tabnet_model
 
     script:
     """
@@ -312,6 +328,7 @@ process ZIP_PUBLISHED {
 // -------------------------------------- //
 
 
+<<<<<<< HEAD
 workflow {
     if ( params.help || !params.input_dirs ) {
         helpMessage()
@@ -364,6 +381,70 @@ workflow {
         prediction_results = PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
         prediction_results.predictions
             .flatMap { batchID, files ->
+=======
+
+workflow {
+    // Show help message if the user specifies the --help flag at runtime
+    // or if any required params are not provided
+    if ( params.help || !params.input_dirs ){
+        // Invoke the function above which prints the help message
+        helpMessage()
+        // Exit out and do not run anything else
+        exit 1
+    } else {
+        // Pull channel object `batchDirs` from nextflow env - see top of file.
+        MERGE_TAB_DELIMITED_FILES(batchDirs)
+        CHECK_PANEL_DESIGN(MERGE_TAB_DELIMITED_FILES.output.batchtables.collect())  
+
+        // Create namedBatchtables channel from batchtables
+        namedBatchtables = MERGE_TAB_DELIMITED_FILES.output.batchtables
+            .flatten()
+            .map { file ->
+                def base = file.getBaseName()
+                def batchID = base.replaceFirst(/^merged_dataframe_/, '').replaceFirst(/\.pkl$/, '')
+                tuple(batchID, file)
+            }
+        
+        ADD_EMPTY_MARKER_NOISE(namedBatchtables, CHECK_PANEL_DESIGN.output.paneldesignfile)
+        /*
+         * - Subworkflow to handle all Normalization/Standardization Tasks - 
+         */ 
+        normalized_output = normalization_wf(ADD_EMPTY_MARKER_NOISE.output.modbatchtables)
+        normalizedDataFrames = normalized_output.normalized
+        
+        labledDataFrames = GENERATE_TRAINING_N_HOLDOUT(normalizedDataFrames.map{ it[1] }.collect())
+        
+        /*
+        * - Subworkflow to examine Cell Type Specific interpetability & Feature Selections - 
+        */ 
+        feature_selection_results = featureselection_wf(labledDataFrames.training, labledDataFrames.lableFile)
+        selectFeatures = feature_selection_results.mas_results
+        
+        /*
+        * - Subworkflow to generate models and then check them against the holdout - 
+        */ 
+        modeling_results = modelling_wf(labledDataFrames.training, labledDataFrames.holdout, selectFeatures, labledDataFrames.lableFile)
+        bestModel = modeling_results.best_model_results
+        
+        // If large file splitting is enabled, merge back the normalized tables
+        // Group normalizedDataFrames by removing hyphen and last 5 chars from key
+        merged_groups = normalizedDataFrames
+        .map { item ->
+            def key = item[0].replaceFirst(/-[^-]{5}$/, '')
+            [key, item[1]]
+        }
+        .groupTuple()  
+
+        // merged_groups.view()
+        mergeResult = MERGE_BACK_LARGE_TABLES(merged_groups)
+        normalizedDataFrames = mergeResult.merged_tables
+
+        // Run the best model on the full input batches/files 
+        prediction_results = PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
+
+        prediction_results.predictions
+            .flatMap { batchID, files -> 
+>>>>>>> origin/expansion_add_tabnet_model
                 def fileList = files instanceof List ? files : [files]
                 fileList.collect { file ->
                     def sampleID = file.getBaseName().split('\\.')[0]
@@ -371,6 +452,7 @@ workflow {
                 }
             }
             .set { prediction_tuples }
+<<<<<<< HEAD
         qc_density = QC_DENSITY(prediction_tuples)
         predictions_for_report = qc_density.qc_predictions
         CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
@@ -380,11 +462,34 @@ workflow {
                 keepHeader: true,
                 skip: 1
             )
+=======
+
+
+        qc_density = QC_DENSITY(prediction_tuples)
+        // Overwrite predictions with QC-augmented files for downstream steps
+        predictions_for_report = qc_density.qc_predictions
+    
+        // Generate a comprehensive HTML report for each prediction file
+        CLASSIFIED_REPORT_PER_SLIDE(predictions_for_report)
+
+        aggregated_counts = CLASSIFIED_REPORT_PER_SLIDE.out.classified_counts
+            .collectFile(
+                name: 'all_cell_counts.tsv',
+                keepHeader: true, 
+                skip: 1
+            )
+
+        // Pass all to reporting including summary JSONs
+>>>>>>> origin/expansion_add_tabnet_model
         final_report = GENERATE_FINAL_REPORT(
             CHECK_PANEL_DESIGN.output.input_metrics,
             aggregated_counts,
             normalized_output.report,
+<<<<<<< HEAD
             feature_selection_results.report,
+=======
+            feature_selection_results.report, 
+>>>>>>> origin/expansion_add_tabnet_model
             modeling_results.report,
             params.html_template,
             params.letterhead,
@@ -392,4 +497,8 @@ workflow {
         )
         // ZIP_PUBLISHED(final_report.report_done.map {"done"}, file("${params.output_dir}/final_reports"))
     }
+<<<<<<< HEAD
+=======
+    
+>>>>>>> origin/expansion_add_tabnet_model
 }
