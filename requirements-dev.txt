@@ -1,0 +1,9 @@
+# Test-only dependencies (production deps are in requirements.txt)
+# pytest is capped <8 because scimap 2.3.5 (in requirements.txt) pins pytest<8.0.0
+pytest>=7.4.3,<8
+# Used by bin/ scripts but not pinned in requirements.txt:
+pyyaml
+joblib
+# xgboost 1.6.2 imports pkg_resources; setuptools is not bundled in py3.12 venvs,
+# and setuptools>=81 removed pkg_resources -> pin below that.
+setuptools<81
