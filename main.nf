@@ -132,7 +132,6 @@ process ADD_EMPTY_MARKER_NOISE {
     """
     add_empty_marker_noise.py \
         --objtype ${params.qupath_object_type} \
-        --bitDepth ${params.bit_depth} \
         --pickleTable ${pickleTable} \
         --batchID ${batchID} \
         --designTable ${designTable} \

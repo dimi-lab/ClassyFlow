@@ -200,7 +200,6 @@ def findMissingFeatures(df, batchID_param, prefix, designFile, objtype):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Add noise columns for missing markers in quantification tables.")
     parser.add_argument('--objtype', required=True, help='QuPath object type (e.g., CellObject)')
-    parser.add_argument('--bitDepth', required=True, help='Bit depth (not used in script, but required for compatibility)')
     parser.add_argument('--pickleTable', required=True, help='Input pickle file with quantification table')
     parser.add_argument('--batchID', required=True, help='Batch ID for output file naming')
     parser.add_argument('--designTable', required=True, help='CSV file with panel design')

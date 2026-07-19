@@ -56,15 +56,10 @@ Note: This pipeline requires exported QuPath (0.5+) measurement tables (quantifi
 | `folder_is_slide`              | `False`                              | If true, assumes folder contains multiple ROIs for a single slide/sample                      |
 | `quant_file_extension`         | `.tsv`                               | File extension for quantification tables                                                      |
 | `quant_file_delimiter`         | `\t`                                 | Delimiter for quantification tables (`\t` for tab, `,` for comma)                             |
-| `bit_depth`                    | `16-bit`                             | Image bit depth: `8-bit` (0-255) or `16-bit` (0-65535)                                        |
 | `qupath_object_type`           | `DetectionObject`                    | QuPath object type: `CellObject` or `DetectionObject`                                         |
-| `nucleus_marker`               | `DAPI_AF_R01`                        | Marker name for nucleus identification                                                        |
-| `plot_fraction`                | `0.25`                               | Fraction of data to use for plotting                                                          |
 | `classifed_column_name`        | `Classification`                     | Column name in quantification tables for cell type labels                                     |
 | `exclude_markers`              | See config                           | Pipe-delimited list of marker names to exclude (regex supported)                              |
-| `housekeeping_marker`          | `S6`                                 | Marker used as a housekeeping control                                                         |
 | `override_normalization`       | `boxcox`                             | Normalization method: `minmax`, `boxcox`, `log`, `quantile`, or `null` for auto              |
-| `downsample_normalization_plots`| `0.5`                               | Fraction of data to use for normalization plots                                               |
 | `quantile_split`               | `1024`                               | Number of quantiles for quantile normalization (good for 16-bit images)                       |
 | `max_xgb_cv`                   | `10`                                 | Maximum number of cross-validation folds for XGBoost                                          |
 | `xgb_depth_start`              | `2`                                  | Starting value for XGBoost tree depth                                                         |
@@ -72,7 +67,6 @@ Note: This pipeline requires exported QuPath (0.5+) measurement tables (quantifi
 | `xgb_depth_step`               | `3`                                  | Step size for XGBoost tree depth                                                              |
 | `xgb_learn_rates`              | `0.1`                                | Learning rates for XGBoost (comma-separated string)                                           |
 | `predict_class_column`         | `CellType`                           | Column name for predicted cell type                                                           |
-| `predict_le_encoder_file`      | `${params.output_dir}/models/classes.npy` | Path to label encoder file for predictions                                              |
 | `predict_columns_to_export`    | `Centroid X µm,Centroid Y µm,Image,CellTypePrediction` | Columns to export in prediction output                                 |
 | `predict_cpu_jobs`             | `16`                                 | Number of CPUs to use for prediction                                                          |
 | `run_get_leiden_clusters`      | `false`                              | Whether to run Leiden clustering for feature engineering                                      |
