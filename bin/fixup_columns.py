@@ -17,6 +17,44 @@ def load_column_map(map_path):
     marker_map = config.get('marker_map', {})
     return remove_columns, rename_columns, marker_map
 
+def dedupe_renamed_columns(df, provenance):
+    """Resolve duplicate column names produced by a rename step.
+
+    ``provenance`` is a list of (original_name, new_name) in column order. When a
+    rename maps an alias onto a name that already exists (e.g. marker_map turns
+    ``DAPI_AF_R01`` into ``DAPI`` while a real ``DAPI`` column is present), the
+    naive rename yields duplicate columns that crash every downstream stage that
+    does ``df[col]`` (it returns a DataFrame, not a Series).
+
+    For each duplicated name we keep a single column, preferring the one that was
+    ALREADY named that (the canonical/original column) and dropping the
+    alias-derived duplicates. Returns (df, dropped) where ``dropped`` lists the
+    "original -> new" renames that were discarded.
+    """
+    names = [new for _, new in provenance]
+    dup_names = {n for n in names if names.count(n) > 1}
+    if not dup_names:
+        return df, []
+
+    keep_positions = []
+    dropped = []
+    for name in dict.fromkeys(names):  # preserve order, unique names
+        positions = [i for i, n in enumerate(names) if n == name]
+        if len(positions) == 1:
+            keep_positions.append(positions[0])
+            continue
+        # Prefer a column that was already canonically named `name`.
+        canonical = [i for i in positions if provenance[i][0] == name]
+        keep = canonical[0] if canonical else positions[0]
+        keep_positions.append(keep)
+        for i in positions:
+            if i != keep:
+                dropped.append(f"{provenance[i][0]} -> {provenance[i][1]}")
+
+    df = df.iloc[:, sorted(keep_positions)]
+    return df, dropped
+
+
 def rename_columns_func(df, rename_columns):
     # Rename whole columns
     return df.rename(columns={k: v for k, v in rename_columns.items() if k in df.columns})
@@ -72,6 +110,13 @@ def main(input_path, map_path):
         if before != after:
             marker_renamed.append(f"{before} -> {after}")
 
+    # A rename (whole-column or marker) can map an alias onto a name that already
+    # exists (e.g. DAPI_AF_R01 -> DAPI when a real DAPI is present), producing
+    # duplicate columns that crash downstream `df[col]` access. Collapse them,
+    # keeping the canonical/original column and dropping the alias duplicate.
+    provenance = list(zip(after_remove_cols, after_marker_cols))
+    df, dropped_duplicates = dedupe_renamed_columns(df, provenance)
+
     # Save back to the same file
     input_path = re.sub(r'\.pkl$', '_fx.pkl', input_path)
     df.to_pickle(input_path)
@@ -91,6 +136,9 @@ def main(input_path, map_path):
         print(f"  Marker renames: {marker_renamed}")
     else:
         print("  No marker columns renamed.")
+    if dropped_duplicates:
+        print(f"  Dropped duplicate columns from rename collisions "
+              f"(kept canonical): {dropped_duplicates}")
 
 
 if __name__ == "__main__":

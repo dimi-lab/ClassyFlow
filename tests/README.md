@@ -36,8 +36,34 @@ container (`container/Dockerfile`). On Python 3.12 the install fails.
 
 - Build with a compatible interpreter: `PY=python3.11 ./tests/run_tests.sh`
 - Or run the suite inside the `classyflow` container.
+- Or use the bundled **pixi** environment (`pixi.toml` at the repo root), which
+  pins Python 3.11 and installs `requirements.txt` + `requirements-dev.txt`:
+
+  ```bash
+  pixi run install-deps   # one-time: pip install the pipeline deps into the env
+  pixi run unit           # fast unit suite
+  pixi run e2e            # end-to-end smoke test (needs nextflow on PATH)
+  ```
 
 The **unit tests** avoid the numba stack (the two `scimap` tests skip
 automatically if `scanpy` is missing), so they can run under a lighter env if
 needed. The **E2E test** requires the full environment and is skipped if
 `nextflow` is not on PATH.
+
+## The E2E micro dataset
+
+The E2E smoke test does **not** run on the full bundled `data/`. It runs on a
+tiny subsample under `tests/e2e/micro_data/` (a few hundred cells across the two
+batches) so the whole Nextflow pipeline finishes in a couple of minutes.
+`conf/test.config` points `input_dirs` at it.
+
+Regenerate it deterministically from `data/` with:
+
+```bash
+pixi run python tests/e2e/make_micro_dataset.py
+```
+
+The generator keeps the original file layout, headers and column order, and
+enough labeled cells per cell type to satisfy the training-split thresholds
+(`minimum_label_count`, holdout fraction). See the script's docstring for the
+sizing rationale.
