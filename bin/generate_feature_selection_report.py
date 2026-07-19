@@ -260,23 +260,6 @@ def generate_section_report(fs_data: Dict[str, Any],
         raise
 
 
-def export_feature_selection_json(fs_data: Dict[str, Any], output_file: Path):
-    """
-    Export feature selection data as JSON for use by other scripts.
-    
-    Args:
-        fs_data: Dictionary containing feature selection data
-        output_file: Path to output JSON file
-    """
-    try:
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_file, 'w') as f:
-            json.dump(fs_data, f, indent=2, default=str)
-        logger.info(f"Feature selection data exported to JSON: {output_file}")
-    except Exception as e:
-        logger.error(f"Error exporting JSON: {e}")
-
-
 def main():
     """Main function to parse arguments and generate feature selection report."""
     parser = argparse.ArgumentParser(
@@ -322,10 +305,7 @@ def main():
     jinja_env = setup_jinja_environment(str(args.template_dir))
     
     generate_section_report(fs_data, args.output_file, jinja_env)
-    
-    # Export JSON if requested
-    # export_feature_selection_json(fs_data, "feature_selection_results.json")
-    
+
     # Print summary
     print("\n" + "="*60)
     print("FEATURE SELECTION REPORT GENERATION COMPLETE")

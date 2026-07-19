@@ -3,22 +3,8 @@
 import argparse
 import csv
 import pandas as pd
-import numpy as np
-from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
+from sklearn.model_selection import StratifiedShuffleSplit
 import pickle
-
-def create_kfold_cv_splits(toTrainDF, classColumn, n_splits=5):
-    #Create and save CV splits once
-    y = toTrainDF[classColumn]
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
-    
-    cv_splits = list(skf.split(toTrainDF, y))
-    
-    # Save to disk
-    with open('cv_splits.pkl', 'wb') as f:
-        pickle.dump(cv_splits, f)
-
-
 
 def create_random_cv_splits(toTrainDF, classColumn, n_splits=5, test_size=0.33, random_state=42):
     y = toTrainDF[classColumn]
@@ -79,7 +65,6 @@ if __name__ == "__main__":
     with open('toTrainDF.pkl', 'wb') as f:
         pickle.dump(focusData, f)
 
-    #create_kfold_cv_splits(focusData, args.classColumn, args.max_cv)
     create_random_cv_splits(focusData, args.classColumn, args.max_cv)
 
     max_cv = args.max_cv

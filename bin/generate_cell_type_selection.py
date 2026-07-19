@@ -32,36 +32,6 @@ from sklearn.feature_selection import RFE, VarianceThreshold
 batchColumn = 'Batch'
 
 ############################ PLOT AND TABLE GENERATION ############################
-def create_binary_count_table(df, output_path):
-    """Create binary count table and save to CSV"""
-    binaryCntTbl = df.groupby([batchColumn, 'Lasso_Binary']).size().reset_index()
-    binaryCntTbl.columns = ['Batch', 'Lasso_Binary', 'Count']
-    binaryCntTbl.to_csv(output_path, index=False)
-    print(f"Binary count table saved: {output_path}")
-    return binaryCntTbl
-
-def plot_best_alpha(scores, scores_std, alphas, best_alpha, n_folds, output_path):
-    """Create best alpha plot and save to file"""
-    plt.figure().set_size_inches(9, 6)
-    plt.semilogx(alphas, scores)
-    std_error = scores_std / np.sqrt(n_folds)
-    plt.semilogx(alphas, scores + std_error, "b--")
-    plt.semilogx(alphas, scores - std_error, "b--")
-    plt.fill_between(alphas, scores + std_error, scores - std_error, alpha=0.2)
-    plt.axvline(best_alpha, linestyle="--", color="green", label="alpha: Best Fit")
-    plt.ylabel("CV score +/- std error")
-    plt.xlabel("alpha")
-    plt.axhline(np.max(scores), linestyle="--", color=".5")
-    plt.xlim([alphas[0], alphas[-1]])
-    plt.title('Alpha Parameter Optimization')
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"Best alpha plot saved: {output_path}")
-
-
 def plot_feature_ranking_with_cutoff(featureRankDF, output_path, cutoff_n, top_n=35, model_name="Lasso"):
     """
     Enhanced feature ranking plot with cutoff line and directionality coloring

@@ -293,22 +293,6 @@ process MERGE_BACK_LARGE_TABLES {
 }
 
 
-process ZIP_PUBLISHED {
-    tag "zipping published dir"
-    publishDir "${params.output_dir}", pattern: "final_reports.zip", mode: 'copy', overwrite: true
-
-    input:
-    val trigger
-    path(final_dir)
-
-    output:
-    path "final_reports.zip"
-
-    script:
-    """
-    zip -r final_reports.zip $final_dir
-    """
-}
 // -------------------------------------- //
 
 
@@ -358,7 +342,6 @@ workflow {
                 [key, item[1]]
             }
             .groupTuple()
-        merged_groups.view()
         mergeResult = MERGE_BACK_LARGE_TABLES(merged_groups)
         normalizedDataFrames = mergeResult.merged_tables
         prediction_results = PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
@@ -390,6 +373,5 @@ workflow {
             params.letterhead,
             params.config_file
         )
-        // ZIP_PUBLISHED(final_report.report_done.map {"done"}, file("${params.output_dir}/final_reports"))
     }
 }

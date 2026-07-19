@@ -10,16 +10,6 @@ import argparse
 import json
 import logging
 
-# Ensure built-ins are available (for environments that restrict them)
-len = __builtins__.len
-open = __builtins__.open
-ValueError = __builtins__.ValueError
-FileNotFoundError = __builtins__.FileNotFoundError
-KeyError = __builtins__.KeyError
-str = __builtins__.str
-list = __builtins__.list
-
-
 # Configure logging
 logging.basicConfig(filename='add_empty_marker_noise.log',level=logging.INFO, format='[%(levelname)s] %(message)s')
 

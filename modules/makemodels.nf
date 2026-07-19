@@ -183,34 +183,6 @@ process SELECT_BEST_MODEL {
     """
 }
 
-process GLMTRANS_MODEL {
-    input:
-    path(trainingDataframe)
-    path(select_features_csv)
-    path(holdoutDataframe)
-    tuple val(mdl_name), path(best_model_info), path(classes_encoded)
-    val(celltype)
-
-    output:
-    path("GLMtrans_model.pkl"), emit: glm_model
-    path("GLMtrans_eval.json"), emit: glm_eval
-    path("*.png"), emit: glm_coeffs
-
-    script:
-    """
-    train_glmtrans.py \
-        --train_data ${trainingDataframe} \
-        --features_csv ${select_features_csv} \
-        --holdout_data ${holdoutDataframe} \
-        --celltype "${celltype}" \
-        --output_model GLMtrans_model.pkl \
-        --output_eval GLMtrans_eval.json \
-        --output_coeffs GLMtrans_coefficients.png \
-        --compare_xgb ${best_model_info} \
-        --output_comparison GLMtrans_vs_xgb_comparison.png
-    """
-}
-
 process GENERATE_MODEL_REPORT {
     publishDir(
         path: "${params.output_dir}/final_reports/plots",
@@ -261,8 +233,7 @@ workflow modelling_wf {
     xgbModels = XGBOOSTING_FINAL_MODEL(xgbconfig.training_df, paramSearch.table)
     
     allModelsTrained = xgbModels.m1.concat(xgbModels.m2).flatten()
-    allModelsTrained.subscribe { println "Model: $it" }
-    
+
     allHoldoutResults = HOLDOUT_XGB_EVALUATION(
         xgbconfig.holdout_df, 
         featuresCSV, 
@@ -272,30 +243,6 @@ workflow modelling_wf {
     
     holdoutEval = MERGE_HOLDOUT_CSV(allHoldoutResults.eval.collect())
     selected = SELECT_BEST_MODEL(holdoutEval.table, xgbModels.m1, xgbModels.m2, xgbModels.classes)
-    
-    // selected.outfile.subscribe { println "Selected outfile: $it" }
-    // xgbModels.classes.subscribe { println "Classes file: $it" }
-
-    // best_model_info = selected.outfile.map { line -> 
-    //     def (name, path) = line.text.split(',')
-    //     tuple(name.trim(), file(path.trim()), xgbModels.classes.value)
-    // }
-
-    // best_model_info.subscribe { println "Best Model: $it" }
-
-    // list_channel = celltypeCsv
-    //     .splitCsv(header: false, sep: ',').flatten()
-
-    // list_channel.subscribe { println "Label: $it" }
-
-
-    // glmtrans_results = GLMTRANS_MODEL(
-    //     trainingPickleTable,
-    //     featuresCSV,
-    //     holdoutPickleTable,
-    //     best_model_info,
-    //     list_channel
-    // )
 
     xgb_results = xgbModels.xgboost_results
         .flatten()

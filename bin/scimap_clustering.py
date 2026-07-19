@@ -171,7 +171,7 @@ def impute_labels(df, adata, label_col, cluster_col, label_fraction):
         n_label = (df[label_col] == label_name).sum()
         n_override = min(len(idx_blank), 3 * n_label)
         if n_override > 0:
-            chosen_idx = np.random.choice(idx_blank, n_override, replace=False)
+            chosen_idx = np.random.RandomState(42).choice(idx_blank, n_override, replace=False)
             for i in chosen_idx:
                 df.at[i, label_col] = label_name
                 override_status[i] = "Yes"
