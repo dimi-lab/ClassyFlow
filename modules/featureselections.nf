@@ -125,6 +125,7 @@ process EXAMINE_CLASS_LABEL{
 	output:
 	path("top_rank_features_*.csv"), emit: feature_list
 	tuple path("feature_selection_*_results.json"), path("feature_selection_*.csv"), path("feature_selection_*.png"), emit: feature_selection_results
+	path("coefficients_*.csv"), emit: coefficients
     
     script:
     """
@@ -173,6 +174,26 @@ process GENERATE_FS_REPORT {
     generate_feature_selection_report.py \
             --output-file feature_selection_report.html \
             --template-dir $html_template
+    """
+}
+
+
+process SCORE_CONCORDANCE {
+    publishDir "${params.output_dir}/final_reports", pattern: "feature_concordance.*", mode: 'copy', overwrite: true
+
+    input:
+    path(coefficient_files)
+    path(card)
+
+    output:
+    tuple path("feature_concordance.csv"), path("feature_concordance.json"), emit: concordance
+
+    script:
+    """
+    score_feature_concordance.py \
+        --card ${card} \
+        --coefficients ${coefficient_files} \
+        --out-prefix feature_concordance
     """
 }
 
@@ -239,6 +260,12 @@ workflow featureselection_wf {
     // Step 11: Run feature selection and generate outputs
     fts = EXAMINE_CLASS_LABEL(labelWithEverything)
     mas = MERGE_AND_SORT_CSV(fts.feature_list.collect())
+
+    // Optional: score feature selection against a PI-owned cell-type card.
+    if (params.celltype_profile_card) {
+        card_ch = Channel.fromPath(params.celltype_profile_card, checkIfExists: true)
+        SCORE_CONCORDANCE(fts.coefficients.collect(), card_ch)
+    }
 
     final_results = fts.feature_selection_results
             .flatten()

@@ -606,7 +606,9 @@ def get_lasso_classification_features(
     dfF = dfF.sort_values(by=['Feature_Importance'], ascending=False)
     dfF['Direction'] = dfF['Coefficient'].apply(lambda x: 'Positive' if x > 0 else 'Negative')
 
-    dfF.to_csv("coefficients.csv", index=False)
+    # Celltype-suffixed so signed coefficients from every class can be gathered
+    # together downstream (e.g. feature-concordance scoring) without collision.
+    dfF.to_csv("coefficients_{}.csv".format(celltype.replace(' ', '_').replace('|', '_').replace('/', '')), index=False)
 
     # Process RFE results
     print("\n=== PROCESSING RFE RESULTS ===")
