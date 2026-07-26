@@ -10,7 +10,7 @@ params.output_dir = "${workflow.projectDir}/output"
 //Static Assests for beautification
 params.letterhead = file("${projectDir}/assets/images/Classyflow_banner_purple.png", checkIfExists: true)
 params.html_template = file("${projectDir}/assets/html_templates", checkIfExists: true)
-params.rename_yaml = file("${projectDir}/assets/rename_columns.yaml", checkIfExists: true)
+params.marker_vocabulary = file("${projectDir}/assets/markers.yaml", checkIfExists: true)
 params.pipeline_version = "1.0"
 params.reports_dir = "${params.output_dir}/final_reports"
 
@@ -74,7 +74,7 @@ process MERGE_TAB_DELIMITED_FILES {
 process COLUMN_FORMAT_AND_FIX {
     input:
     path tables_pkl
-    path rename_yaml
+    path marker_vocabulary
 
     output:
     path("*_fx.pkl"), emit: batchtables
@@ -83,7 +83,7 @@ process COLUMN_FORMAT_AND_FIX {
     """
     fixup_columns.py \
         --input_table ${tables_pkl} \
-        --rename_yaml ${rename_yaml}
+        --marker_vocabulary ${marker_vocabulary}
     """
 }
 
@@ -306,8 +306,8 @@ workflow {
         // 2. Optionally fix columns if enabled
         if (params.batch_correct_column_names) {
             // Pass static asset as path, like params.letterhead
-            rename_yaml_path = file(params.rename_yaml, checkIfExists: true)
-            fixed_pkl_ch = COLUMN_FORMAT_AND_FIX(merged_pkl_ch.flatten(), rename_yaml_path)
+            marker_vocab_path = file(params.marker_vocabulary, checkIfExists: true)
+            fixed_pkl_ch = COLUMN_FORMAT_AND_FIX(merged_pkl_ch.flatten(), marker_vocab_path)
             input_for_panel_design = fixed_pkl_ch
         } else {
             input_for_panel_design = merged_pkl_ch

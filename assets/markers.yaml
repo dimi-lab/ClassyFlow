@@ -1,0 +1,94 @@
+# --- Canonical marker vocabulary ---
+#
+# The project's single canonical marker namespace: every marker in the panel is
+# declared here by its canonical name, with `aliases` listing the raw channel
+# spellings that resolve to it. Batches that spell the same marker differently
+# (e.g. `DAPI_AF_R01` vs `DAPI`) therefore harmonize to one name and align for
+# cross-batch runs.
+#
+# Resolution of a raw column's marker token (the part before the first ':'):
+#   1. exact canonical match -> kept as-is
+#   2. explicit alias match  -> rewritten to the canonical name (suffix preserved)
+#   3. unresolved            -> reported (and, under --strict, fails the run)
+# There is deliberately NO fuzzy/normalized matching: every mapping is explicit.
+# Markers not listed here are reported as unresolved, so a new/misspelled channel
+# is never silently carried through as a mystery feature.
+#
+# A canonical marker that needs no renaming is still listed (with no aliases) so
+# it resolves cleanly. `drop` lists whole columns removed outright at ingest.
+#
+# NOTE: markers matched by `exclude_markers` (nextflow.config) are dropped at
+# ingest before this stage, so they need no entry here.
+
+markers:
+  # --- markers with raw-name aliases to harmonize ---
+  aSMA:
+    aliases: [ASMA]
+  CD11b:
+    aliases: [CD11B]
+  CD11c:
+    aliases: [CD11C]
+  CD3:
+    aliases: [CD3e]
+  DAPI:
+    aliases: [DAPI_AF_R01]
+  TENASCINC:
+    aliases: [TenC]
+  GALECTIN9:
+    aliases: [Gal9]
+  HLA_I:
+    aliases: [HLAI]
+  HLA_II:
+    aliases: [HLAII]
+  NAKATPASE:
+    aliases: [NAK]
+  FoxP3:
+    aliases: [FOXP3]
+  PanCK:
+    aliases: [PANCK]
+  gp100:
+    aliases: [GP100]
+  B2M:
+    aliases: [B2MG]
+  Tryptase:
+    aliases: [tryptase, TRYPTASE]
+  GzB:
+    aliases: [GZB]
+
+  # --- canonical panel markers that need no renaming ---
+  CD4:
+  CD8:
+  CD14:
+  CD15:
+  CD19:
+  CD20:
+  CD21:
+  CD34:
+  CD38:
+  CD45:
+  CD56:
+  CD57:
+  CD68:
+  CD107a:
+  CD163:
+  CD206:
+  Casp3:
+  "Collagen IV":
+  FAP:
+  IDO:
+  MPO:
+  PAX8:
+  PD1:
+  PDL1:
+  S6:
+  TCF7:
+  TGFB:
+  Vimentin:
+
+drop:
+  - Batch
+  - Histology
+  - DAPI_R01
+  - DAPI_R08
+  - DAPI_R25
+  - DAPI_R27

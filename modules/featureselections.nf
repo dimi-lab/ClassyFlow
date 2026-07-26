@@ -183,7 +183,7 @@ process SCORE_CONCORDANCE {
 
     input:
     path(coefficient_files)
-    path(card)
+    path(profile)
 
     output:
     tuple path("feature_concordance.csv"), path("feature_concordance.json"), emit: concordance
@@ -191,7 +191,7 @@ process SCORE_CONCORDANCE {
     script:
     """
     score_feature_concordance.py \
-        --card ${card} \
+        --profile ${profile} \
         --coefficients ${coefficient_files} \
         --out-prefix feature_concordance
     """
@@ -261,10 +261,10 @@ workflow featureselection_wf {
     fts = EXAMINE_CLASS_LABEL(labelWithEverything)
     mas = MERGE_AND_SORT_CSV(fts.feature_list.collect())
 
-    // Optional: score feature selection against a PI-owned cell-type card.
-    if (params.celltype_profile_card) {
-        card_ch = Channel.fromPath(params.celltype_profile_card, checkIfExists: true)
-        SCORE_CONCORDANCE(fts.coefficients.collect(), card_ch)
+    // Optional: score feature selection against a PI-owned cell-type profile.
+    if (params.celltype_profile) {
+        profile_ch = Channel.fromPath(params.celltype_profile, checkIfExists: true)
+        SCORE_CONCORDANCE(fts.coefficients.collect(), profile_ch)
     }
 
     final_results = fts.feature_selection_results

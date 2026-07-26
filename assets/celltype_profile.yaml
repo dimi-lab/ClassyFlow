@@ -1,0 +1,26 @@
+# --- Cell-type marker profile ---
+#
+# Expected marker signature per cell type, authored in CANONICAL marker names
+# (the names defined in assets/markers.yaml). Because ClassyFlow's feature columns
+# are harmonized to those same canonical names, concordance scoring
+# (bin/score_feature_concordance.py) joins canonical-to-canonical with no silent
+# marker drop.
+#
+# Fields per entry:
+#   name    - cell-type label.
+#   parent  - optional; the parent cell-type `name`, forming the hierarchy used to
+#             report how a best match relates to the class's own node
+#             (self / ancestor / descendant / sibling / unrelated).
+#   markers - map of {canonical_marker: state}, state in {positive, negative}.
+#
+# This is a template/example; edit it to your panel and lineage.
+
+cell_types:
+  - name: T cell
+    markers: { CD3: positive }
+  - name: Helper T
+    parent: T cell
+    markers: { CD3: positive, CD4: positive, CD8: negative }
+  - name: Cytotoxic T
+    parent: T cell
+    markers: { CD3: positive, CD8: positive, CD4: negative }
