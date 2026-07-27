@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdn.plot.ly/plotly-2.29.1.min.js"></script> 
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClassyFlow Light Report</title>
+    <style>
+        /* ==========================================================================
+           1. Reset & Base
+           ========================================================================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            font-size: 17px;
+            color: #333;
+            background-color: #f5f6f8;
+            min-width: 1024px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ==========================================================================
+           2. Layout
+           ========================================================================== */
+        .main-content {
+            flex: 1;
+            width: 90%;
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 1.5rem 0 2rem;
+        }
+
+        .page-section {
+            background: white;
+            border-radius: 6px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            border: 1px solid #e5e7eb;
+        }
+
+        /* ==========================================================================
+           3. Header
+           ========================================================================== */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .header-content {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 400;
+            margin-bottom: 0.25rem;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .header .report-subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        .letterhead-banner {
+            width: 100%;
+            background: white;
+            text-align: center;
+        }
+
+        .letterhead-banner img {
+            width: 100%;
+            height: auto;
+            display: block;
+            max-height: 220px;
+            object-fit: contain;
+        }
+
+        /* ==========================================================================
+           4. Navigation
+           ========================================================================== */
+        .nav {
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        }
+
+        .nav ul {
+            list-style: none;
+            display: flex;
+            justify-content: center;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .nav a {
+            display: block;
+            padding: 1rem 1.5rem;
+            text-decoration: none;
+            color: #6b7280;
+            font-weight: 500;
+            font-size: 1.1rem;
+            transition: all 0.2s ease;
+            border-top: 3px solid transparent;
+            border-bottom: 3px solid transparent;
+        }
+
+        .nav a:hover {
+            color: #667eea;
+            background-color: #f9fafb;
+        }
+
+        .nav a.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            background-color: #f9fafb;
+            font-weight: 600;
+        }
+
+        /* ==========================================================================
+           5. Typography
+           ========================================================================== */
+        h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #374151;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        h4, h5 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #4b5563;
+            margin: 1.25rem 0 0.5rem;
+        }
+
+        p {
+            color: #6b7280;
+            margin-bottom: 0.75rem;
+        }
+
+        .text-muted {
+            color: #9ca3af;
+            font-style: italic;
+        }
+
+        .text-danger {
+            color: #dc3545 !important;
+        }
+
+        /* ==========================================================================
+           6. Metrics Grid
+           ========================================================================== */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .metric-card {
+            background: #f9fafb;
+            padding: 1rem 1.25rem;
+            border-radius: 6px;
+            border-left: 3px solid #667eea;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .metric-card.success { border-left-color: #10b981; }
+        .metric-card.warning { border-left-color: #f59e0b; }
+        .metric-card.info { border-left-color: #3b82f6; }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #667eea;
+            line-height: 1.2;
+        }
+
+        .metric-card.success .metric-value { color: #10b981; }
+        .metric-card.warning .metric-value { color: #f59e0b; }
+        .metric-card.info .metric-value { color: #3b82f6; }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+            font-weight: 600;
+            margin-top: 0.25rem;
+        }
+
+        .metric-description {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+
+        /* Secondary metrics (inline, de-emphasized) */
+        .secondary-metrics {
+            display: flex;
+            gap: 2rem;
+            margin: 1rem 0 1.5rem;
+            padding: 0.75rem 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .secondary-metric {
+            color: #6c757d;
+        }
+
+        .secondary-label {
+            font-weight: 500;
+        }
+
+        .secondary-value {
+            margin-left: 0.25rem;
+        }
+
+        /* ==========================================================================
+           7. Tables
+           ========================================================================== */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            margin: 1rem 0;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .table-container.narrow { max-width: 600px; }
+        .table-container.medium { max-width: 900px; }
+        .table-container.small { max-width: 450px; }
+        .table-container.centered { margin-left: auto; margin-right: auto; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            font-size: 0.875rem;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+            position: sticky;
+            top: 0;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        tbody tr:hover {
+            background-color: #f3f4f6;
+        }
+
+        tr[onclick] {
+            cursor: pointer;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .table-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            padding: 0.5rem 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            width: 250px;
+            transition: border-color 0.2s;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+
+        .table-info {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        /* Table cell helpers */
+        .cell-count { font-weight: 600; color: #10b981; }
+        .roi-name { font-weight: 600; color: #374151; }
+        .batch-name { font-weight: 500; color: #374151; }
+        .percentage { font-weight: 500; color: #3b82f6; }
+        .primary-class { font-weight: 600; color: #374151; }
+        .secondary-class { color: #6b7280; }
+        .deemphasized-col { color: #6c757d; font-size: 0.9em; }
+
+        .class-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.125rem;
+        }
+
+        /* Status indicators */
+        .status-cell { text-align: center; }
+        .status-icon { font-size: 1.2rem; cursor: help; }
+        .status-good { color: #10b981; }
+        .status-danger { color: #dc3545; }
+
+        /* Gating color indicators */
+        .gated-good { color: #10b981; font-weight: 500; }
+        .gated-warning { color: #f59e0b; font-weight: 500; }
+        .gated-danger { color: #dc3545; font-weight: 500; }
+
+        /* Table links */
+        .table-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .table-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Flagged filter checkbox */
+        .flagged-filter {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: #4b5563;
+            cursor: pointer;
+        }
+
+        .flagged-filter input {
+            cursor: pointer;
+        }
+
+        /* ==========================================================================
+           8. Plots & Visualizations
+           ========================================================================== */
+        .plot-container {
+            margin: 1rem 0;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+            overflow: hidden;
+        }
+
+        .plot-container .plot-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #374151;
+            padding: 0.75rem 1rem;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .plot-container img {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .plot-container .plot-caption {
+            font-size: 0.8rem;
+            color: #6b7280;
+            padding: 0.5rem 1rem;
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        /* Plotly specific */
+        .plotly-wrapper {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            max-height: 80vh;
+            margin: 0 auto;
+        }
+
+        /* Square plots (confusion matrix, heatmaps) */
+        .plotly-wrapper.square {
+            aspect-ratio: 1 / 1;
+        }
+
+        /* Wide plots (ROC curves, line charts) */
+        .plotly-wrapper.wide {
+            aspect-ratio: 16 / 9;
+        }
+
+        .plotly-wrapper > div {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .plotly-wrapper .plotly-graph-div {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Forest plots grid layout */
+        .forest-plots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        /* ==========================================================================
+           9. Badges & Alerts
+           ========================================================================== */
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-info { background: #dbeafe; color: #1e40af; }
+
+        .alert {
+            padding: 1rem 1.25rem;
+            margin: 1rem 0;
+            border-radius: 6px;
+            border-left: 3px solid;
+            font-size: 0.875rem;
+        }
+
+        .alert-info {
+            background: #eff6ff;
+            border-color: #3b82f6;
+            color: #1e40af;
+        }
+
+        .alert-success {
+            background: #ecfdf5;
+            border-color: #10b981;
+            color: #065f46;
+        }
+
+        .alert-warning {
+            background: #fffbeb;
+            border-color: #f59e0b;
+            color: #92400e;
+        }
+
+        /* ==========================================================================
+           10. Buttons & Links
+           ========================================================================== */
+        .btn {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-decoration: none;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .view-plots-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.4rem 0.75rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .view-plots-btn:hover {
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+        }
+
+        /* ==========================================================================
+           11. Tabs (Batch/CellType/Model)
+           ========================================================================== */
+        .tab-navigation {
+            display: flex;
+            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 1.5rem;
+            overflow-x: auto;
+            gap: 2px;
+        }
+
+        .tab-btn {
+            padding: 0.6rem 1.25rem;
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-bottom: none;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+            border-radius: 6px 6px 0 0;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .tab-btn:hover {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: #667eea;
+            font-weight: 600;
+            border-bottom: 2px solid white;
+            margin-bottom: -2px;
+        }
+
+        .tab-btn.warning-tab {
+            border-left-color: #f59e0b;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+            animation: fadeIn 0.2s ease;
+        }
+
+        /* Main nav tabs */
+        .tab-content {
+            display: none;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* ==========================================================================
+           12. Feature List
+           ========================================================================== */
+        .feature-list {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 1rem 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .feature-list-header {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #374151;
+            font-size: 0.875rem;
+        }
+
+        .feature-item {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+        }
+
+        .feature-item:last-child {
+            border-bottom: none;
+        }
+
+        .feature-name { color: #374151; }
+        .feature-score { color: #667eea; font-weight: 600; }
+
+        /* ==========================================================================
+           13. Inline Tables Layout
+           ========================================================================== */
+        .tables-row {
+            display: flex;
+            gap: 1rem;
+            margin: 1rem 0;
+            flex-wrap: wrap;
+        }
+
+        .tables-row .table-container {
+            flex: 1;
+            min-width: 280px;
+            margin: 0;
+        }
+
+        /* ==========================================================================
+           14. Collapsible Sections
+           ========================================================================== */
+        .collapsible-section {
+            margin: 1.5rem 0;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+        }
+
+        .collapsible-section summary {
+            padding: 1rem;
+            background: #f9fafb;
+            cursor: pointer;
+            font-weight: 500;
+            color: #4b5563;
+            border-radius: 6px;
+            list-style: none;
+        }
+
+        .collapsible-section summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .collapsible-section summary::before {
+            content: "▶ ";
+            font-size: 0.75rem;
+            margin-right: 0.5rem;
+        }
+
+        .collapsible-section[open] summary::before {
+            content: "▼ ";
+        }
+
+        .collapsible-section summary:hover {
+            background: #f3f4f6;
+        }
+
+        .collapsible-section[open] summary {
+            border-radius: 6px 6px 0 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .collapsible-section > div {
+            padding: 1rem;
+        }
+
+        /* Table legend (special collapsible for column descriptions) */
+        .table-legend {
+            background: #f9fafb;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            border: 1px solid #e5e7eb;
+        }
+
+        .table-legend summary {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            font-weight: 500;
+            color: #4b5563;
+            font-size: 0.9rem;
+            list-style: none;
+        }
+
+        .table-legend summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .table-legend summary::before {
+            content: "▶ ";
+            font-size: 0.7rem;
+            margin-right: 0.5rem;
+        }
+
+        .table-legend[open] summary::before {
+            content: "▼ ";
+        }
+
+        .table-legend summary:hover {
+            background: #f3f4f6;
+        }
+
+        .table-legend[open] summary {
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .table-legend ul {
+            margin: 0;
+            padding: 1rem 1rem 1rem 2.5rem;
+            font-size: 0.85rem;
+            color: #4b5563;
+        }
+
+        .table-legend li {
+            margin-bottom: 0.25rem;
+        }
+
+        /* ==========================================================================
+           15. Pagination
+           ========================================================================== */
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            padding: 1rem 0;
+        }
+
+        .pagination-controls button {
+            padding: 0.5rem 1rem;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .pagination-controls button:hover:not(:disabled) {
+            background: #f9fafb;
+            border-color: #667eea;
+        }
+
+        .pagination-controls button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination-controls span {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        /* Hidden row for pagination/filtering */
+        .hidden-row {
+            display: none !important;
+        }
+
+        /* ==========================================================================
+           16. Footer
+           ========================================================================== */
+        .footer {
+            background: #1f2937;
+            color: white;
+            text-align: center;
+            padding: 1.25rem;
+            margin-top: auto;
+        }
+
+        .footer p {
+            color: #9ca3af;
+            margin: 0 0 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .footer-links a {
+            color: #9ca3af;
+            text-decoration: none;
+            font-size: 0.8rem;
+            padding: 0.3rem 0.75rem;
+            border: 1px solid #4b5563;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: white;
+            border-color: #667eea;
+            background: #667eea;
+        }
+
+        /* ==========================================================================
+           17. Print Styles
+           ========================================================================== */
+        @media print {
+            .nav, .footer, .tab-navigation, .search-box, .view-plots-btn,
+            .pagination-controls, .flagged-filter, .table-legend {
+                display: none !important;
+            }
+
+            body {
+                min-width: auto;
+                background: white;
+            }
+
+            .main-content {
+                width: 100%;
+                max-width: none;
+            }
+
+            .page-section {
+                box-shadow: none;
+                border: 1px solid #ccc;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            .metrics-grid {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            .plot-container {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            .tab-content,
+            .tab-panel {
+                display: block !important;
+            }
+
+            .collapsible-section[open] > div,
+            .collapsible-section > div {
+                display: block !important;
+            }
+        }
+
+        /* ==========================================================================
+           18. Row Highlighting
+           ========================================================================== */
+        .row-excluded { background-color: #fef2f2 !important; }
+        .row-warning { background-color: #fffbeb !important; }
+
+        /* ==========================================================================
+           19. Score Colors (AUC/AP values)
+           ========================================================================== */
+        .score-excellent { color: #10b981; font-weight: 600; }
+        .score-good { color: #3b82f6; font-weight: 600; }
+        .score-moderate { color: #f59e0b; font-weight: 600; }
+        .score-poor { color: #ef4444; font-weight: 600; }
+
+        /* ==========================================================================
+           20. Synthetic Data Percentage Colors
+           ========================================================================== */
+        .synthetic-none { color: #10b981; font-weight: 600; }
+        .synthetic-low { color: #f59e0b; font-weight: 600; }
+        .synthetic-high { color: #b45309; font-weight: 600; }
+
+        /* ==========================================================================
+           21. Warning Icon
+           ========================================================================== */
+        .warning-icon { color: #f59e0b; }
+
+        /* ==========================================================================
+           22. Flex Plot Layout
+           ========================================================================== */
+        .plot-flex-half { flex: 1; min-width: 400px; }
+        .plot-flex-half.wide { min-width: 500px; }
+
+        /* ==========================================================================
+           23. Utility Classes
+           ========================================================================== */
+        .mt-0 { margin-top: 0; }
+        .mb-0 { margin-bottom: 0; }
+        .mt-1 { margin-top: 1rem; }
+        .mb-1 { margin-bottom: 1rem; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .flex { display: flex; }
+        .flex-wrap { flex-wrap: wrap; }
+        .gap-1 { gap: 1rem; }
+        .items-center { align-items: center; }
+    </style>
+</head>
+<body>
+
+    {% if letterhead %}
+    <div class="letterhead-banner">
+        <img src="{{ letterhead }}" alt="Organization Letterhead" />
+    </div>
+    {% else %}
+    <header class="header">
+        <div class="header-content">
+            <h1>ClassyFlow Light Report</h1>
+            <p class="report-subtitle">Condensed Cell Type Classification Summary</p>
+        </div>
+    </header>
+    {% endif %}
+
+    <nav class="nav">
+        <ul>
+            <li><a href="#light-summary">Input Data</a></li>
+            <li><a href="#light-features">Feature Selection</a></li>
+            <li><a href="#light-modeling">Model Performance</a></li>
+            <li><a href="#light-predictions">Predictions</a></li>
+        </ul>
+    </nav>
+
+    <div class="main-content">
+        {% include '_light_summary.html' %}
+        {% include '_light_features.html' %}
+        {% include '_light_modeling.html' %}
+        {% include '_light_predictions.html' %}
+
+        <section class="page-section" id="light-provenance">
+            <h2>Provenance</h2>
+            <p>Run parameters and pipeline settings used to produce this report.</p>
+            <div class="table-container medium">
+                <table>
+                    <tbody>
+                        <tr><th>Pipeline Version</th><td>{{ provenance.pipeline_version }}</td></tr>
+                        <tr><th>Report Generated</th><td>{{ provenance.run_date }}</td></tr>
+                        <tr>
+                            <th>Input Directories</th>
+                            <td>
+                                {% if provenance.input_dirs %}
+                                {% for d in provenance.input_dirs %}<div>{{ d }}</div>{% endfor %}
+                                {% else %}<span class="text-muted">N/A</span>{% endif %}
+                            </td>
+                        </tr>
+                        <tr><th>Normalization</th><td>{{ provenance.normalization }}</td></tr>
+                        <tr><th>Holdout Fraction</th><td>{{ provenance.holdout_fraction }}</td></tr>
+                        <tr><th>Minimum Label Count</th><td>{{ provenance.minimum_label_count }}</td></tr>
+                        <tr>
+                            <th>Excluded Markers</th>
+                            <td>
+                                {% if provenance.exclude_markers %}
+                                {% for m in provenance.exclude_markers %}<span class="badge badge-info" style="margin:0 0.2rem 0.2rem 0;">{{ m }}</span>{% endfor %}
+                                {% else %}<span class="text-muted">None</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% if provenance.config_link %}
+                        <tr><th>Configuration</th><td><a class="table-link" href="pages/{{ provenance.config_link }}" target="_blank">{{ provenance.config_link }}</a></td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <footer class="footer">
+        <p>Generated {{ generation_date }} | Pipeline Version {{ pipeline_version if pipeline_version else 'Unknown' }}</p>
+        <div class="footer-links">
+            <a href="pages/nextflow.config" target="_blank">View Pipeline Configuration</a>
+        </div>
+    </footer>
+
+    <script>
+    // Resize Plotly charts after page loads (single scrolling page — all visible).
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            document.querySelectorAll('.plotly-graph-div').forEach(plot => {
+                Plotly.Plots.resize(plot);
+            });
+        }, 100);
+    });
+    </script>
+</body>
+</html>

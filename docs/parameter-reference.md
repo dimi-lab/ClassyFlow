@@ -9,6 +9,7 @@ Complete configuration guide for ClassyFlow parameters.
 | `help` | `false` | Display help message and exit |
 | `input_dir` | `["./data/TMA1990", "./data/TMAS1_4xB2"]` | A list of paths to batch directories, comma separated |
 | `output_dir` | `"./output"` | Output directory for all results |
+| `report_mode` | `"both"` | Which final report(s) to produce: `"full"` (5-tab report), `"light"` (condensed single-page PI-facing summary), or `"both"` |
 
 ## Input Data Configuration
 | Parameter | Default | Description |

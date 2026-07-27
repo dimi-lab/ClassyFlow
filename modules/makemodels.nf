@@ -258,4 +258,6 @@ workflow modelling_wf {
     best_model_results = selected.best_model
     report = model_report.model_html
     model_summary = model_report.model_summary
+    // holdoutEval_*_results.json + confusion/ROC/PR div HTMLs for the light report.
+    holdout_evals = holdout_evals
 }

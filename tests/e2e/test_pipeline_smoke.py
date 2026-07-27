@@ -52,8 +52,9 @@ def test_pipeline_runs_end_to_end(tmp_path):
         assert matches, f"expected a non-empty file matching '{pattern}' under {output_dir}"
         return matches
 
-    _nonempty("classyflow_report.html")     # final assembled report
-    _nonempty("celltypes.csv")              # train/holdout label list
+    _nonempty("classyflow_report.html")       # final assembled (full) report
+    _nonempty("classyflow_report_light.html")  # condensed PI-facing light report
+    _nonempty("celltypes.csv")                # train/holdout label list
     _nonempty("classes.npy")                # trained label encoder
     _nonempty("*.pkl")                      # a serialized model / dataframe
     _nonempty("*_qPRED.tsv")                # per-slide QC'd predictions

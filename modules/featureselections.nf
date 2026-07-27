@@ -262,9 +262,13 @@ workflow featureselection_wf {
     mas = MERGE_AND_SORT_CSV(fts.feature_list.collect())
 
     // Optional: score feature selection against a PI-owned cell-type profile.
+    // When no profile is configured, emit an empty channel so downstream
+    // (e.g. the light report) can stay guarded without failing.
     if (params.celltype_profile) {
         profile_ch = Channel.fromPath(params.celltype_profile, checkIfExists: true)
-        SCORE_CONCORDANCE(fts.coefficients.collect(), profile_ch)
+        concordance_ch = SCORE_CONCORDANCE(fts.coefficients.collect(), profile_ch).concordance
+    } else {
+        concordance_ch = Channel.empty()
     }
 
     final_results = fts.feature_selection_results
@@ -280,4 +284,8 @@ workflow featureselection_wf {
     emit:
     mas_results = mas
     report = fs_report.fs_html
+    // feature_selection_*_results.json artifacts for the light report assembler.
+    fs_results = final_results
+    // feature_concordance.{csv,json}; empty when celltype_profile is unset.
+    concordance = concordance_ch
 }
