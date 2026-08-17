@@ -174,24 +174,62 @@ def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegat
     # Split data
     holdout_df = merged_df[merged_df['split'] == 'holdout'].copy()
     train_df = merged_df[merged_df['split'] == 'train'].copy()
+
+    # Only classes meeting the minimum threshold are expected in both sets.
+    eligible_classes = set(merged_df[merged_df['split'] != 'Not Used'][classColumn].unique())
+
+    train_classes = set(train_df[classColumn].unique())
+    holdout_classes = set(holdout_df[classColumn].unique())
+    missing_in_train = sorted(eligible_classes - train_classes)
+    missing_in_holdout = sorted(eligible_classes - holdout_classes)
+
+    if missing_in_train or missing_in_holdout:
+        print("\n[WARN] Repairing split to ensure all eligible classes appear in both training and holdout sets")
+        if missing_in_train:
+            print(f"Classes missing in train before repair: {missing_in_train}")
+        if missing_in_holdout:
+            print(f"Classes missing in holdout before repair: {missing_in_holdout}")
+
+    # Move one deterministic sample per missing class from train -> holdout.
+    for cls in missing_in_holdout:
+        candidates = train_df[train_df[classColumn] == cls]
+        if len(candidates) == 0:
+            continue
+        move_idx = candidates.sample(n=1, random_state=42).index
+        holdout_df = pd.concat([holdout_df, train_df.loc[move_idx]], axis=0)
+        train_df = train_df.drop(index=move_idx)
+
+    # Move one deterministic sample per missing class from holdout -> train.
+    for cls in missing_in_train:
+        candidates = holdout_df[holdout_df[classColumn] == cls]
+        if len(candidates) == 0:
+            continue
+        move_idx = candidates.sample(n=1, random_state=42).index
+        train_df = pd.concat([train_df, holdout_df.loc[move_idx]], axis=0)
+        holdout_df = holdout_df.drop(index=move_idx)
+
+    # Validate class coverage after repair.
+    train_classes = set(train_df[classColumn].unique())
+    holdout_classes = set(holdout_df[classColumn].unique())
+    if train_classes != eligible_classes or holdout_classes != eligible_classes:
+        print("\n[ERROR] Unable to reconcile class coverage between training and holdout sets")
+        print(f"Eligible classes ({len(eligible_classes)}): {sorted(eligible_classes)}")
+        print(f"Unique classes in training set ({len(train_classes)}): {sorted(train_classes)}")
+        print(f"Unique classes in holdout set ({len(holdout_classes)}): {sorted(holdout_classes)}")
+        missing_in_train = sorted(eligible_classes - train_classes)
+        missing_in_holdout = sorted(eligible_classes - holdout_classes)
+        if missing_in_train:
+            print(f"Classes missing in train: {missing_in_train}")
+        if missing_in_holdout:
+            print(f"Classes missing in holdout: {missing_in_holdout}")
+        raise AssertionError("Unable to ensure class coverage in both training and holdout sets")
+
     del merged_df
     gc.collect()
 
     # Remove split column before saving
     holdout_df = holdout_df.drop('split', axis=1)
     train_df = train_df.drop('split', axis=1)
-    
-    if holdout_df[classColumn].nunique() != train_df[classColumn].nunique():
-        print("\n[ERROR] Training and holdout data have different number of classes!!!")
-        print(f"Unique classes in training set ({train_df[classColumn].nunique()}): {sorted(train_df[classColumn].unique())}")
-        print(f"Unique classes in holdout set ({holdout_df[classColumn].nunique()}): {sorted(holdout_df[classColumn].unique())}")
-        missing_in_train = set(holdout_df[classColumn].unique()) - set(train_df[classColumn].unique())
-        missing_in_holdout = set(train_df[classColumn].unique()) - set(holdout_df[classColumn].unique())
-        if missing_in_train:
-            print(f"Classes in holdout but not in train: {sorted(missing_in_train)}")
-        if missing_in_holdout:
-            print(f"Classes in train but not in holdout: {sorted(missing_in_holdout)}")
-        raise AssertionError("Training and holdout data have different number of classes!!!")
     
     results['total_holdout'] = len(holdout_df)
     results['total_training'] = len(train_df)

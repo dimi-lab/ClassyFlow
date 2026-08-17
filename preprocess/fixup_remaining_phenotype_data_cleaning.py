@@ -12,6 +12,11 @@ def remove_dash_suffix(val):
 
 lookup = {
     "Ignore*": "",
+
+    "Hepatocytes": "HepMal Joint Cells",
+    "Malignant cells": "HepMal Joint Cells",
+    "CD68 Macrophages": "Macrophages",
+
     "Melanocytes": "Tumor",
     "B cell": "B Cell",
     "Bcell": "B Cell",
@@ -19,8 +24,10 @@ lookup = {
     "CTL": "CytoT",
     "Helper T": "HelperT",
     "M1": "M1 Macrophage",
+    "CD68+": "M1 Macrophage",
     "M2": "M2 Macrophage",
     "MPO": "Neutro",
+    "MPO+": "Neutro",
     "Neuto": "Neutro",
     "Neutro": "Neutro",
     "Stroma": "Epithelial",
@@ -29,6 +36,9 @@ lookup = {
     "TumGas": "Tumor",
     "Vascul": "Endothelial",
     "Endo": "Endothelial",
+    "Dendritic Cell": "DC",
+    "CD11c@": "",
+    "CD11c+": "DC",
     "<TBD>": "",
     "B2M": "",
     "GZB": "",
@@ -39,6 +49,7 @@ lookup = {
     "NKG2D": "",
     "NKGD2": "",
     "Gal3": "",
+    "Gal-3": "",
     "Gal9": "",
     "GzB": "",
     "HER2": "",
@@ -48,13 +59,12 @@ lookup = {
     "LAG3": "",
     "LAG3+": "",    
     "FAP=": "",
-    "PD1": "",
+    "PDL1": "",
     "PDL1": "",
     "Survivin": "",
     "TIGIT": "",
     "TIM3": "",
     "CTLA4": "",
-    "CTLA4+": "",
     "EGFR": "",
     "CD013A": "",
     "CD103A": "",
@@ -64,17 +74,7 @@ lookup = {
     "HLAI": "",
     "CD141": "",
     "CD103a": "",
-    "SURVIVIN+": "",
-    "NKG2D+": "",
-    "CD28+": "",
-    "PD1+": "",
-    "EGFR+": "",
-    "B2M+": "",
-    "Tim3": "",
-    "Her2+": "",
-    "Gal9+": "",
-    "Gal3+": "",
-    "ILT4+": ""
+    "Tim3": ""
 }
 
 def main(tsv_path):
@@ -104,6 +104,9 @@ def main(tsv_path):
             else:
                 not_found.add(p)
                 new_parts.append(p)
+
+        # After lookup remapping, remove values that end with '+', '-', or '@'.
+        new_parts = [p for p in new_parts if not re.search(r'[+\-@]$', p)]
         return '|'.join(new_parts)
 
     df["Classification"] = df["Classification"].apply(remap)

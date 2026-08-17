@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# GCP_PATH="gs://<bucket_path>/Mel30/*" # Get from EXPORT environment
+export GCP_PATH="gs://ml-phi-staff-m088378-p-rsa-us-central1-p-6a4f/Tassos_NRP2_validate/ClassyINPUT/*" # Get from EXPORT environment
 LOCAL_TMP="/fslustre/qhs/ext_moore_raymond_mayo_edu/tmp_gcp_d2"
-LOCAL_LOG="/home/ext_moore_raymond_mayo_edu/MyClassyConfigs/mixedLN_fixup.json"
+LOCAL_LOG="/home/ext_moore_raymond_mayo_edu/MyClassyConfigs/z02_fixup.json"
 SCRIPT_PATH="/home/ext_moore_raymond_mayo_edu/ClassyFlow/preprocess/fixup_columns.py"
 
 mkdir -p "$LOCAL_TMP"
@@ -56,3 +56,4 @@ gsutil ls "$GCP_PATH" | while read -r gcp_file; do
 done
 
 rmdir "$LOCAL_TMP"
+echo -e "\n\n"

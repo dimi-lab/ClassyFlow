@@ -93,19 +93,26 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
             except Exception as e:
                 print(f"[WARNING] Could not reorder columns in '{file}': {e}")
         if slide_by_prefix:
-            df['Slide'] = df['Image'].str.split('_').str[0]
+            slide_series = df['Image'].str.split('_').str[0]
         elif folder_is_slide:
-            df['Slide'] = directory_path
+            slide_series = pd.Series(directory_path, index=df.index)
         else:
-            df['Slide'] = file
+            slide_series = pd.Series(file, index=df.index)
 
+        # Build all new/modified columns at once via pd.concat to avoid
+        # repeated frame.insert calls that cause DataFrame fragmentation.
         if folder_is_slide:
-            df['Image'] = directory_path+'-'+df['Image']
-<<<<<<< HEAD
-        df = df.copy()
-
-=======
->>>>>>> origin/expansion_add_tabnet_model
+            image_series = directory_path + '-' + df['Image']
+            df = pd.concat(
+                [df.drop(columns=['Image']),
+                 pd.DataFrame({'Image': image_series, 'Slide': slide_series}, index=df.index)],
+                axis=1
+            )
+        else:
+            df = pd.concat(
+                [df, pd.DataFrame({'Slide': slide_series}, index=df.index)],
+                axis=1
+            )
         dataframes.append(df)
 
     # Concatenate all DataFrames
@@ -188,18 +195,12 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
                 print(f"[ERROR] File '{fname}' has different columns than '{ref_file}'.")
                 print(f"  Missing = {missing}  & Extra = {extra}")
                 if missing:
-<<<<<<< HEAD
                     if len(missing) > 5:
                         print(f" '{fname}' Missing columns (showing first 5 of {len(missing)}): {missing[:5]}")
                     else:
                         print(f" '{fname}' Missing columns: {missing}")
                 if extra:
                     print(f" '{fname}' Extra columns: {extra}")
-=======
-                    print(f"  Missing columns: {missing}")
-                if extra:
-                    print(f"  Extra columns: {extra}")
->>>>>>> origin/expansion_add_tabnet_model
     if mismatch:
         sys.exit("[ERROR] Not all files have identical columns. Please fix the input files.")
 

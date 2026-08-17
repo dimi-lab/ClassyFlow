@@ -5,7 +5,17 @@ import os
 import json
 
 # --- Column cleaning config ---
-remove_columns = ['Batch', 'Histology', 'DAPI_R01', 'DAPI_AF_R01', 'DAPI_R08','DAPI_R25', 'DAPI_R27', 'DAPI_AF_R13']
+# remove_columns = ['Batch', 'Histology', 'DAPI_R01', 'DAPI_AF_R01', 'DAPI_R08','DAPI_R25', 'DAPI_R27', 'DAPI_AF_R13']
+remove_columns = ['Distance to annotation with Macrophage µm', 'Distance to annotation with Hepatocyte µm', 
+    'Distance to annotation with Cholangiocytes µm', 'Distance to annotation with CD4 T Cell µm',
+    'Distance to annotation with B Cell µm', 'Distance to annotation with Hepatic Stellate Cell µm', 
+    'Distance to annotation with LSEC Endothelial µm' ,'Distance to annotation with Other µm', 
+    'Distance to annotation with CD8 T Cell µm',
+    'Distance to detection B Cell µm', 'Distance to detection CD4 T Cell µm', 'Distance to detection CD8 T Cell µm', 
+    'Distance to detection Cholangiocytes µm', 'Distance to detection Hepatic Stellate Cell µm', 
+    'Distance to detection Hepatocyte µm', 'Distance to detection LSEC Endothelial µm', 
+    'Distance to detection Macrophage µm', 'Distance to detection Other µm']
+
 rename_columns = {
     'OldName1': 'NewName1'
     # Add more renaming rules as needed
@@ -24,22 +34,27 @@ marker_map = {'ASMA': 'aSMA',
 }  # Add more as needed
 
 # --- Classification cleaning config ---
-upgradeMacs = False  # Set to False to downgrade M1/M2 to Macrophage
+upgradeMacs = True  # Set to False to downgrade M1/M2 to Macrophage
 
 lookup = {
     "Ignore*": "",
     "Melanocytes": "Tumor",
     "Tumor Cell": "Tumor",
+    "NRP2+TumC": "Tumor",
+    "NRP+TumC": "Tumor",
     "Bcell": "B Cell",
     "CLT": "CytoT",
     "CTL": "CytoT",
     "Cytotoxic T Cell": "CytoT",
     "Helper T": "HelperT",
+    "Thelper": "HelperT",
     "Helper T Cell": "HelperT",
+    "Helper T-cell": "HelperT",
     "Helper T-cell": "HelperT",
     "M1": "M1 Macrophage",
     "Macrophage": "M1 Macrophage",
     "M1 Macrophages": "M1 Macrophage",
+    "CD68+": "M1 Macrophage",
     "M2": "M2 Macrophage",
     "MPO": "Neutro",
     "Neuto": "Neutro",
@@ -59,14 +74,19 @@ lookup = {
     "Dendritic Cell": "DC",
     "CD11c@": "",
     "CD11c+": "DC",
-    "Unclassified Immune":"",  # BE WARE - PROJECT SPECIFIC REMOVAL
-    "Monocyte":"",  # BE WARE - PROJECT SPECIFIC REMOVAL
+    "Monocyte":"Non-classical monocytes",  
+    "Int-M":"Non-classical monocytes",  
+    "NCM":"Non-classical monocytes",  
+    "CM":"Classical Monocytes",  
     "TAM" : "M2 Macrophage", # BE WARE - PROJECT SPECIFIC Recodification
     "MDSC" : "M2 Macrophage", # BE WARE - PROJECT SPECIFIC Recodification
     "NK" : "NK Cell",
     "CD56" : "NK Cell",
     "<TBD>": "",
     "B2M": "",
+    "NRP2+": "",
+    "NRP+": "",
+    "NRP": "",
     "GZB": "",
     "CD28": "",
     "FAP": "",
@@ -78,12 +98,14 @@ lookup = {
     "GzB": "",
     "HER2": "",
     "HLA1": "",
+    "HLAI": "",
     "HLA2": "",
+    "HLAII": "",
     "ILT4": "",
     "LAG3": "",
     "LAG3+": "",    
     "FAP=": "",
-    "PD1": "",
+    "PDL1": "",
     "PDL1": "",
     "Survivin": "",
     "TIGIT": "",
@@ -102,7 +124,7 @@ lookup = {
     "SURVIVIN+": "",
     "NKG2D+": "",
     "CD28+": "",
-    "PD1+": "",
+    "PDL1+": "",
     "EGFR+": "",
     "B2M+": "",
     "Tim3": "",

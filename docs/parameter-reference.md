@@ -32,7 +32,7 @@ Complete configuration guide for ClassyFlow parameters.
 ### Excluded Markers (Default)
 ```
 Arg1, BAD, B2M, CCAM5, CCR8, CD209, CTLA4, GATA3, Gal3, Gal9, GzB, 
-Her2, ILT4, Ki67, PD1, PDL1, T-BET, TIGIT, TCF7, iNOS, CD103a, LAG3, 
+Her2, ILT4, Ki67, PDL1, PDL1, T-BET, TIGIT, TCF7, iNOS, CD103a, LAG3, 
 HLAI, DAPI_R28, NKG7, TIM3, TenC, IDO
 ```
 
