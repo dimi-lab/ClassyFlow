@@ -10,16 +10,6 @@ import argparse
 import json
 import logging
 
-# Ensure built-ins are available (for environments that restrict them)
-len = __builtins__.len
-open = __builtins__.open
-ValueError = __builtins__.ValueError
-FileNotFoundError = __builtins__.FileNotFoundError
-KeyError = __builtins__.KeyError
-str = __builtins__.str
-list = __builtins__.list
-
-
 # Configure logging
 logging.basicConfig(filename='add_empty_marker_noise.log',level=logging.INFO, format='[%(levelname)s] %(message)s')
 
@@ -210,7 +200,6 @@ def findMissingFeatures(df, batchID_param, prefix, designFile, objtype):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Add noise columns for missing markers in quantification tables.")
     parser.add_argument('--objtype', required=True, help='QuPath object type (e.g., CellObject)')
-    parser.add_argument('--bitDepth', required=True, help='Bit depth (not used in script, but required for compatibility)')
     parser.add_argument('--pickleTable', required=True, help='Input pickle file with quantification table')
     parser.add_argument('--batchID', required=True, help='Batch ID for output file naming')
     parser.add_argument('--designTable', required=True, help='CSV file with panel design')

@@ -1,0 +1,129 @@
+<section class="page-section" id="light-features">
+    <h2>Feature Selection</h2>
+
+    <p>
+        Markers selected to distinguish each cell type. Fewer, more informative markers improve prediction reliability.
+    </p>
+
+    {% if feature_selection.summary %}
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-value">{{ feature_selection.summary.total_celltypes }}</div>
+            <div class="metric-label">Cell Types</div>
+        </div>
+        <div class="metric-card info">
+            <div class="metric-value">{{ feature_selection.summary.unique_original_features }}</div>
+            <div class="metric-label">Total Features</div>
+        </div>
+        <div class="metric-card success">
+            <div class="metric-value">{{ feature_selection.summary.unique_selected_features }}</div>
+            <div class="metric-label">Selected Features</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ feature_selection.summary.avg_reduction_rate }}%</div>
+            <div class="metric-label">Avg Reduction</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ feature_selection.summary.cv_folds_summary }}</div>
+            <div class="metric-label">CV Folds</div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if feature_selection.results %}
+    <h3>Selected Features by Cell Type</h3>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Cell Type</th>
+                    <th>Selected</th>
+                    <th>Reduction</th>
+                    <th>Features</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in feature_selection.results %}
+                <tr {% if r.rfe_warning %}class="row-warning"{% endif %}>
+                    <td>
+                        <strong>{{ r.celltype }}</strong>
+                        {% if r.rfe_warning %}<span class="warning-icon" title="Selected features below the 2% threshold — risk of overfitting."> &#9888;</span>{% endif %}
+                    </td>
+                    <td class="cell-count">{{ r.optimal_n_features }}</td>
+                    <td class="percentage">{{ "%.1f"|format(r.reduction_percentage) if r.reduction_percentage is not none else "N/A" }}%</td>
+                    <td class="deemphasized-col">
+                        {{ r.selected_features | join(', ') if r.selected_features else '—' }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</section>
+
+<section class="page-section" id="light-concordance">
+    <h2>Marker Concordance</h2>
+    <p>
+        Agreement between data-driven feature selection and the PI-provided marker definitions.
+    </p>
+
+    {% if concordance.available and concordance.rows %}
+    <details class="table-legend">
+        <summary>Relation legend</summary>
+        <ul>
+            <li><span class="badge badge-success">self</span> — best match is the class's own definition.</li>
+            <li><span class="badge badge-info">ancestor / descendant</span> — best match is a related node in the hierarchy.</li>
+            <li><span class="badge badge-warning">sibling</span> — best match shares a parent with the class.</li>
+            <li><span class="badge badge-danger">unrelated</span> — best match is not related to the class definition.</li>
+        </ul>
+    </details>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>CF Class</th>
+                    <th>Self Definition</th>
+                    <th>Self Score</th>
+                    <th>Best Match</th>
+                    <th>Best Score</th>
+                    <th>Relation</th>
+                    <th>Shared</th>
+                    <th>Conflicting</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in concordance.rows %}
+                <tr>
+                    <td><strong>{{ row.cf_class }}</strong></td>
+                    <td>{{ row.self_cell_type if row.self_cell_type else '—' }}</td>
+                    <td>{{ row.self_score if row.self_score not in (None, '') else '—' }}</td>
+                    <td>{{ row.best_match if row.best_match else '—' }}</td>
+                    <td>{{ row.best_score if row.best_score not in (None, '') else '—' }}</td>
+                    <td>
+                        <span class="badge
+                            {% if row.relation == 'self' %}badge-success
+                            {% elif row.relation in ['ancestor', 'descendant'] %}badge-info
+                            {% elif row.relation == 'sibling' %}badge-warning
+                            {% elif row.relation in ['unrelated', 'no_match', 'no_self_def'] %}badge-danger
+                            {% else %}badge-info{% endif %}">
+                            {{ row.relation if row.relation else 'n/a' }}
+                        </span>
+                    </td>
+                    <td class="cell-count">{{ row.shared_markers }}</td>
+                    <td class="deemphasized-col">
+                        {{ row.conflicting_markers | join(', ') if row.conflicting_markers else '—' }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        Concordance scoring was not run. Set <code>celltype_profile</code> in <code>nextflow.config</code>
+        (with <code>batch_correct_column_names = true</code>) to score feature selection against your marker definitions.
+    </div>
+    {% endif %}
+</section>

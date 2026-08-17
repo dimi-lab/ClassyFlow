@@ -41,18 +41,6 @@ def validate_originalBatchID(input_files):
     
     print(f"All files have passed batchID validation and are ok to merge!")
 
-def write_header(input_file, output_file):
-    with open(input_file, 'r') as fin, open(output_file, 'w') as fout:
-        header = fin.readline()
-        fout.write(header)
-
-def append_file(input_file, output_file):
-    with open(input_file, 'r') as fin, open(output_file, 'a') as fout:
-        # Skip header
-        next(fin)
-        for line in fin:
-            fout.write(line)
-
 def main():
     args = parse_args()
     input_files = args.input_files

@@ -10,7 +10,11 @@ params.output_dir = "${workflow.projectDir}/output"
 //Static Assests for beautification
 params.letterhead = file("${projectDir}/assets/images/Classyflow_banner_purple.png", checkIfExists: true)
 params.html_template = file("${projectDir}/assets/html_templates", checkIfExists: true)
+<<<<<<< HEAD
 params.rename_yaml = file("${projectDir}/assets/rename_columns.yaml", checkIfExists: true)
+=======
+params.marker_vocabulary = file("${projectDir}/assets/markers.yaml", checkIfExists: true)
+>>>>>>> origin/dev_manuscript_freeze
 params.pipeline_version = "1.0"
 params.reports_dir = "${params.output_dir}/final_reports"
 
@@ -74,7 +78,7 @@ process MERGE_TAB_DELIMITED_FILES {
 process COLUMN_FORMAT_AND_FIX {
     input:
     path tables_pkl
-    path rename_yaml
+    path marker_vocabulary
 
     output:
     path("*_fx.pkl"), emit: batchtables
@@ -83,7 +87,7 @@ process COLUMN_FORMAT_AND_FIX {
     """
     fixup_columns.py \
         --input_table ${tables_pkl} \
-        --rename_yaml ${rename_yaml}
+        --marker_vocabulary ${marker_vocabulary}
     """
 }
 
@@ -132,7 +136,6 @@ process ADD_EMPTY_MARKER_NOISE {
     """
     add_empty_marker_noise.py \
         --objtype ${params.qupath_object_type} \
-        --bitDepth ${params.bit_depth} \
         --pickleTable ${pickleTable} \
         --batchID ${batchID} \
         --designTable ${designTable} \
@@ -276,6 +279,52 @@ process GENERATE_FINAL_REPORT {
 }
 
 
+process GENERATE_LIGHT_REPORT {
+    publishDir "${params.output_dir}/final_reports", pattern: "*.html", mode: 'copy', overwrite: true
+
+    input:
+    path(input_metrics_json)
+    path(holdout_eval_files)   // holdoutEval_*_results.json + confusion/ROC/PR div HTMLs
+    path(fs_files)             // feature_selection_*_results.json
+    path(concordance_files)    // feature_concordance.{csv,json}; optional (may be empty)
+    path(aggregated_counts)
+    path(template_dir)
+    path(letterhead_file)
+    path(nf_config, stageAs: "nextflow.config")
+
+    output:
+    path("classyflow_report_light.html"), emit: report_done
+
+    script:
+    """
+    mkdir -p plots
+    concordance_flag=""
+    if [ -f feature_concordance.csv ]; then
+        concordance_flag="--concordance-csv feature_concordance.csv"
+    fi
+
+    generate_light_report.py \
+        --input-metrics ${input_metrics_json} \
+        --holdout-eval-dir . \
+        --fs-dir . \
+        \$concordance_flag \
+        --counts-tsv ${aggregated_counts} \
+        --plots-dir plots \
+        --template-dir ${template_dir} \
+        --report-name classyflow_report_light.html \
+        --letterhead ${letterhead_file} \
+        --version ${params.pipeline_version} \
+        --input-dirs "${params.input_dirs.join(',')}" \
+        --normalization "${params.override_normalization ?: ''}" \
+        --holdout-fraction ${params.holdout_fraction} \
+        --min-label-count ${params.minimum_label_count} \
+        --exclude-markers "${params.exclude_markers}" \
+        --config-file nextflow.config
+    """
+
+}
+
+
 process MERGE_BACK_LARGE_TABLES {
     tag { mergedID }
     input:
@@ -293,22 +342,6 @@ process MERGE_BACK_LARGE_TABLES {
 }
 
 
-process ZIP_PUBLISHED {
-    tag "zipping published dir"
-    publishDir "${params.output_dir}", pattern: "final_reports.zip", mode: 'copy', overwrite: true
-
-    input:
-    val trigger
-    path(final_dir)
-
-    output:
-    path "final_reports.zip"
-
-    script:
-    """
-    zip -r final_reports.zip $final_dir
-    """
-}
 // -------------------------------------- //
 
 
@@ -323,8 +356,8 @@ workflow {
         // 2. Optionally fix columns if enabled
         if (params.batch_correct_column_names) {
             // Pass static asset as path, like params.letterhead
-            rename_yaml_path = file(params.rename_yaml, checkIfExists: true)
-            fixed_pkl_ch = COLUMN_FORMAT_AND_FIX(merged_pkl_ch.flatten(), rename_yaml_path)
+            marker_vocab_path = file(params.marker_vocabulary, checkIfExists: true)
+            fixed_pkl_ch = COLUMN_FORMAT_AND_FIX(merged_pkl_ch.flatten(), marker_vocab_path)
             input_for_panel_design = fixed_pkl_ch
         } else {
             input_for_panel_design = merged_pkl_ch
@@ -358,7 +391,6 @@ workflow {
                 [key, item[1]]
             }
             .groupTuple()
-        merged_groups.view()
         mergeResult = MERGE_BACK_LARGE_TABLES(merged_groups)
         normalizedDataFrames = mergeResult.merged_tables
         prediction_results = PREDICT_ALL_CELLS_XGB(bestModel, normalizedDataFrames)
@@ -380,16 +412,34 @@ workflow {
                 keepHeader: true,
                 skip: 1
             )
-        final_report = GENERATE_FINAL_REPORT(
-            CHECK_PANEL_DESIGN.output.input_metrics,
-            aggregated_counts,
-            normalized_output.report,
-            feature_selection_results.report,
-            modeling_results.report,
-            params.html_template,
-            params.letterhead,
-            params.config_file
-        )
-        // ZIP_PUBLISHED(final_report.report_done.map {"done"}, file("${params.output_dir}/final_reports"))
+        // Select which final report(s) to build. Nothing is removed from the
+        // existing output; the light report is an additional condensed summary.
+        def report_mode = params.report_mode ?: 'both'
+
+        if (report_mode in ['full', 'both']) {
+            GENERATE_FINAL_REPORT(
+                CHECK_PANEL_DESIGN.output.input_metrics,
+                aggregated_counts,
+                normalized_output.report,
+                feature_selection_results.report,
+                modeling_results.report,
+                params.html_template,
+                params.letterhead,
+                params.config_file
+            )
+        }
+
+        if (report_mode in ['light', 'both']) {
+            GENERATE_LIGHT_REPORT(
+                CHECK_PANEL_DESIGN.output.input_metrics,
+                modeling_results.holdout_evals,
+                feature_selection_results.fs_results,
+                feature_selection_results.concordance.ifEmpty { [] },
+                aggregated_counts,
+                params.html_template,
+                params.letterhead,
+                params.config_file
+            )
+        }
     }
 }

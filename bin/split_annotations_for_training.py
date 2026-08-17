@@ -231,6 +231,18 @@ def gather_annotations(pickle_files, classColumn, holdoutFraction, cellTypeNegat
     holdout_df = holdout_df.drop('split', axis=1)
     train_df = train_df.drop('split', axis=1)
     
+    if holdout_df[classColumn].nunique() != train_df[classColumn].nunique():
+        print("\n[ERROR] Training and holdout data have different number of classes!!!")
+        print(f"Unique classes in training set ({train_df[classColumn].nunique()}): {sorted(train_df[classColumn].unique())}")
+        print(f"Unique classes in holdout set ({holdout_df[classColumn].nunique()}): {sorted(holdout_df[classColumn].unique())}")
+        missing_in_train = set(holdout_df[classColumn].unique()) - set(train_df[classColumn].unique())
+        missing_in_holdout = set(train_df[classColumn].unique()) - set(holdout_df[classColumn].unique())
+        if missing_in_train:
+            print(f"Classes in holdout but not in train: {sorted(missing_in_train)}")
+        if missing_in_holdout:
+            print(f"Classes in train but not in holdout: {sorted(missing_in_holdout)}")
+        raise AssertionError("Training and holdout data have different number of classes!!!")
+    
     results['total_holdout'] = len(holdout_df)
     results['total_training'] = len(train_df)
     

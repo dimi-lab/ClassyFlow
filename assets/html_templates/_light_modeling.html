@@ -1,0 +1,110 @@
+<section class="page-section" id="light-modeling">
+    <h2>Model Performance</h2>
+
+    {% if model_performance %}
+    <p>
+        Performance of the best trained classifier on held-out test data. Higher accuracy and AUC indicate better predictions.
+    </p>
+
+    <div class="metrics-grid">
+        <div class="metric-card success">
+            <div class="metric-value">{{ (model_performance.accuracy * 100) | round(1) if model_performance.accuracy is not none else "N/A" }}%</div>
+            <div class="metric-label">Accuracy</div>
+        </div>
+        <div class="metric-card info">
+            <div class="metric-value">{{ (model_performance.f1_score * 100) | round(1) if model_performance.f1_score is not none else "N/A" }}%</div>
+            <div class="metric-label">F1 Score</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ model_performance.n_classes | default("N/A") }}</div>
+            <div class="metric-label">Training Classes</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ model_performance.total_samples | number_format }}</div>
+            <div class="metric-label">Test Samples</div>
+        </div>
+        <div class="metric-card success">
+            <div class="metric-value">{{ model_performance.best_performing_class | default("N/A") }}</div>
+            <div class="metric-label">Best Class</div>
+        </div>
+        <div class="metric-card warning">
+            <div class="metric-value">{{ model_performance.worst_performing_class | default("N/A") }}</div>
+            <div class="metric-label">Worst Class</div>
+        </div>
+    </div>
+
+    {% if model_performance.class_imbalance_detected %}
+    <div class="alert alert-warning">
+        <strong>Class imbalance detected.</strong> F1 and per-class metrics are more reliable than overall accuracy.
+    </div>
+    {% endif %}
+
+    {% if model_performance.class_rows %}
+    <h3>Per-Class Performance</h3>
+    <p>Breakdown by cell type, sorted by AUC (best first). Rare cell types may score lower due to limited examples.</p>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Cell Type</th>
+                    <th>Samples</th>
+                    <th>%</th>
+                    <th>AUC</th>
+                    <th>AP</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in model_performance.class_rows %}
+                <tr>
+                    <td><strong>{{ c.name }}</strong></td>
+                    <td>{{ c.count | number_format }}</td>
+                    <td>{{ "%.1f"|format(c.percentage) }}%</td>
+                    <td>
+                        {% if c.auc is not none %}
+                        <span class="{{ c.auc_class }}">{{ "%.3f"|format(c.auc) }}</span>
+                        {% else %}<span class="text-muted">N/A</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if c.ap is not none %}{{ "%.3f"|format(c.ap) }}{% else %}<span class="text-muted">N/A</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if model_performance.confusion_html %}
+    <div class="plot-container">
+        <div class="plot-title">Confusion Matrix</div>
+        <div class="plotly-wrapper square">
+            {{ model_performance.confusion_html | safe }}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap gap-1">
+        {% if model_performance.roc_curves_html %}
+        <div class="plot-container plot-flex-half wide">
+            <div class="plot-title">ROC Curves</div>
+            <div class="plotly-wrapper wide">
+                {{ model_performance.roc_curves_html | safe }}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if model_performance.pr_curves_html %}
+        <div class="plot-container plot-flex-half wide">
+            <div class="plot-title">Precision-Recall Curves</div>
+            <div class="plotly-wrapper wide">
+                {{ model_performance.pr_curves_html | safe }}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="alert alert-warning">
+        <strong>No model evaluation data available.</strong>
+    </div>
+    {% endif %}
+</section>

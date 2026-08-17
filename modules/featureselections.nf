@@ -125,6 +125,7 @@ process EXAMINE_CLASS_LABEL{
 	output:
 	path("top_rank_features_*.csv"), emit: feature_list
 	tuple path("feature_selection_*_results.json"), path("feature_selection_*.csv"), path("feature_selection_*.png"), emit: feature_selection_results
+	path("coefficients_*.csv"), emit: coefficients
     
     script:
     """
@@ -173,6 +174,26 @@ process GENERATE_FS_REPORT {
     generate_feature_selection_report.py \
             --output-file feature_selection_report.html \
             --template-dir $html_template
+    """
+}
+
+
+process SCORE_CONCORDANCE {
+    publishDir "${params.output_dir}/final_reports", pattern: "feature_concordance.*", mode: 'copy', overwrite: true
+
+    input:
+    path(coefficient_files)
+    path(profile)
+
+    output:
+    tuple path("feature_concordance.csv"), path("feature_concordance.json"), emit: concordance
+
+    script:
+    """
+    score_feature_concordance.py \
+        --profile ${profile} \
+        --coefficients ${coefficient_files} \
+        --out-prefix feature_concordance
     """
 }
 
@@ -240,6 +261,16 @@ workflow featureselection_wf {
     fts = EXAMINE_CLASS_LABEL(labelWithEverything)
     mas = MERGE_AND_SORT_CSV(fts.feature_list.collect())
 
+    // Optional: score feature selection against a PI-owned cell-type profile.
+    // When no profile is configured, emit an empty channel so downstream
+    // (e.g. the light report) can stay guarded without failing.
+    if (params.celltype_profile) {
+        profile_ch = Channel.fromPath(params.celltype_profile, checkIfExists: true)
+        concordance_ch = SCORE_CONCORDANCE(fts.coefficients.collect(), profile_ch).concordance
+    } else {
+        concordance_ch = Channel.empty()
+    }
+
     final_results = fts.feature_selection_results
             .flatten()
             .collect()
@@ -253,4 +284,8 @@ workflow featureselection_wf {
     emit:
     mas_results = mas
     report = fs_report.fs_html
+    // feature_selection_*_results.json artifacts for the light report assembler.
+    fs_results = final_results
+    // feature_concordance.{csv,json}; empty when celltype_profile is unset.
+    concordance = concordance_ch
 }

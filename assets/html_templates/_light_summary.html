@@ -1,0 +1,75 @@
+<section class="page-section" id="light-summary">
+    <h2>Input Data Summary</h2>
+
+    <p>
+        Overview of the data used for training, including the number of batches, ROIs, and cells analyzed.
+    </p>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-value">{{ input_metrics.total_batches | default("--") | number_format }}</div>
+            <div class="metric-label">Batches</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ input_metrics.total_rois | default("--") | number_format }}</div>
+            <div class="metric-label">ROIs</div>
+        </div>
+        <div class="metric-card info">
+            <div class="metric-value">{{ input_metrics.total_cells | default("--") | number_format }}</div>
+            <div class="metric-label">Total Cells</div>
+        </div>
+        <div class="metric-card success">
+            <div class="metric-value">{{ input_metrics.total_labeled_cells | default("--") | number_format }}</div>
+            <div class="metric-label">Labeled Cells</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ input_metrics.num_unique_labels | default("--") | number_format }}</div>
+            <div class="metric-label">Unique Labels</div>
+        </div>
+    </div>
+
+    {% if input_metrics.any_synthetic_warnings %}
+    <div class="alert alert-warning">
+        <strong>Warning:</strong> One or more batches have &gt;25% synthetic data. This may impact model reliability for those batches.
+    </div>
+    {% endif %}
+
+    {% if input_metrics.label_table %}
+    <h3>Label Distribution</h3>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    {% for header in input_metrics.label_table.headers %}
+                    <th>{{ header }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in input_metrics.label_table.rows %}
+                <tr {% if row["Status"] == "Excluded" %}class="row-excluded"{% endif %}>
+                    <td><strong>{{ row["Label"] }}</strong></td>
+                    <td>{{ "{:,}".format(row["Label Count"]) }}</td>
+                    <td>{{ "%.2f"|format(row["Label Percent"]) }}%</td>
+                    <td>
+                        <span class="badge
+                            {% if row["Class Balance"] == "Severely Underrepresented" %}badge-danger
+                            {% elif row["Class Balance"] == "Underrepresented" %}badge-warning
+                            {% elif row["Class Balance"] == "Dominant" %}badge-info
+                            {% else %}badge-success{% endif %}">
+                            {{ row["Class Balance"] }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge {% if row["Status"] == "Excluded" %}badge-danger{% else %}badge-success{% endif %}">
+                            {{ row["Status"] }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</section>

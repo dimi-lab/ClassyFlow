@@ -26,13 +26,13 @@ def split_and_binarize(df, celltype, classColumn, varThreshold, mim_class_label_
         if totCls < subSet_n:
             df1 = df[df["Lasso_Binary"] == 1]
         else:
-            df1 = df[df["Lasso_Binary"] == 1].sample(n=subSet_n)
+            df1 = df[df["Lasso_Binary"] == 1].sample(n=subSet_n, random_state=42)
 
         negN = totRow - totCls
         if negN < subSet_n:
             df2 = df[df["Lasso_Binary"] == 0]
         else:
-            df2 = df[df["Lasso_Binary"] == 0].sample(n=subSet_n)
+            df2 = df[df["Lasso_Binary"] == 0].sample(n=subSet_n, random_state=42)
 
         df = pd.concat([df1, df2])
 

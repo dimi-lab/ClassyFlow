@@ -9,6 +9,7 @@ Complete configuration guide for ClassyFlow parameters.
 | `help` | `false` | Display help message and exit |
 | `input_dir` | `["./data/TMA1990", "./data/TMAS1_4xB2"]` | A list of paths to batch directories, comma separated |
 | `output_dir` | `"./output"` | Output directory for all results |
+| `report_mode` | `"both"` | Which final report(s) to produce: `"full"` (5-tab report), `"light"` (condensed single-page PI-facing summary), or `"both"` |
 
 ## Input Data Configuration
 | Parameter | Default | Description |
@@ -17,17 +18,13 @@ Complete configuration guide for ClassyFlow parameters.
 | `folder_is_slide` | `"False"` | Folder represents single slide with multiple ROIs |
 | `quant_file_extension` | `".tsv"` | File extension for quantification files |
 | `quant_file_delimiter` | `"\\t"` | Column delimiter (tab or comma) |
-| `bit_depth` | `"16-bit"` | Original Image Capture quality: 8-bit (0-255) or 16-bit (0-65,535) |
 | `qupath_object_type` | `"DetectionObject"` | QuPath object type: "CellObject" (4 components) or "DetectionObject" (single cell/nucleus) |
 
 ## Marker and Feature Settings
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `nucleus_marker` | `"DAPI"` | Nuclear marker for normalization reference |
-| `housekeeping_marker` | `"S6"` | Housekeeping gene marker |
 | `classifed_column_name` | `"Classification"` | Column name containing cell type annotations |
 | `exclude_markers` | `"Arg1\|BAD\|B2M\|..."` | Pipe-delimited markers to exclude (regex pattern) |
-| `plot_fraction` | `0.25` | Fraction of data used for quality control plots |
 
 ### Excluded Markers (Default)
 ```
@@ -42,7 +39,6 @@ HLAI, DAPI_R28, NKG7, TIM3, TenC, IDO
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `override_normalization` | `"boxcox"` | Normalization method for downstream analysis |
-| `downsample_normalization_plots` | `0.5` | Fraction of data used for normalization plots |
 | `quantile_split` | `1024` | Number of quantiles for QuantileTransformer (good for 16-bit, but not for 8-bit/DualBand/Hyperion) |
 
 ### Available Normalization Methods
@@ -78,7 +74,6 @@ HLAI, DAPI_R28, NKG7, TIM3, TenC, IDO
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `predict_class_column` | `'CellType'` | Column name for predictions |
-| `predict_le_encoder_file` | `"{output_dir}/models/classes.npy"` | Path to label encoder |
 | `predict_columns_to_export` | `'Centroid X µm,Centroid Y µm,Image,CellTypePrediction'` | Columns in output files |
 | `predict_cpu_jobs` | `16` | CPU cores for prediction |
 
