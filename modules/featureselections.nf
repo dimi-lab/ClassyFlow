@@ -125,6 +125,8 @@ process EXAMINE_CLASS_LABEL{
 	output:
 	path("top_rank_features_*.csv"), emit: feature_list
 	tuple path("feature_selection_*_results.json"), path("feature_selection_*.csv"), path("feature_selection_*.png"), emit: feature_selection_results
+	// Signed per-feature coefficients, kept as a user-facing audit trail. No
+	// process consumes these; downstream reads marker_importance from the JSON.
 	path("coefficients_*.csv"), emit: coefficients
     
     script:
@@ -182,7 +184,7 @@ process SCORE_CONCORDANCE {
     publishDir "${params.output_dir}/final_reports", pattern: "feature_concordance.*", mode: 'copy', overwrite: true
 
     input:
-    path(coefficient_files)
+    path(fs_result_files)
     path(profile)
 
     output:
@@ -192,7 +194,7 @@ process SCORE_CONCORDANCE {
     """
     score_feature_concordance.py \
         --profile ${profile} \
-        --coefficients ${coefficient_files} \
+        --fs-results ${fs_result_files} \
         --out-prefix feature_concordance
     """
 }
@@ -266,7 +268,10 @@ workflow featureselection_wf {
     // (e.g. the light report) can stay guarded without failing.
     if (params.celltype_profile) {
         profile_ch = Channel.fromPath(params.celltype_profile, checkIfExists: true)
-        concordance_ch = SCORE_CONCORDANCE(fts.coefficients.collect(), profile_ch).concordance
+        // Scored from the results JSONs (marker_importance), not the coefficient
+        // CSVs — the JSON is the single source of truth for marker direction.
+        fs_json_ch = fts.feature_selection_results.map { it[0] }.collect()
+        concordance_ch = SCORE_CONCORDANCE(fs_json_ch, profile_ch).concordance
     } else {
         concordance_ch = Channel.empty()
     }

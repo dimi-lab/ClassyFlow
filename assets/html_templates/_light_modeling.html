@@ -1,9 +1,11 @@
-<section class="page-section" id="light-modeling">
+<section class="page-section">
     <h2>Model Performance</h2>
 
     {% if model_performance %}
-    <p>
-        Performance of the best trained classifier on held-out test data. Higher accuracy and AUC indicate better predictions.
+    <p class="fs-intro">
+        After training, the classifier was tested on cells it had never seen. The numbers below
+        show how often it predicted the correct cell type. Higher percentages mean more trustworthy
+        predictions.
     </p>
 
     <div class="metrics-grid">
@@ -49,8 +51,8 @@
                     <th>Cell Type</th>
                     <th>Samples</th>
                     <th>%</th>
-                    <th>AUC</th>
-                    <th>AP</th>
+                    <th title="Area Under the ROC Curve: how well the model separates this cell type from all others. 1.0 is perfect, 0.5 is a coin flip.">AUC</th>
+                    <th title="Average Precision: how reliably the model finds this cell type without false alarms. Higher is better; especially informative for rare cell types.">AP</th>
                 </tr>
             </thead>
             <tbody>
@@ -80,6 +82,7 @@
         <div class="plotly-wrapper square">
             {{ model_performance.confusion_html | safe }}
         </div>
+        <div class="plot-caption">Rows are the true cell type, columns are what the model predicted. A strong diagonal means most cells were classified correctly.</div>
     </div>
     {% endif %}
 
@@ -90,6 +93,7 @@
             <div class="plotly-wrapper wide">
                 {{ model_performance.roc_curves_html | safe }}
             </div>
+            <div class="plot-caption">Each line shows how well one cell type is distinguished from the rest. Lines that hug the top-left corner are best.</div>
         </div>
         {% endif %}
 
@@ -99,6 +103,7 @@
             <div class="plotly-wrapper wide">
                 {{ model_performance.pr_curves_html | safe }}
             </div>
+            <div class="plot-caption">Balance between finding a cell type and avoiding false alarms. Curves toward the top-right are best, and are especially telling for rare cell types.</div>
         </div>
         {% endif %}
     </div>

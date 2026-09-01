@@ -12,9 +12,15 @@ Plotly div HTML) and drops the heavy visualizations of the full report.
 
 Four sections:
     1. Input data summary
-    2. Feature selection + concordance scoring vs marker definitions
+    2. Feature selection: per-celltype selected-feature bar chart, plus
+       concordance against the marker definitions when a profile is supplied
     3. Model performance (metric cards, per-class AUC/AP, confusion/ROC/PR)
     4. Prediction results/summary
+
+Feature importance and direction are NOT computed here. They are read from each
+feature_selection_<celltype>_results.json's ``feature_importance`` list, written
+by rank_selected_features() in bin/generate_cell_type_selection.py. That makes
+the bar chart independent of whether a cell-type profile was supplied.
 
 Usage:
     generate_light_report.py \
@@ -42,6 +48,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 import plotly.graph_objects as go
 import seaborn as sns
+import yaml
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -162,37 +169,14 @@ def _get_cell_type_colors(cell_types) -> Dict[str, str]:
 
 
 def compute_prediction_metrics(counts_df: pd.DataFrame) -> Dict:
-    """Derive prediction metrics from aggregated counts DataFrame."""
+    """Derive the prediction headline metrics from the aggregated counts."""
     total_cells = counts_df.groupby('sample_name')['total_cells'].first().sum()
-    total_low_density = counts_df.groupby('sample_name')['low_density_cells'].first().sum()
-
     global_counts = counts_df.groupby('cell_type')['count'].sum().sort_values(ascending=False)
-
-    samples = []
-    for sample_name, group in counts_df.groupby('sample_name'):
-        sample_total = group['total_cells'].iloc[0]
-        cell_counts = group.set_index('cell_type')['count'].sort_values(ascending=False)
-        percentages = (cell_counts / sample_total * 100).round(1)
-
-        samples.append({
-            'sample_name': sample_name,
-            'total_cells': int(sample_total),
-            'unique_classes': len(cell_counts),
-            'low_density_cells': int(group['low_density_cells'].iloc[0]),
-            'most_common_class': cell_counts.index[0] if len(cell_counts) > 0 else None,
-            'most_common_percentage': float(percentages.iloc[0]) if len(percentages) > 0 else None,
-            'second_common_class': cell_counts.index[1] if len(cell_counts) > 1 else None,
-            'second_common_percentage': float(percentages.iloc[1]) if len(percentages) > 1 else None,
-            'least_common_class': cell_counts.index[-1] if len(cell_counts) > 0 else None,
-            'least_common_percentage': float(percentages.iloc[-1]) if len(percentages) > 0 else None,
-        })
 
     return {
         'total_predicted_cells': int(total_cells),
-        'total_low_density_cells': int(total_low_density),
         'most_common_prediction': global_counts.index[0] if len(global_counts) > 0 else None,
         'most_rare_prediction': global_counts.index[-1] if len(global_counts) > 0 else None,
-        'samples': sorted(samples, key=lambda x: x['sample_name'])
     }
 
 
@@ -358,98 +342,293 @@ def _score_class(auc_value: float) -> str:
     return 'score-poor'
 
 
-def collect_feature_selection(fs_dir: str, fs_files: Optional[List[str]]) -> Dict:
-    """Section 2: read per-celltype feature_selection_*_results.json files."""
-    if fs_files:
-        json_files = sorted(f for f in fs_files if f.endswith('_results.json'))
+# --- Feature-selection helpers -----------------------------------------------
+
+MAX_FEATURES_SHOWN = 15   # bars per cell type in the feature-selection chart
+
+
+def _bar_color(t: float, direction: Optional[str]) -> str:
+    """Importance ramp for a marker bar, hue chosen by association direction.
+
+    Positive markers use the blue ramp, negative-association markers a warm
+    (orange) ramp, so the two are distinguishable at a glance while still
+    encoding importance through shade. A marker with no direction (its
+    coefficient was exactly zero, so it carries no sign) gets a neutral grey
+    ramp rather than borrowing the positive hue.
+    """
+    t = max(0.0, min(1.0, t))
+    d = str(direction or '').lower()
+    if d == 'negative':
+        lo, hi = (255, 247, 237), (154, 52, 18)   # #fff7ed -> #9a3412 (orange)
+    elif d == 'positive':
+        lo, hi = (239, 246, 255), (30, 58, 138)   # #eff6ff -> #1e3a8a (blue)
     else:
-        json_files = sorted(glob.glob(os.path.join(fs_dir, "feature_selection_*_results.json")))
+        lo, hi = (249, 250, 251), (107, 114, 128) # #f9fafb -> #6b7280 (grey)
+    r = round(lo[0] + (hi[0] - lo[0]) * t)
+    g = round(lo[1] + (hi[1] - lo[1]) * t)
+    b = round(lo[2] + (hi[2] - lo[2]) * t)
+    return f'#{r:02x}{g:02x}{b:02x}'
 
-    results = []
-    all_selected = set()
-    original_features = 0
-    reduction_rates = []
-    cv_folds_values = []
 
-    for jf in json_files:
-        data = load_json(jf)
-        if not data:
-            continue
-        summary = data.get('feature_selection_summary', {})
-        selected = data.get('selected_features', []) or []
-        all_selected.update(selected)
-        original_features = max(original_features, summary.get('original_features', 0))
-        red = summary.get('reduction_percentage')
-        if red is not None:
-            reduction_rates.append(red)
-        cv = data.get('cv_folds', data.get('n_folds'))
-        if isinstance(cv, (int, float)):
-            cv_folds_values.append(int(cv))
+def _feature_bars(feature_importance: List[Dict],
+                  limit: int = MAX_FEATURES_SHOWN) -> List[Dict]:
+    """Turn the upstream ``feature_importance`` list into bar records.
 
-        results.append({
-            'celltype': data.get('celltype', 'Unknown'),
-            'optimal_n_features': data.get('optimal_n_features', 0),
-            'non_variant_removed': summary.get('non_variant_removed'),
-            'reduction_percentage': red,
-            'cv_folds': cv if cv is not None else 'N/A',
-            'selected_features': selected,
-            'selected_features_count': len(selected),
-            'rfe_warning': data.get('rfe_warning', False),
-            'min_features_threshold': data.get('min_features_threshold'),
+    Presentation only. The importance, the signed direction and the ranking all
+    come from rank_selected_features() in
+    bin/generate_cell_type_selection.py; nothing is re-derived here.
+    """
+    shown = feature_importance[:limit]
+    max_imp = shown[0].get('importance', 0.0) if shown else 0.0
+    bars = []
+    for f in shown:
+        imp = f.get('importance', 0.0) or 0.0
+        t = (imp / max_imp) if max_imp > 0 else 0.0
+        bars.append({
+            'feature': f.get('feature', ''),
+            'marker': f.get('marker', ''),
+            'direction': f.get('direction'),
+            'importance': imp,
+            'intensity': round(t, 3),
+            'height_pct': round(max(t * 100, 8), 1),  # floor so weak bars stay visible
+            'bg': _bar_color(t, f.get('direction')),
         })
-
-    results.sort(key=lambda r: str(r['celltype']))
-
-    if cv_folds_values:
-        cv_summary = (f"{min(cv_folds_values)}-{max(cv_folds_values)}"
-                      if min(cv_folds_values) != max(cv_folds_values)
-                      else str(cv_folds_values[0]))
-    else:
-        cv_summary = "N/A"
-
-    summary_stats = {
-        'total_celltypes': len(results),
-        'unique_original_features': int(original_features),
-        'unique_selected_features': len(all_selected),
-        'avg_reduction_rate': round(sum(reduction_rates) / len(reduction_rates), 1) if reduction_rates else 0,
-        'cv_folds_summary': cv_summary,
-    }
-
-    return {
-        'feature_selection': {
-            'results': results,
-            'summary': summary_stats,
-        }
-    }
+    return bars
 
 
-def collect_concordance(concordance_csv: Optional[str]) -> Dict:
-    """Section 2: read the concordance headline table (feature_concordance.csv)."""
+def _relation_class(relation: str) -> str:
+    """Map a concordance relation to a colour class.
+
+    * match     (green)  -> best match IS the cell type's own definition.
+    * related   (yellow) -> best match is a nearby lineage (ancestor/descendant/sibling).
+    * undefined (grey)   -> the cell type has no definition in the profile, so
+                            nothing could be checked. Not a finding.
+    * mismatch  (red)    -> best match is a genuinely unrelated definition.
+    """
+    r = str(relation or '').lower()
+    if r == 'self':
+        return 'match'
+    if r in ('ancestor', 'descendant', 'sibling'):
+        return 'related'
+    if r in ('no_self_def', 'no_match', ''):
+        return 'undefined'
+    return 'mismatch'
+
+
+def _verdict(relation_class: str, celltype: str, best_match: str,
+             n_matched: int, n_expected: int) -> str:
+    """One plain-language sentence per cell type, for a non-technical reader."""
+    found = f"{n_matched} of {n_expected} expected markers found"
+    if relation_class == 'match':
+        return f"Markers match the expected {celltype} definition ({found})."
+    if relation_class == 'related':
+        return (f"Markers point to {best_match}, a closely related cell type "
+                f"({found}).")
+    if relation_class == 'undefined':
+        return ("No definition was provided for this cell type, so its markers "
+                "could not be checked.")
+    return (f"Markers point to {best_match}, which is not related to {celltype} "
+            f"— worth checking the training labels.")
+
+
+def _hierarchy_breadcrumb(name: str, nodes: Dict[str, Dict]) -> List[str]:
+    """Root-to-node lineage path for a profile node (e.g. Epithelial > Basal)."""
+    if not name or name not in nodes:
+        return []
+    chain, cur, guard = [], name, 0
+    while cur and guard < 100:
+        chain.append(cur)
+        cur = nodes.get(cur, {}).get('parent')
+        guard += 1
+    return list(reversed(chain))
+
+
+def load_celltype_profile(profile_path: Optional[str]) -> Dict:
+    """Parse the cell-type profile YAML into nodes + a rooted tree.
+
+    Returns {'nodes': {name: {name, parent, markers:[{marker,state}], sig:set}},
+             'roots': [tree_node]} or {} when no usable profile is given.
+    """
+    if not profile_path or not os.path.exists(profile_path):
+        return {}
+    try:
+        with open(profile_path) as f:
+            profile = yaml.safe_load(f) or {}
+    except Exception as e:
+        logger.error(f"Error loading celltype profile {profile_path}: {e}")
+        return {}
+
+    nodes: Dict[str, Dict] = {}
+    for t in profile.get("cell_types", []) or []:
+        name = t.get("name")
+        if not name:
+            continue
+        markers = []
+        sig = set()
+        for marker, state in (t.get("markers") or {}).items():
+            st = str(state).strip().lower()
+            if st in ("positive", "negative"):
+                markers.append({'marker': marker, 'state': st})
+                sig.add(marker)
+        nodes[name] = {'name': name, 'parent': t.get('parent') or None,
+                       'markers': markers, 'sig': sig}
+    if not nodes:
+        return {}
+
+    # Build the rooted tree (children lists) for the graphical view.
+    children: Dict[Optional[str], List[str]] = {}
+    for n in nodes.values():
+        children.setdefault(n['parent'], []).append(n['name'])
+
+    def _build(name: str) -> Dict:
+        node = nodes[name]
+        return {'name': name, 'markers': node['markers'],
+                'children': [_build(c) for c in sorted(children.get(name, []))]}
+
+    roots = [_build(r) for r in sorted(children.get(None, []))]
+    return {'nodes': nodes, 'roots': roots}
+
+
+def _read_concordance_rows(concordance_csv: Optional[str]) -> Dict[str, Dict]:
+    """Index concordance CSV rows by cf_class.
+
+    ``cf_class`` is written straight from the FS results JSON's ``celltype``
+    field, which is also what this report keys on, so the join is exact.
+    """
     if not concordance_csv or not os.path.exists(concordance_csv):
-        return {'concordance': {'available': False, 'rows': []}}
-
-    rows = []
+        return {}
+    indexed = {}
     try:
         with open(concordance_csv, newline='') as f:
             for row in csv.DictReader(f):
                 conflicting = row.get('conflicting_markers', '') or ''
-                rows.append({
+                indexed[row.get('cf_class', '')] = {
                     'cf_class': row.get('cf_class', ''),
                     'self_cell_type': row.get('self_cell_type', ''),
                     'self_score': row.get('self_score', ''),
-                    'best_match': row.get('best_match', ''),
+                    'best_match': (row.get('best_match', '') or '').strip(),
                     'best_score': row.get('best_score', ''),
                     'relation': (row.get('relation', '') or '').strip(),
                     'shared_markers': row.get('shared_markers', ''),
                     'conflicting_markers': [m for m in conflicting.split('|') if m],
                     'note': row.get('note', ''),
-                })
+                }
     except Exception as e:
         logger.error(f"Error reading concordance CSV {concordance_csv}: {e}")
-        return {'concordance': {'available': False, 'rows': []}}
+    return indexed
 
-    rows.sort(key=lambda r: r['cf_class'])
-    return {'concordance': {'available': True, 'rows': rows}}
+
+def build_feature_section(fs_dir: str, fs_files: Optional[List[str]],
+                          concordance_csv: Optional[str],
+                          profile_path: Optional[str]) -> Dict:
+    """Assemble the Feature Selection section from the per-celltype FS results.
+
+    The selected-feature bar chart is always built: per-feature importance and
+    direction come from the FS results JSON (``feature_importance``), which does
+    not depend on a cell-type profile. When a profile *is* supplied, each cell
+    type additionally gains its best-matching definition, a plain-language
+    verdict, and the profile tree is rendered.
+    """
+    if fs_files:
+        json_files = sorted(f for f in fs_files if f.endswith('_results.json'))
+    else:
+        json_files = sorted(glob.glob(os.path.join(fs_dir, "feature_selection_*_results.json")))
+
+    concordance = _read_concordance_rows(concordance_csv)
+    profile = load_celltype_profile(profile_path)
+    profile_nodes = profile.get('nodes', {})
+    has_definitions = bool(concordance)
+    if profile_nodes and not has_definitions:
+        logger.warning("A cell-type profile was supplied but no concordance rows "
+                       "were found; rendering marker charts without definitions.")
+
+    celltypes = []
+    for jf in json_files:
+        data = load_json(jf)
+        if not data:
+            continue
+        celltype = data.get('celltype', 'Unknown')
+        feature_importance = data.get('feature_importance', []) or []
+
+        record = {
+            'celltype': celltype,
+            'rfe_warning': data.get('rfe_warning', False),
+            'feature_bars': _feature_bars(feature_importance),
+            'n_features_total': len(feature_importance),
+            'n_features_shown': min(len(feature_importance), MAX_FEATURES_SHOWN),
+        }
+
+        # Both sides read `celltype` from the same JSON field, so match exactly.
+        conc = concordance.get(celltype)
+        if conc:
+            # Marker-level match against this cell type's definition: prefer its
+            # own profile node, else fall back to the best-matching definition.
+            def_name = conc['self_cell_type'] if conc['self_cell_type'] in profile_nodes \
+                else conc['best_match']
+            def_node = profile_nodes.get(def_name, {})
+            selected_markers = {f['marker'] for f in feature_importance}
+            conflicting = set(conc['conflicting_markers'])
+            marker_matches = []
+            for m in def_node.get('markers', []):
+                marker = m['marker']
+                if marker in conflicting:
+                    status = 'conflict'
+                elif marker in selected_markers:
+                    status = 'matched'
+                else:
+                    status = 'missing'
+                marker_matches.append({'marker': marker, 'state': m['state'],
+                                       'status': status})
+            marker_matches.sort(key=lambda x: ({'matched': 0, 'conflict': 1,
+                                                'missing': 2}[x['status']], x['marker']))
+            n_matched = sum(1 for m in marker_matches if m['status'] == 'matched')
+            relation_class = _relation_class(conc['relation'])
+
+            record.update({
+                'best_match': conc['best_match'],
+                'best_score': conc['best_score'],
+                'relation': conc['relation'],
+                'relation_class': relation_class,
+                'verdict': _verdict(relation_class, celltype, conc['best_match'],
+                                    n_matched, len(marker_matches)),
+                'conflicting_markers': conc['conflicting_markers'],
+                'shared_marker_count': conc['shared_markers'],
+                'hierarchy_breadcrumb': _hierarchy_breadcrumb(conc['best_match'], profile_nodes),
+                'marker_matches': marker_matches,
+                'n_matched': n_matched,
+                'n_conflict': sum(1 for m in marker_matches if m['status'] == 'conflict'),
+                'n_missing': sum(1 for m in marker_matches if m['status'] == 'missing'),
+                'n_expected': len(marker_matches),
+            })
+        elif has_definitions:
+            # Definitions were supplied, but none cover this cell type. That is
+            # not a finding — say so explicitly rather than leaving it to a
+            # default that would read as a mismatch.
+            record.update({
+                'relation_class': 'undefined',
+                'verdict': _verdict('undefined', celltype, '', 0, 0),
+            })
+        celltypes.append(record)
+
+    celltypes.sort(key=lambda c: str(c['celltype']))
+
+    overview = None
+    if has_definitions:
+        overview = {'match': 0, 'related': 0, 'mismatch': 0, 'undefined': 0}
+        for c in celltypes:
+            # No concordance row at all means undefined, not a mismatch.
+            overview[c.get('relation_class', 'undefined')] += 1
+        overview['total'] = len(celltypes)
+
+    return {
+        'feature_selection': {
+            'has_definitions': has_definitions,
+            'celltypes': celltypes,
+            'tree': profile.get('roots'),
+            'overview': overview,
+            'max_features_shown': MAX_FEATURES_SHOWN,
+        }
+    }
 
 
 def collect_model_performance(holdout_eval_dir: str, holdout_files: Optional[List[str]]) -> Dict:
@@ -554,10 +733,6 @@ def build_provenance(args) -> Dict:
     if args.exclude_markers:
         exclude_markers = [m.strip() for m in args.exclude_markers.split('|') if m.strip()]
 
-    config_link = None
-    if args.config_file:
-        config_link = os.path.basename(args.config_file)
-
     return {
         'provenance': {
             'pipeline_version': args.version,
@@ -567,7 +742,9 @@ def build_provenance(args) -> Dict:
             'holdout_fraction': args.holdout_fraction,
             'minimum_label_count': args.min_label_count,
             'exclude_markers': exclude_markers,
-            'config_link': config_link,
+            # Plain filename, not a link: the light report is published as a
+            # single standalone file with no sibling pages/ directory.
+            'config_name': os.path.basename(args.config_file) if args.config_file else None,
         }
     }
 
@@ -617,8 +794,8 @@ def main():
                         help='Explicit feature-selection files; overrides --fs-dir')
     parser.add_argument('--concordance-csv', default=None,
                         help='Optional feature_concordance.csv (headline table)')
-    parser.add_argument('--concordance-json', default=None,
-                        help='Optional feature_concordance.json (detail; currently unused)')
+    parser.add_argument('--celltype-profile', default=None,
+                        help='Optional cell-type profile YAML (enables profile mode + tree)')
     parser.add_argument('--counts-tsv', required=True,
                         help='Path to aggregated cell counts TSV')
 
@@ -646,8 +823,8 @@ def main():
 
     all_data: Dict[str, Any] = {}
     all_data.update(collect_input_metrics(args.input_metrics))
-    all_data.update(collect_feature_selection(args.fs_dir, args.fs_files))
-    all_data.update(collect_concordance(args.concordance_csv))
+    all_data.update(build_feature_section(args.fs_dir, args.fs_files,
+                                          args.concordance_csv, args.celltype_profile))
     all_data.update(collect_model_performance(args.holdout_eval_dir, args.holdout_eval_files))
     all_data.update(collect_predictions(args.counts_tsv, args.plots_dir))
     all_data.update(build_provenance(args))

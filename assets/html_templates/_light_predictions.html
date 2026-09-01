@@ -1,7 +1,10 @@
-<section class="page-section" id="light-predictions">
+<section class="page-section">
     <h2>Prediction Results</h2>
 
-    <p>Summary of predicted cell types across all samples.</p>
+    <p class="fs-intro">
+        Finally, the trained model was applied to every cell in the study. This is the
+        breakdown of predicted cell types across all of your samples.
+    </p>
 
     <div class="metrics-grid">
         <div class="metric-card">
@@ -16,49 +19,15 @@
             <div class="metric-value">{{ prediction_metrics.most_rare_prediction if prediction_metrics.most_rare_prediction else "N/A" }}</div>
             <div class="metric-label">Least Abundant Cell Type</div>
         </div>
-        <div class="metric-card">
-            <div class="metric-value">{{ prediction_metrics.total_low_density_cells | number_format if prediction_metrics.total_low_density_cells else "N/A" }}</div>
-            <div class="metric-label">Low Density Cells</div>
-            <div class="metric-description">Cells in sparse regions</div>
-        </div>
     </div>
 
     {% if prediction_metrics.abundance_plot_html %}
     <div class="plot-container">
         <div class="plot-title">Cell Type Prediction Abundance</div>
-        <div class="plotly-wrapper">
+        <div class="plotly-wrapper wide">
             {{ prediction_metrics.abundance_plot_html | safe }}
         </div>
-        <div class="plot-caption">The proportion of predicted cell types per sample/slide.</div>
-    </div>
-    {% endif %}
-
-    {% if prediction_metrics.samples %}
-    <h3>Per-Sample Summary</h3>
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th>Sample</th>
-                    <th>Total Cells</th>
-                    <th>Most Common Class</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for s in prediction_metrics.samples %}
-                <tr>
-                    <td class="roi-name">{{ s.sample_name }}</td>
-                    <td class="cell-count">{{ "{:,}".format(s.total_cells) if s.total_cells else "N/A" }}</td>
-                    <td>
-                        <div class="class-info">
-                            <span class="primary-class">{{ s.most_common_class if s.most_common_class else "N/A" }}</span>
-                            <span class="percentage">{{ "%.1f%%"|format(s.most_common_percentage) if s.most_common_percentage is not none else "" }}</span>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="plot-caption">The proportion of each predicted cell type per sample. Hover any bar to see exact percentages.</div>
     </div>
     {% endif %}
 </section>

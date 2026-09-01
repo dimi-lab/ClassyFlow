@@ -19,34 +19,34 @@ Inputs
 --profile         YAML cell-type profile (assets/celltype_profile.yaml). A list of
                   cell_types, each with `name`, optional `parent` (a cell-type
                   name), and `markers: {canonical_marker: positive|negative}`.
---coefficients    One or more coefficients_<celltype>.csv files (from
-                  generate_cell_type_selection.py). Columns: Name,
-                  Feature_Importance, Coefficient, Direction. "Name" is a
-                  measurement column "<marker>: <compartment>: <statistic>".
+--fs-results      One or more feature_selection_<celltype>_results.json files
+                  (from generate_cell_type_selection.py). Read: `celltype` and
+                  `marker_importance` — a list of {marker, importance, direction}
+                  over the selected features, already collapsed to one record per
+                  marker upstream. That list is the single source of truth for
+                  marker-level importance and direction; nothing is re-derived
+                  here.
 
 Scoring
 -------
 Per CF class:
-  1. marker = Name.split(":")[0].strip()
-  2. Reduce to one signed direction per marker: the direction of that marker's
-     highest-importance feature (rule "a").
-  3. For each profile cell type, over markers present in BOTH the CF
-     marker->direction map and the profile node's signature, score =
-     agreements / shared (Positive<->positive, Negative<->negative).
-  4. Rank profile types; pick best_match.
-  5. Resolve the CF class to its own profile node (by normalized name) and report
+  1. For each profile cell type, over markers present in BOTH the class's
+     marker->direction map and the profile node's signature, score = an F1 over
+     agreements (positive<->positive, negative<->negative).
+  2. Rank profile types; pick best_match.
+  3. Resolve the CF class to its own profile node (by normalized name) and report
      the relation of best_match to that self node.
 
-Outputs (standalone; HTML integration deferred)
+Outputs
   <prefix>.csv   one row per CF class (headline table)
   <prefix>.json  full ranked profile-type list per CF class
 
 Usage:
     score_feature_concordance.py --profile celltype_profile.yaml \
-        --coefficients coefficients_*.csv --out-prefix feature_concordance
+        --fs-results feature_selection_*_results.json \
+        --out-prefix feature_concordance
 """
 
-import os
 import re
 import csv
 import json
@@ -60,39 +60,13 @@ import yaml
 # --------------------------------------------------------------------------- #
 
 def norm_key(s):
-    """Normalize a label for joining CF class names to profile nodes.
+    """Normalize a label for joining a CF class name to a profile node.
 
-    CF coefficient files are named coefficients_<safe>.csv where <safe> replaced
-    spaces / '|' / '/' with '_'. Profile nodes carry human names. Stripping to
-    lowercase alphanumerics makes the two comparable regardless of that
-    sanitization.
+    CF class labels come from the training data; profile nodes are hand-authored
+    by the PI. Stripping to lowercase alphanumerics lets "Helper T" match
+    "helper-T" without demanding the two sources agree on punctuation.
     """
     return re.sub(r'[^a-z0-9]', '', str(s).lower())
-
-
-def marker_of(feature_name):
-    """Marker token of a measurement column '<marker>: <compartment>: ...'.
-
-    Mirrors the convention in bin/fixup_columns.py (token before the first ':').
-    """
-    return str(feature_name).split(":")[0].strip()
-
-
-def state_of_direction(direction):
-    """Map a coefficient Direction to a +/- state string."""
-    d = str(direction).strip().lower()
-    if d.startswith("pos"):
-        return "positive"
-    if d.startswith("neg"):
-        return "negative"
-    return None
-
-
-def cf_class_from_filename(path):
-    """Recover the CF class label from coefficients_<safe>.csv."""
-    base = os.path.basename(path)
-    m = re.match(r'coefficients_(.+)\.csv$', base)
-    return m.group(1) if m else os.path.splitext(base)[0]
 
 
 # --------------------------------------------------------------------------- #
@@ -159,40 +133,44 @@ def relation(best_name, self_name, nodes):
 
 
 # --------------------------------------------------------------------------- #
-# coefficients -> per-marker direction (rule "a")
+# feature-selection results -> per-marker direction
 # --------------------------------------------------------------------------- #
 
-def marker_directions(coeff_csv):
-    """Reduce a coefficients file to {marker: state} via highest-importance rule.
+def read_fs_result(fs_json):
+    """Read (cf_class, {marker: direction}) from a feature-selection results JSON.
 
-    Only non-zero coefficients contribute (a zero-coef feature was not selected
-    by the Lasso and carries no directional signal).
+    ``marker_importance`` is produced by collapse_to_markers() in
+    generate_cell_type_selection.py — already one record per marker over the
+    selected features.
+
+    Markers whose coefficient was exactly zero carry ``direction: null``; they
+    are skipped here because there is no sign to agree or disagree with a
+    profile definition. They are still charted in the report.
     """
-    best = {}  # marker -> (importance, state)
-    with open(coeff_csv, newline="") as f:
-        for row in csv.DictReader(f):
-            try:
-                imp = abs(float(row.get("Feature_Importance") or 0))
-            except (TypeError, ValueError):
-                imp = 0
-            if imp == 0:
-                continue
-            state = state_of_direction(row.get("Direction"))
-            if state is None and row.get("Coefficient") not in (None, ""):
-                coef = float(row["Coefficient"])
-                state = "positive" if coef > 0 else ("negative" if coef < 0 else None)
-            if state is None:
-                continue
-            marker = marker_of(row["Name"])
-            if marker not in best or imp > best[marker][0]:
-                best[marker] = (imp, state)
-    return {m: s for m, (_, s) in best.items()}
+    with open(fs_json) as f:
+        data = json.load(f)
+    records = data.get("marker_importance", []) or []
+    if not records:
+        # Without this the class scores against nothing and every profile type
+        # comes back "no shared markers", which reads like a real biological
+        # finding instead of a broken upstream contract.
+        print(f"WARNING: {fs_json} has no 'marker_importance'; "
+              f"class '{data.get('celltype', '')}' cannot be scored.")
+    cf_dirs = {r["marker"]: r["direction"] for r in records if r.get("direction")}
+    return data.get("celltype", ""), cf_dirs
 
 
 def score_against_profile(cf_dirs, nodes):
-    """Rank every profile node against one CF class's marker->direction map."""
+    """Rank every profile node against one CF class's marker->direction map.
+
+    ``score`` is an F1 that balances purity (agreements among shared markers)
+    with coverage (agreements against the definition's full marker set). This
+    penalises both direction conflicts and expected markers that went unpicked,
+    and stops a lone 1/1 match from outranking a broad 7/8 one.
+    """
     ranked = []
     for n in nodes.values():
+        expected = len(n["sig"])
         shared, agree, conflicts = 0, 0, []
         for marker, st in n["sig"].items():
             if marker in cf_dirs:
@@ -201,14 +179,23 @@ def score_against_profile(cf_dirs, nodes):
                     agree += 1
                 else:
                     conflicts.append(marker)
+        precision = (agree / shared) if shared else None
+        recall = (agree / expected) if expected else None
+        if agree > 0 and precision and recall:
+            f1 = 2 * precision * recall / (precision + recall)
+        else:
+            f1 = 0.0 if shared else None
         ranked.append({
             "cell_type": n["name"],
-            "score": (agree / shared) if shared else None,
+            "score": f1,
+            "precision": None if precision is None else round(precision, 4),
+            "recall": None if recall is None else round(recall, 4),
             "shared_markers": shared,
+            "expected_markers": expected,
             "agreements": agree,
             "conflicting_markers": conflicts,
         })
-    # best = highest score, tie-broken by most shared markers; unscored last
+    # best = highest F1, tie-broken by most shared markers; unscored last
     ranked.sort(
         key=lambda r: (r["score"] is not None,
                        r["score"] if r["score"] is not None else -1,
@@ -227,8 +214,8 @@ def main():
         description="Score ClassyFlow feature selection against a cell-type profile.")
     parser.add_argument("--profile", required=True,
                         help="Cell-type profile YAML (assets/celltype_profile.yaml).")
-    parser.add_argument("--coefficients", required=True, nargs="+",
-                        help="coefficients_<celltype>.csv file(s).")
+    parser.add_argument("--fs-results", required=True, nargs="+",
+                        help="feature_selection_<celltype>_results.json file(s).")
     parser.add_argument("--out-prefix", default="feature_concordance",
                         help="Output file prefix.")
     args = parser.parse_args()
@@ -236,9 +223,8 @@ def main():
     nodes, key_index = load_profile(args.profile)
 
     rows, detail = [], []
-    for coeff_csv in args.coefficients:
-        cf_class = cf_class_from_filename(coeff_csv)
-        cf_dirs = marker_directions(coeff_csv)
+    for fs_json in args.fs_results:
+        cf_class, cf_dirs = read_fs_result(fs_json)
         ranked = score_against_profile(cf_dirs, nodes)
 
         self_name = key_index.get(norm_key(cf_class))
@@ -256,6 +242,10 @@ def main():
                           else round(self_row["score"], 4),
             "best_match": best["cell_type"] if best else "",
             "best_score": "" if not best else round(best["score"], 4),
+            "best_precision": "" if not best or best["precision"] is None
+                              else best["precision"],
+            "best_recall": "" if not best or best["recall"] is None
+                           else best["recall"],
             "relation": relation(best["cell_type"], self_name, nodes) if best else "no_match",
             "shared_markers": best["shared_markers"] if best else 0,
             "conflicting_markers": "|".join(best["conflicting_markers"]) if best else "",
@@ -272,8 +262,8 @@ def main():
     json_path = f"{args.out_prefix}.json"
 
     fieldnames = ["cf_class", "self_cell_type", "self_score", "best_match",
-                  "best_score", "relation", "shared_markers",
-                  "conflicting_markers", "note"]
+                  "best_score", "best_precision", "best_recall", "relation",
+                  "shared_markers", "conflicting_markers", "note"]
     with open(csv_path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fieldnames)
         w.writeheader()

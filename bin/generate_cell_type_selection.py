@@ -31,6 +31,49 @@ from sklearn.feature_selection import RFE, VarianceThreshold
 
 batchColumn = 'Batch'
 
+
+def rank_selected_features(dfF, n_selected):
+    """The selected features, ranked, with importance and signed direction.
+
+    ``dfF`` is already sorted by descending Feature_Importance, so the returned
+    order is the selection order. A coefficient of exactly zero carries no sign,
+    so its ``direction`` is None rather than a fabricated "negative" -- such a
+    feature was still selected (the RFE cutoff is derived independently of the
+    Lasso), so it is reported, not dropped.
+
+    This is the single source of truth for feature-level importance/direction;
+    the light report's bar chart reads it verbatim.
+    """
+    out = []
+    for row in dfF.head(n_selected).itertuples():
+        coef = float(row.Coefficient)
+        out.append({
+            "feature": str(row.Name),
+            "marker": str(row.Name).split(":")[0].strip(),
+            "importance": abs(float(row.Feature_Importance)),
+            "direction": "positive" if coef > 0 else ("negative" if coef < 0 else None),
+        })
+    return out
+
+
+def collapse_to_markers(features):
+    """Roll ranked features up to one record per marker.
+
+    The marker token is the text before the first ':' in a measurement column
+    (matches bin/fixup_columns.py). Each marker takes the importance and sign of
+    its single highest-importance selected feature, so multi-statistic features
+    of the same marker (CD45: Cell: Mean, CD45: Cell: StdDev) reduce to one
+    record. Consumed by score_feature_concordance.py, which needs a
+    marker->direction map to compare against a cell-type profile.
+    """
+    best = {}
+    for f in features:
+        marker = f["marker"]
+        if marker not in best or f["importance"] > best[marker]["importance"]:
+            best[marker] = f
+    return [{"marker": m, "importance": f["importance"], "direction": f["direction"]}
+            for m, f in sorted(best.items(), key=lambda kv: -kv[1]["importance"])]
+
 ############################ PLOT AND TABLE GENERATION ############################
 def plot_feature_ranking_with_cutoff(featureRankDF, output_path, cutoff_n, top_n=35, model_name="Lasso"):
     """
@@ -604,7 +647,9 @@ def get_lasso_classification_features(
     # Create feature importance dataframe
     dfF = pd.DataFrame(list(zip(features, importance, coefficients)), columns=['Name', 'Feature_Importance', 'Coefficient'])
     dfF = dfF.sort_values(by=['Feature_Importance'], ascending=False)
-    dfF['Direction'] = dfF['Coefficient'].apply(lambda x: 'Positive' if x > 0 else 'Negative')
+    # Blank for exactly zero: an unselected feature has no direction to assert.
+    dfF['Direction'] = dfF['Coefficient'].apply(
+        lambda x: 'Positive' if x > 0 else ('Negative' if x < 0 else ''))
 
     # Celltype-suffixed so signed coefficients from every class can be gathered
     # together downstream (e.g. feature-concordance scoring) without collision.
@@ -645,11 +690,11 @@ def get_lasso_classification_features(
     results['selected_features'] = selected_features
     results['selected_features_count'] = len(selected_features)
     
-    # Save selected features with their importance scores
-    feature_importance_data = {}
-    for idx, row in dfF.head(featureCutoff).iterrows():
-        feature_importance_data[row['Name']] = float(row['Feature_Importance'])
-    results['feature_importance_data'] = feature_importance_data
+    # Per-feature importance + signed direction over the selected features,
+    # ranked. Consumed by the light report's bar chart and the full report.
+    results['feature_importance'] = rank_selected_features(dfF, featureCutoff)
+    # Marker-level rollup, consumed by score_feature_concordance.py.
+    results['marker_importance'] = collapse_to_markers(results['feature_importance'])
 
     # Create feature ranking plot with cutoff line
     feature_ranking_path = f"{output_prefix}_feature_ranking.png"
@@ -694,11 +739,10 @@ def get_lasso_classification_features(
     }
 
     # Save selected features to CSV
-    ctl = dfF['Name'].tolist()[:featureCutoff]  
     with open("top_rank_features_{}.csv".format(celltype.replace(' ','_').replace('|','_').replace('/','')), 'w', newline='') as csvfile:
         f_writer = csv.writer(csvfile)
         f_writer.writerow(["Features"])
-        for ln in ctl:
+        for ln in selected_features:
             f_writer.writerow([ln])
 
     return results

@@ -67,14 +67,43 @@ def test_score_against_profile_canonical_join(tmp_path):
     assert best["shared_markers"] == 3
 
 
-def test_marker_directions_highest_importance_per_marker(tmp_path):
-    csv_path = tmp_path / "coefficients_Helper_T.csv"
-    csv_path.write_text(
-        "Name,Feature_Importance,Coefficient,Direction\n"
-        "CD4: Mean,0.9,0.9,Positive\n"
-        "CD4: Max,0.2,-0.2,Negative\n"   # lower importance -> ignored for CD4
-        "CD8: Mean,0.5,-0.5,Negative\n"
-        "CD3: Mean,0.0,0.0,Positive\n"   # zero importance -> dropped
-    )
-    dirs = sc.marker_directions(str(csv_path))
+def _write_fs_result(tmp_path, celltype, marker_importance, name=None):
+    import json
+    p = tmp_path / (name or f"feature_selection_{celltype}_results.json")
+    p.write_text(json.dumps({"celltype": celltype,
+                             "marker_importance": marker_importance}))
+    return p
+
+
+def test_read_fs_result_uses_upstream_marker_importance(tmp_path):
+    # The feature->marker collapse happens upstream; this only reads it back.
+    p = _write_fs_result(tmp_path, "Helper T", [
+        {"marker": "CD4", "importance": 0.9, "direction": "positive"},
+        {"marker": "CD8", "importance": 0.5, "direction": "negative"},
+    ])
+    cf_class, dirs = sc.read_fs_result(str(p))
+    assert cf_class == "Helper T"
     assert dirs == {"CD4": "positive", "CD8": "negative"}
+
+
+def test_read_fs_result_preserves_label_with_spaces(tmp_path):
+    # cf_class comes from the JSON's celltype field, so labels are not mangled
+    # by filename sanitization (which used to collapse "T cell" -> "T_cell").
+    p = _write_fs_result(tmp_path, "T cell", [
+        {"marker": "CD3", "importance": 0.4, "direction": "positive"}],
+        name="feature_selection_T_cell_results.json")
+    cf_class, _ = sc.read_fs_result(str(p))
+    assert cf_class == "T cell"
+
+
+def test_read_fs_result_warns_on_missing_marker_importance(tmp_path, capsys):
+    # A broken upstream contract must be visible: without a warning, every
+    # profile type scores "no shared markers", which looks like a real result.
+    import json
+    p = tmp_path / "feature_selection_Empty_results.json"
+    p.write_text(json.dumps({"celltype": "Empty"}))
+    cf_class, dirs = sc.read_fs_result(str(p))
+    assert cf_class == "Empty"
+    assert dirs == {}
+    out = capsys.readouterr().out
+    assert "no 'marker_importance'" in out and "Empty" in out

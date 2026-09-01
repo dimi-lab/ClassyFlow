@@ -1,129 +1,183 @@
-<section class="page-section" id="light-features">
+{% macro tree_nodes(nodes) -%}
+<ul>
+    {% for node in nodes %}
+    <li>
+        <span class="profile-node">
+            <span class="profile-node-name">{{ node.name }}</span>
+            {% for m in node.markers %}
+            <span class="marker-badge {% if m.state == 'positive' %}marker-pos{% else %}marker-neg{% endif %}">{{ m.marker }} {{ '+' if m.state == 'positive' else '−' }}</span>
+            {% endfor %}
+        </span>
+        {% if node.children %}{{ tree_nodes(node.children) }}{% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{%- endmacro %}
+
+{% macro relation_label(relation_class) -%}
+    {%- if relation_class == 'match' -%}Own definition
+    {%- elif relation_class == 'related' -%}Related lineage
+    {%- elif relation_class == 'undefined' -%}No definition
+    {%- else -%}Unexpected
+    {%- endif -%}
+{%- endmacro %}
+
+{% macro feature_chart(ct) -%}
+<div class="mk-chart">
+    {% for f in ct.feature_bars %}
+    {% set is_neg = f.direction and f.direction|lower == 'negative' %}
+    <div class="mk-col" title="{{ f.feature }} &mdash; relative importance {{ '%.0f'|format(f.intensity * 100) }}%{% if f.direction %} ({{ f.direction }} association){% else %} (no direction: coefficient is zero){% endif %}">
+        <div class="mk-bar-area">
+            <div class="mk-bar-top">
+                {% if not is_neg %}<div class="mk-bar mk-bar-up" style="height:{{ f.height_pct }}%; background:{{ f.bg }};"></div>{% endif %}
+            </div>
+            <div class="mk-baseline"></div>
+            <div class="mk-bar-bottom">
+                {% if is_neg %}<div class="mk-bar mk-bar-down" style="height:{{ f.height_pct }}%; background:{{ f.bg }};"></div>{% endif %}
+            </div>
+        </div>
+        <div class="mk-label-wrap"><span class="mk-label">{{ f.feature }}</span></div>
+    </div>
+    {% else %}
+    <span class="text-muted">No features were selected for this cell type.</span>
+    {% endfor %}
+</div>
+{% if ct.n_features_total > ct.n_features_shown %}
+<div class="mk-caption">{{ ct.n_features_shown }} of {{ ct.n_features_total }} selected features shown (most important first)</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro importance_scale() -%}
+<div class="mk-scale">
+    <span>Lower importance</span>
+    <span class="mk-scale-ramp mk-ramp-pos"></span>
+    <span>Higher importance</span>
+    <span class="mk-scale-sep">&bull;</span>
+    <span><span class="mk-swatch mk-swatch-pos"></span>positive feature (points up)</span>
+    <span><span class="mk-swatch mk-swatch-neg"></span>negative feature (points down)</span>
+    <span><span class="mk-swatch mk-swatch-none"></span>selected, but no direction</span>
+    <span class="text-muted">bar height &amp; shade scale with each feature's importance within the cell type; hover a bar for its full name</span>
+</div>
+{%- endmacro %}
+
+<section class="page-section">
     <h2>Feature Selection</h2>
 
-    <p>
-        Markers selected to distinguish each cell type. Fewer, more informative markers improve prediction reliability.
+    <p class="fs-intro">
+        Before building the classifier, ClassyFlow decides which measured markers are most
+        useful for telling each cell type apart. Each bar below is one selected
+        measurement, and its height shows how much the classifier leans on it.
+        Keeping only the most informative measurements makes the predictions more
+        reliable and easier to interpret.
     </p>
 
-    {% if feature_selection.summary %}
-    <div class="metrics-grid">
-        <div class="metric-card">
-            <div class="metric-value">{{ feature_selection.summary.total_celltypes }}</div>
-            <div class="metric-label">Cell Types</div>
-        </div>
-        <div class="metric-card info">
-            <div class="metric-value">{{ feature_selection.summary.unique_original_features }}</div>
-            <div class="metric-label">Total Features</div>
-        </div>
-        <div class="metric-card success">
-            <div class="metric-value">{{ feature_selection.summary.unique_selected_features }}</div>
-            <div class="metric-label">Selected Features</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-value">{{ feature_selection.summary.avg_reduction_rate }}%</div>
-            <div class="metric-label">Avg Reduction</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-value">{{ feature_selection.summary.cv_folds_summary }}</div>
-            <div class="metric-label">CV Folds</div>
-        </div>
-    </div>
+    {% if feature_selection.celltypes %}
+
+    {% if feature_selection.tree %}
+    <details class="fs-definitions" open>
+        <summary>Cell-Type Definitions</summary>
+        <p>The marker profile you provided, drawn as a hierarchy. Each cell type inherits from its parent; badges show the expected markers.</p>
+        <ul class="profile-tree">
+            {% for node in feature_selection.tree %}
+            <li>
+                <span class="profile-node">
+                    <span class="profile-node-name">{{ node.name }}</span>
+                    {% for m in node.markers %}
+                    <span class="marker-badge {% if m.state == 'positive' %}marker-pos{% else %}marker-neg{% endif %}">{{ m.marker }} {{ '+' if m.state == 'positive' else '−' }}</span>
+                    {% endfor %}
+                </span>
+                {% if node.children %}{{ tree_nodes(node.children) }}{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </details>
     {% endif %}
 
-    {% if feature_selection.results %}
-    <h3>Selected Features by Cell Type</h3>
-    <div class="table-container">
-        <table>
+    {% if feature_selection.has_definitions %}
+    <p>
+        Each cell type's selected markers are compared against your provided marker
+        definitions to check they point to the expected cell type. A
+        <span class="def-cell def-match">green</span> best match means the markers fit the
+        cell type's own definition, <span class="def-cell def-related">yellow</span> a
+        closely related type, <span class="def-cell def-mismatch">red</span> an
+        unexpected one, and <span class="def-cell def-undefined">grey</span> that no
+        definition was provided for that cell type.
+    </p>
+
+    {% if feature_selection.overview %}
+    <div class="fs-overview">
+        <div class="ov-card">
+            <div class="ov-num">{{ feature_selection.overview.total }}</div>
+            <div class="ov-label">Cell types</div>
+        </div>
+        <div class="ov-card ov-match">
+            <div class="ov-num">{{ feature_selection.overview.match }}</div>
+            <div class="ov-label">Match own definition</div>
+        </div>
+        <div class="ov-card ov-related">
+            <div class="ov-num">{{ feature_selection.overview.related }}</div>
+            <div class="ov-label">Related lineage</div>
+        </div>
+        <div class="ov-card ov-mismatch">
+            <div class="ov-num">{{ feature_selection.overview.mismatch }}</div>
+            <div class="ov-label">Unexpected</div>
+        </div>
+        {% if feature_selection.overview.undefined %}
+        <div class="ov-card ov-undefined">
+            <div class="ov-num">{{ feature_selection.overview.undefined }}</div>
+            <div class="ov-label">No definition</div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <div class="table-container no-scroll">
+        <table class="fs-summary-table">
+            <colgroup>
+                {% if feature_selection.has_definitions %}
+                <col class="col-ct"><col class="col-def"><col class="col-mk">
+                {% else %}
+                <col class="col-ct-wide"><col class="col-mk-wide">
+                {% endif %}
+            </colgroup>
             <thead>
                 <tr>
                     <th>Cell Type</th>
-                    <th>Selected</th>
-                    <th>Reduction</th>
-                    <th>Features</th>
+                    {% if feature_selection.has_definitions %}<th>Best Matching Definition</th>{% endif %}
+                    <th>Selected Features</th>
                 </tr>
             </thead>
             <tbody>
-                {% for r in feature_selection.results %}
-                <tr {% if r.rfe_warning %}class="row-warning"{% endif %}>
-                    <td>
-                        <strong>{{ r.celltype }}</strong>
-                        {% if r.rfe_warning %}<span class="warning-icon" title="Selected features below the 2% threshold — risk of overfitting."> &#9888;</span>{% endif %}
+                {% for ct in feature_selection.celltypes %}
+                <tr {% if ct.rfe_warning %}class="row-warning"{% endif %}>
+                    <td><strong>{{ ct.celltype }}</strong></td>
+                    {% if feature_selection.has_definitions %}
+                    <td class="def-col">
+                        {% if ct.best_match %}
+                        <div class="def-line1"><span class="def-cell def-{{ ct.relation_class }}">{{ ct.best_match }}</span></div>
+                        <div class="def-line2">
+                            <span class="relation-tag rel-{{ ct.relation_class }}">{{ relation_label(ct.relation_class) }}</span>
+                            {% if ct.n_expected %}<span class="def-count">{{ ct.n_matched }} of {{ ct.n_expected }} expected markers</span>{% endif %}
+                        </div>
+                        {% if ct.hierarchy_breadcrumb and ct.hierarchy_breadcrumb|length > 1 %}
+                        <div class="def-breadcrumb">{{ ct.hierarchy_breadcrumb|join(' › ') }}</div>
+                        {% endif %}
+                        {% else %}
+                        <div class="def-line1"><span class="def-cell def-undefined">&mdash;</span></div>
+                        {% endif %}
+                        {% if ct.verdict %}<div class="def-verdict">{{ ct.verdict }}</div>{% endif %}
                     </td>
-                    <td class="cell-count">{{ r.optimal_n_features }}</td>
-                    <td class="percentage">{{ "%.1f"|format(r.reduction_percentage) if r.reduction_percentage is not none else "N/A" }}%</td>
-                    <td class="deemphasized-col">
-                        {{ r.selected_features | join(', ') if r.selected_features else '—' }}
-                    </td>
+                    {% endif %}
+                    <td class="mk-col-cell">{{ feature_chart(ct) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    {% endif %}
-</section>
+    {{ importance_scale() }}
 
-<section class="page-section" id="light-concordance">
-    <h2>Marker Concordance</h2>
-    <p>
-        Agreement between data-driven feature selection and the PI-provided marker definitions.
-    </p>
-
-    {% if concordance.available and concordance.rows %}
-    <details class="table-legend">
-        <summary>Relation legend</summary>
-        <ul>
-            <li><span class="badge badge-success">self</span> — best match is the class's own definition.</li>
-            <li><span class="badge badge-info">ancestor / descendant</span> — best match is a related node in the hierarchy.</li>
-            <li><span class="badge badge-warning">sibling</span> — best match shares a parent with the class.</li>
-            <li><span class="badge badge-danger">unrelated</span> — best match is not related to the class definition.</li>
-        </ul>
-    </details>
-
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th>CF Class</th>
-                    <th>Self Definition</th>
-                    <th>Self Score</th>
-                    <th>Best Match</th>
-                    <th>Best Score</th>
-                    <th>Relation</th>
-                    <th>Shared</th>
-                    <th>Conflicting</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in concordance.rows %}
-                <tr>
-                    <td><strong>{{ row.cf_class }}</strong></td>
-                    <td>{{ row.self_cell_type if row.self_cell_type else '—' }}</td>
-                    <td>{{ row.self_score if row.self_score not in (None, '') else '—' }}</td>
-                    <td>{{ row.best_match if row.best_match else '—' }}</td>
-                    <td>{{ row.best_score if row.best_score not in (None, '') else '—' }}</td>
-                    <td>
-                        <span class="badge
-                            {% if row.relation == 'self' %}badge-success
-                            {% elif row.relation in ['ancestor', 'descendant'] %}badge-info
-                            {% elif row.relation == 'sibling' %}badge-warning
-                            {% elif row.relation in ['unrelated', 'no_match', 'no_self_def'] %}badge-danger
-                            {% else %}badge-info{% endif %}">
-                            {{ row.relation if row.relation else 'n/a' }}
-                        </span>
-                    </td>
-                    <td class="cell-count">{{ row.shared_markers }}</td>
-                    <td class="deemphasized-col">
-                        {{ row.conflicting_markers | join(', ') if row.conflicting_markers else '—' }}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
     {% else %}
-    <div class="alert alert-info">
-        Concordance scoring was not run. Set <code>celltype_profile</code> in <code>nextflow.config</code>
-        (with <code>batch_correct_column_names = true</code>) to score feature selection against your marker definitions.
-    </div>
+    <div class="alert alert-info">No feature-selection results were available for this run.</div>
     {% endif %}
 </section>

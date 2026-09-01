@@ -9,13 +9,11 @@ Usage:
     python generate_feature_selection_report.py --fs-dir /path/to/feature_selection --output-file feature_selection_report.html
 """
 
-import os
 import json
 import glob
 import argparse
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 import logging
 import pandas as pd
 import numpy as np
@@ -81,10 +79,11 @@ def read_feature_selection_results(fs_dir: Path) -> List[Dict[str, Any]]:
                 except Exception as e:
                     logger.warning(f"Could not read features CSV for {celltype}: {e}")
             
-            # Read feature importance data if available
-            feature_importance = {}
-            if 'feature_importance_data' in data:
-                feature_importance = data['feature_importance_data']
+            # {feature: importance} for the template's per-feature score lookup.
+            # Source is the ranked list written by rank_selected_features() in
+            # generate_cell_type_selection.py (which also carries the sign).
+            feature_importance = {r['feature']: r['importance']
+                                  for r in data.get('feature_importance', []) or []}
             
             # Calculate warning threshold (2% of total features)
             warning_threshold = 0.02
