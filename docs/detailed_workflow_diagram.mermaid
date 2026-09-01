@@ -1,107 +1,166 @@
 ---
 config:
-  theme: redux
-  look: neo
-  layout: elk
+  theme: neutral
 ---
 flowchart TD
- subgraph NORM["Normalization Pipeline"]
-    direction TB
-        E5["IDENTIFY_BEST<br><small>Compare &amp; select optimal</small>"]
-        E1["BoxCox Transform<br><small>Power transformation</small>"]
-        E2["Quantile Transform<br><small>Uniform distribution</small>"]
-        E3["MinMax Scaling<br><small>0-1 normalization</small>"]
-        E4["Log Transform<br><small>Log scale conversion</small>"]
-        E6["AUGMENT_WITH_LEIDEN<br><small>Optional Scimap clustering</small>"]
-  end
- subgraph FEAT["Feature Selection Pipeline"]
-    direction TB
-        G2["search_for_alphas<br><small>LASSO regularization grid</small>"]
-        G1["topLabelSplit<br><small>Binary classification setup</small>"]
-        G3["merge_alphas_search<br><small>Consolidate alpha results</small>"]
-        G4["select_best_alpha<br><small>Optimal regularization</small>"]
-        G5["runAllRFE<br><small>Recursive feature elimination</small>"]
-        G6["merge_rfe_scores<br><small>Combine RFE results</small>"]
-        G7["examineClassLabel<br><small>Generate feature reports</small>"]
-        G8["mergeAndSortCsv<br><small>Final feature list</small>"]
-  end
- subgraph MODEL["ML Model Development"]
-    direction TB
-        H2["xgboostingModel<br><small>Hyperparameter tuning</small>"]
-        H1["createXGBParams<br><small>Parameter search space</small>"]
-        H3["mergeXgbCsv<br><small>Combine training results</small>"]
-        H4["xgboostingFinalModel<br><small>Train best models</small>"]
-        H5["holdOutXgbEvaluation<br><small>Validation testing</small>"]
-        H6["mergeHoldoutCsv<br><small>Performance summary</small>"]
-        H7["selectBestModel<br><small>Choose optimal classifier</small>"]
-  end
-    A["Input Directories<br>"] --> B["mergeTabDelimitedFiles<br><small>Combine quantification data</small>"]
-    B --> C["checkPanelDesign<br><small>Analyze marker presence</small>"] & D["addEmptyMarkerNoise<br><small>Harmonize missing markers</small>"]
-    C --> D
-    D --> E["Normalization Workflow<br><small>Auto-select best method</small>"]
-    E --> F["generateTrainingNHoldout<br><small>70/30 stratified split</small>"] & I["predictAllCells_xgb<br><small>Apply best model to all data</small>"]
-    F --> G["Feature Selection Workflow<br><small>LASSO + RFE per cell type</small>"] & H["Modeling Workflow<br><small>XGBoost optimization</small>"]
-    G --> H
-    H --> I
-    E1 --> E5
-    E2 --> E5
-    E3 --> E5
-    E4 --> E5
-    E5 --> E6
-    G1 --> G2 & G5 & G7
-    G2 --> G3
-    G3 --> G4 & G7
-    G4 --> G5 & G7
-    G5 --> G6
-    G6 --> G7
-    G7 --> G8
-    H1 --> H2
-    H2 --> H3
-    H3 --> H4
-    H4 --> H5
-    H5 --> H6
-    H6 --> H7
-    I --> OUT1["Cell Type Predictions<br><small>TSV format results</small>"] & OUT2["Performance Reports<br><small>PDF validation summaries</small>"] & OUT3["Trained Models<br><small>Pickle format classifiers</small>"]
-    A@{ shape: rounded}
-     E5:::subprocessNode
-     E1:::subprocessNode
-     E2:::subprocessNode
-     E3:::subprocessNode
-     E4:::subprocessNode
-     E6:::subprocessNode
-     G2:::subprocessNode
-     G1:::subprocessNode
-     G3:::subprocessNode
-     G4:::subprocessNode
-     G5:::subprocessNode
-     G6:::subprocessNode
-     G7:::subprocessNode
-     G8:::subprocessNode
-     H2:::subprocessNode
-     H1:::subprocessNode
-     H3:::subprocessNode
-     H4:::subprocessNode
-     H5:::subprocessNode
-     H6:::subprocessNode
-     H7:::subprocessNode
-     A:::inputNode
-     B:::processNode
-     C:::processNode
-     D:::processNode
-     E:::workflowNode
-     F:::processNode
-     I:::workflowNode
-     G:::workflowNode
-     H:::workflowNode
-     OUT1:::outputNode
-     OUT2:::outputNode
-     OUT3:::outputNode
-    classDef inputNode fill:#1565C0,stroke:#0D47A1,stroke-width:3px,color:#fff,font-weight:bold
+%% ClassyFlow - detailed workflow
+%% Node labels are the real Nextflow process names, so each box maps to a
+%% process in main.nf, modules/normalizations.nf, modules/featureselections.nf
+%% or modules/makemodels.nf. Dotted edges are optional paths.
+
+    IN[/"input_dirs<br><small>one folder per batch</small>"/]
+
+    IN --> P1["MERGE_TAB_DELIMITED_FILES<br><small>combine per-image tables, drop exclude_markers,<br>shard at target_splitting_size</small>"]
+    P1 --> P2["COLUMN_FORMAT_AND_FIX<br><small>optional: batch_correct_column_names<br>canonical names from assets/markers.yaml</small>"]
+    P1 -. "when disabled" .-> TBL
+    P2 --> TBL(["batch tables"])
+
+    TBL --> P3["CHECK_PANEL_DESIGN<br><small>compare panels across batches<br>panel_design.csv, input_batch_metrics.json</small>"]
+    TBL --> P4
+    P3 --> P4["ADD_EMPTY_MARKER_NOISE<br><small>synthesize low-noise columns for markers<br>a batch does not have</small>"]
+
+    P4 --> N1
+
+    subgraph NORM["normalization_wf"]
+        direction TB
+        N1["NORMALIZATION<br><small>apply override_normalization<br>boxcox / quantile / minmax / log / none</small>"]
+        N2["GMM_GATING<br><small>two-component mixture per marker,<br>adds positive/negative calls</small>"]
+        N3["GENERATE_NORM_REPORT<br><small>normalization_report.html</small>"]
+        N1 --> N2
+        N1 --> N3
+        N2 --> N3
+    end
+
+    N2 --> P5["GENERATE_TRAINING_N_HOLDOUT<br><small>drop junk labels and rare classes,<br>stratified split by batch x cell type</small>"]
+    N2 --> P9["MERGE_BACK_LARGE_TABLES<br><small>rejoin the shards from step 1</small>"]
+
+    P5 --> TR(["training_dataframe.pkl"])
+    P5 --> HO(["holdout_dataframe.pkl"])
+    P5 --> CT(["celltypes.csv"])
+    P5 --> ANN(["cell_count_table.csv<br>per_batch_label_count.csv"])
+
+    TR --> F1
+    CT --> F1
+    TR --> M1
+    HO --> M1
+
+    subgraph FEAT["featureselection_wf - runs once per cell type"]
+        direction TB
+        F1["TOP_LABEL_SPLIT<br><small>one-vs-rest binary table</small>"]
+        F2["SEARCH_FOR_ALPHAS<br><small>96 LASSO alphas in 16 chunks</small>"]
+        F3["MERGE_ALPHAS_SEARCH_CSV_FILES"]
+        F4["SELECT_BEST_ALPHA"]
+        F5["RUN_ALL_RFE<br><small>one job per feature count:<br>min_rfe_nfeatures..max_rfe_nfeatures</small>"]
+        F6["MERGE_RFE_SCORE_CSV_FILES"]
+        F7["EXAMINE_CLASS_LABEL<br><small>final ranking per cell type</small>"]
+        F8["MERGE_AND_SORT_CSV<br><small>selected_features.csv</small>"]
+        F9["SCORE_CONCORDANCE<br><small>optional: celltype_profile<br>feature_concordance.csv/.json</small>"]
+        F10["GENERATE_FS_REPORT<br><small>feature_selection_report.html</small>"]
+        F1 --> F2 --> F3 --> F4 --> F5 --> F6 --> F7 --> F8
+        F1 --> F5
+        F1 --> F7
+        F3 --> F7
+        F4 --> F7
+        F7 -.-> F9
+        F7 --> F10
+    end
+
+    F8 --> M1
+
+    subgraph MODEL["modelling_wf"]
+        direction TB
+        M1["CREATE_XGB_PARAMS<br><small>build hyperparameter grid,<br>CV splits, feature-subset tables</small>"]
+        M2["XGBOOSTING_MODEL<br><small>one job per grid point:<br>depths x xgb_learn_rates</small>"]
+        M3["MERGE_XGB_CSV"]
+        M4["XGBOOSTING_FINAL_MODEL<br><small>train the top two configurations</small>"]
+        M5["HOLDOUT_XGB_EVALUATION<br><small>score both on held-out cells,<br>confusion / ROC / PR</small>"]
+        M6["MERGE_HOLDOUT_CSV"]
+        M7["SELECT_BEST_MODEL<br><small>keep the higher scorer</small>"]
+        M8["GENERATE_MODEL_REPORT<br><small>model_report.html</small>"]
+        M1 --> M2 --> M3 --> M4 --> M5 --> M6 --> M7
+        M1 --> M5
+        M1 --> M8
+        M4 --> M7
+        M4 --> M8
+        M5 --> M8
+    end
+
+    M7 --> P10["PREDICT_ALL_CELLS_XGB<br><small>label every cell, plus the<br>top two class probabilities</small>"]
+    P9 --> P10
+    P10 --> P11["QC_DENSITY<br><small>bin by position, flag sparse calls</small>"]
+    P11 --> P12["CLASSIFIED_REPORT_PER_SLIDE<br><small>one page per slide</small>"]
+    P12 --> CNT(["all_cell_counts.tsv"])
+
+    P3 --> R1
+    P3 --> R2
+    N3 --> R1
+    F10 --> R1
+    M8 --> R1
+    CNT --> R1
+    CNT --> R2
+    M5 --> R2
+    F7 --> R2
+    F9 -.-> R2
+
+    R1["GENERATE_FINAL_REPORT<br><small>report_mode = full or both</small>"]
+    R2["GENERATE_LIGHT_REPORT<br><small>report_mode = light or both</small>"]
+
+    P11 --> OUT1[/"celltypes/*_qPRED.tsv"/]
+    R1 --> OUT2[/"final_reports/classyflow_report.html"/]
+    R2 --> OUT3[/"final_reports/classyflow_report_light.html"/]
+    M7 --> OUT4[/"models/*.pkl, classes.npy"/]
+    ANN --> OUT5[/"annotation/*.csv"/]
+
+    IN:::ioNode
+    TBL:::dataNode
+    TR:::dataNode
+    HO:::dataNode
+    CT:::dataNode
+    ANN:::dataNode
+    CNT:::dataNode
+    P1:::processNode
+    P2:::processNode
+    P3:::processNode
+    P4:::processNode
+    P5:::processNode
+    P9:::processNode
+    P10:::processNode
+    P11:::processNode
+    P12:::processNode
+    R1:::processNode
+    R2:::processNode
+    N1:::subprocessNode
+    N2:::subprocessNode
+    N3:::subprocessNode
+    F1:::subprocessNode
+    F2:::subprocessNode
+    F3:::subprocessNode
+    F4:::subprocessNode
+    F5:::subprocessNode
+    F6:::subprocessNode
+    F7:::subprocessNode
+    F8:::subprocessNode
+    F9:::subprocessNode
+    F10:::subprocessNode
+    M1:::subprocessNode
+    M2:::subprocessNode
+    M3:::subprocessNode
+    M4:::subprocessNode
+    M5:::subprocessNode
+    M6:::subprocessNode
+    M7:::subprocessNode
+    M8:::subprocessNode
+    OUT1:::outputNode
+    OUT2:::outputNode
+    OUT3:::outputNode
+    OUT4:::outputNode
+    OUT5:::outputNode
+
+    classDef ioNode fill:#1565C0,stroke:#0D47A1,stroke-width:3px,color:#fff,font-weight:bold
+    classDef dataNode fill:#ECEFF1,stroke:#546E7A,stroke-width:2px,color:#212121
     classDef processNode fill:#6A1B9A,stroke:#4A148C,stroke-width:2px,color:#fff,font-weight:bold
-    classDef workflowNode fill:#2E7D32,stroke:#1B5E20,stroke-width:3px,color:#fff,font-weight:bold
     classDef subprocessNode fill:#5E35B1,stroke:#311B92,stroke-width:2px,color:#fff
     classDef outputNode fill:#D84315,stroke:#BF360C,stroke-width:3px,color:#fff,font-weight:bold
-    classDef subgraphStyle fill:#F5F5F5,stroke:#424242,stroke-width:2px,color:#212121
     style NORM fill:#E8F5E8,stroke:#2E7D32,stroke-width:3px
-    style FEAT fill:#FFF3E0,stroke:#F57C00,stroke-width:3px  
+    style FEAT fill:#FFF3E0,stroke:#F57C00,stroke-width:3px
     style MODEL fill:#E3F2FD,stroke:#1976D2,stroke-width:3px

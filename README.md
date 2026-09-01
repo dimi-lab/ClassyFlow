@@ -63,6 +63,10 @@ flowchart LR
 | Spatial QC | Predictions are binned by position and sparse, isolated calls are flagged. |
 | Report | An HTML report covers input counts, normalisation, features, model performance and final cell counts. |
 
+Every step above is several Nextflow processes. For the full process graph, see
+[docs/detailed_workflow_diagram.mermaid](docs/detailed_workflow_diagram.mermaid)
+— paste it into any Mermaid viewer, such as [mermaid.live](https://mermaid.live).
+
 ## Requirements
 
 - [Nextflow](https://www.nextflow.io/) 23.04 or newer
