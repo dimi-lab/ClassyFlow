@@ -28,7 +28,7 @@ pytest -c tests/pytest.ini -m e2e     # end-to-end smoke test
 
 ## Environment
 
-The venv is built from `requirements.txt` + `requirements-dev.txt`.
+The venv is built from `requirements.txt` (a single file: pipeline deps + pytest).
 
 **Python version matters:** the full dependency set (`scimap`, `umap-learn` →
 `numba`) only installs on **Python 3.8–3.11** — the same 3.11 used by the
@@ -37,7 +37,7 @@ container (`container/Dockerfile`). On Python 3.12 the install fails.
 - Build with a compatible interpreter: `PY=python3.11 ./tests/run_tests.sh`
 - Or run the suite inside the `classyflow` container.
 - Or use the bundled **pixi** environment (`pixi.toml` at the repo root), which
-  pins Python 3.11 and installs `requirements.txt` + `requirements-dev.txt`:
+  pins Python 3.11 and installs `requirements.txt`:
 
   ```bash
   pixi run install-deps   # one-time: pip install the pipeline deps into the env

@@ -2,7 +2,6 @@ scimap==2.3.5
 scanpy==1.10.4
 numpy==1.26.4
 matplotlib==3.8.1
-dataframe-image==0.2.3
 pandas==2.2.0
 seaborn==0.13.2
 xgboost==1.6.2
@@ -13,4 +12,15 @@ scikit-learn>=1.5.0,<1.8
 plotly==5.19.0
 umap-learn==0.5.7
 jinja2>=3.1.6
+pyyaml==6.0.3
 numcodecs<0.16.0
+
+# xgboost 1.6.2 imports pkg_resources at import time (xgboost/compat.py), which
+# setuptools>=81 removed -> pin below that. This is a runtime dep, not test-only:
+# bin/get_xgboost.py imports xgboost in the pipeline.
+setuptools<81
+
+# Test-only. Kept here rather than in a separate requirements-dev.txt so there is
+# a single dependency file; the container installs this file, so pytest ships with
+# it. Capped <8 because scimap 2.3.5 pins pytest<8.0.0.
+pytest>=7.4.3,<8

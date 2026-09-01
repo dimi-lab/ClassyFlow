@@ -5,7 +5,7 @@
 #   ./run_tests.sh e2e      # also run the end-to-end Nextflow smoke test
 #   ./run_tests.sh all      # run everything (unit + e2e)
 #
-# The venv is built from requirements.txt (production deps) + requirements-dev.txt.
+# The venv is built from requirements.txt (production deps + pytest).
 set -euo pipefail
 
 # Script lives in tests/ but operates from the repo root (requirements.txt,
@@ -30,7 +30,7 @@ if [[ ! -d "$VENV" ]]; then
     echo "[run_tests] creating virtualenv in $VENV (using $PY) ..."
     "$PY" -m venv "$VENV"
     "$VENV/bin/pip" install --upgrade pip
-    "$VENV/bin/pip" install -r requirements.txt -r requirements-dev.txt
+    "$VENV/bin/pip" install -r requirements.txt
 fi
 
 # Activate so bin/ scripts run under the venv interpreter (needed by the E2E run).
