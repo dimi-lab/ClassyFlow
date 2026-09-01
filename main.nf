@@ -27,19 +27,32 @@ include { modelling_wf } from './modules/makemodels'
 // -------------------------------------- //
 // Function which prints help message text
 def helpMessage() {
-    """
-    This pipeline processes batches of images, where the list of input directories is specified in the configuration file (nextflow.config) using the 'input_dirs' parameter. 
-    By default, all output will be written to the 'output' directory within the Nextflow working directory, unless an alternative output directory is specified in the configuration file.
+    println """
+    ClassyFlow -- supervised cell-type classification for multiplex imaging.
+
+    ClassyFlow reads one directory of QuPath quantification tables per batch,
+    trains a classifier on the cells that are already labelled, predicts a cell
+    type for every remaining cell, and writes an HTML report.
 
     Usage:
-      nextflow run main.nf
+      nextflow run main.nf -profile local
+      nextflow run main.nf -profile docker --input_dirs '["/data/batchA","/data/batchB"]'
 
-    Options:
-      --input_dirs      List of input directories containing image batches (set in nextflow.config)
-      --outdir          Output directory for results (default: ./output, can be overridden in nextflow.config)
-      -profile          Chose configuration profile to use [local, slurm, gcp] (default: local)
+    Common options:
+      --input_dirs      List of input directories, one per batch. Required.
+      --output_dir      Where results are written (default: classyflow_output)
+      --report_mode     Which report to build: light, full or both (default: both)
+      --override_normalization
+                        minmax, boxcox, log, quantile or none (default: boxcox)
+      --holdout_fraction
+                        Fraction of each batch withheld for evaluation (default: 0.1)
+      --help            Print this message and exit
 
-    For more details, see the
+      -profile          Configuration profile: local, docker, slurm or gcp
+      -resume           Reuse results from a previous run
+
+    Every parameter can also be set in nextflow.config. See docs/parameters.md
+    for the full list, and the README for input format and outputs.
     """.stripIndent()
 }
 
