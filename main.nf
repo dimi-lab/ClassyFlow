@@ -5,14 +5,11 @@ import groovy.json.JsonOutput
 nextflow.enable.dsl=2
 println "Active profile: ${workflow.profile}"
 
-// Users can override this in their own config or with --input_dirs
-params.output_dir = "${workflow.projectDir}/output"
 //Static Assests for beautification
 params.letterhead = file("${projectDir}/assets/images/Classyflow_banner_purple.png", checkIfExists: true)
 params.html_template = file("${projectDir}/assets/html_templates", checkIfExists: true)
 params.marker_vocabulary = file("${projectDir}/assets/markers.yaml", checkIfExists: true)
 params.pipeline_version = "1.0"
-params.reports_dir = "${params.output_dir}/final_reports"
 
 params.config_file = file(workflow.configFiles[0], checkIfExists: true)
 
