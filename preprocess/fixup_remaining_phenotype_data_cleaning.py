@@ -59,7 +59,7 @@ lookup = {
     "LAG3": "",
     "LAG3+": "",    
     "FAP=": "",
-    "PDL1": "",
+    "PD1": "",
     "PDL1": "",
     "Survivin": "",
     "TIGIT": "",

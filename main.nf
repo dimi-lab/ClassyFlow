@@ -10,11 +10,7 @@ params.output_dir = "${workflow.projectDir}/output"
 //Static Assests for beautification
 params.letterhead = file("${projectDir}/assets/images/Classyflow_banner_purple.png", checkIfExists: true)
 params.html_template = file("${projectDir}/assets/html_templates", checkIfExists: true)
-<<<<<<< HEAD
-params.rename_yaml = file("${projectDir}/assets/rename_columns.yaml", checkIfExists: true)
-=======
 params.marker_vocabulary = file("${projectDir}/assets/markers.yaml", checkIfExists: true)
->>>>>>> origin/dev_manuscript_freeze
 params.pipeline_version = "1.0"
 params.reports_dir = "${params.output_dir}/final_reports"
 
@@ -245,6 +241,9 @@ process CLASSIFIED_REPORT_PER_SLIDE {
 }
 
 process GENERATE_FINAL_REPORT {
+    // 'deep' hashing indexes template file contents so in-place edits inside the
+    // staged html_templates/ directory correctly invalidate -resume.
+    cache 'deep'
     publishDir "${params.output_dir}/final_reports", pattern: "*.html", mode: 'copy', overwrite: true
     publishDir "${params.output_dir}/final_reports/pages/", pattern: "nextflow.config", mode: 'copy', overwrite: true
     
@@ -280,13 +279,17 @@ process GENERATE_FINAL_REPORT {
 
 
 process GENERATE_LIGHT_REPORT {
+    // 'deep' hashing indexes template file contents so in-place edits inside the
+    // staged html_templates/ directory correctly invalidate -resume.
+    cache 'deep'
     publishDir "${params.output_dir}/final_reports", pattern: "*.html", mode: 'copy', overwrite: true
 
     input:
     path(input_metrics_json)
     path(holdout_eval_files)   // holdoutEval_*_results.json + confusion/ROC/PR div HTMLs
     path(fs_files)             // feature_selection_*_results.json
-    path(concordance_files)    // feature_concordance.{csv,json}; optional (may be empty)
+    path(concordance_files)    // feature_concordance.csv (+ .json, unread); optional
+    path(celltype_profile_file, stageAs: "celltype_profile.yaml")  // optional (may be empty)
     path(aggregated_counts)
     path(template_dir)
     path(letterhead_file)
@@ -302,12 +305,17 @@ process GENERATE_LIGHT_REPORT {
     if [ -f feature_concordance.csv ]; then
         concordance_flag="--concordance-csv feature_concordance.csv"
     fi
+    profile_flag=""
+    if [ -f celltype_profile.yaml ]; then
+        profile_flag="--celltype-profile celltype_profile.yaml"
+    fi
 
     generate_light_report.py \
         --input-metrics ${input_metrics_json} \
         --holdout-eval-dir . \
         --fs-dir . \
         \$concordance_flag \
+        \$profile_flag \
         --counts-tsv ${aggregated_counts} \
         --plots-dir plots \
         --template-dir ${template_dir} \
@@ -435,6 +443,7 @@ workflow {
                 modeling_results.holdout_evals,
                 feature_selection_results.fs_results,
                 feature_selection_results.concordance.ifEmpty { [] },
+                params.celltype_profile ? file(params.celltype_profile) : [],
                 aggregated_counts,
                 params.html_template,
                 params.letterhead,
