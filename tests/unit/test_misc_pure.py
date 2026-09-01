@@ -34,23 +34,6 @@ def test_detect_class_imbalance_ratio_over_10_is_true():
     assert ghe.detect_class_imbalance([100, 8, 92], threshold=0.01) is True
 
 
-# --- bin/scimap_clustering.py : find_best_coord ---------------------------
-# scimap_clustering imports scanpy/scimap (numba stack); skip if unavailable
-# (e.g. on Python 3.12 where numba can't install). Covered in the container env.
-def test_find_best_coord_prefers_specific_micron_column():
-    pytest.importorskip("scanpy")
-    import scimap_clustering as sc
-    cols = ["Centroid X µm", "Centroid X", "X", "CD4: Mean"]
-    assert sc.find_best_coord(cols, "X") == "Centroid X µm"
-
-
-def test_find_best_coord_raises_when_absent():
-    pytest.importorskip("scanpy")
-    import scimap_clustering as sc
-    with pytest.raises(ValueError, match="No column found"):
-        sc.find_best_coord(["CD4: Mean", "CD8: Mean"], "X")
-
-
 # --- bin/generate_cell_type_selection.py : feature/marker ranking -----------
 # rank_selected_features() is the single source of truth for feature-level
 # importance + direction (light report bar chart); collapse_to_markers() rolls

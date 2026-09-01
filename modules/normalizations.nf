@@ -22,34 +22,6 @@ process NORMALIZATION {
     """
 }
 
-process AUGMENT_WITH_LEIDEN_CLUSTERS{
-    publishDir(
-        path: "${params.output_dir}/clusters",
-        pattern: '*.{html,png}',
-        mode: 'copy'
-    )
-
-    input:
-    tuple val(batchID), path(norms_pkl)
-
-    output:
-    tuple val(batchID), path("scimap_extended_${batchID}.tsv"), emit: norm_df
-    path("*.png"), optional: true
-    path("*.html")
-
-    script:
-    """
-    scimap_clustering.py \
-        --input_tsv ${norms_pkl} \
-        --roi_name ${batchID} \
-        --resolution ${params.scimap_resolution} \
-        --label_fraction ${params.scimap_label_fraction} \
-        --perc_top_features ${params.scimap_top_feature_prec} \
-        --qupath_object_type ${params.qupath_object_type} \
-        --classifed_column_name ${params.classifed_column_name}
-    """
-}
-
 process GMM_GATING {
     tag { batchID }
     publishDir(
@@ -112,15 +84,7 @@ workflow normalization_wf {
     //norm_results.norm_df.view()
     // Step 2: Apply GMM gating to the normalized data
     gmm_gated = GMM_GATING(norm_results.norm_df)
-    gated_ch = gmm_gated.norm_df
-
-    // Step 3: Optionally augment with Leiden clusters if enabled
-    if (params.run_get_leiden_clusters) {
-        leiden_augmented = AUGMENT_WITH_LEIDEN_CLUSTERS(gated_ch)
-        final_ch = leiden_augmented.norm_df
-    } else {
-        final_ch = gated_ch
-    }
+    final_ch = gmm_gated.norm_df
 
     //norm_outputs = norm_results.norm_results.map { batchID, file -> file }.collect()
     norm_outputs = norm_results.norm_results.collect()
