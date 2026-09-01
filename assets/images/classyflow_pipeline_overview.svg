@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1350" viewBox="0 0 2400 1350" role="img" aria-labelledby="svg-title svg-desc">
+<title id="svg-title">ClassyFlow pipeline</title>
+<desc id="svg-desc">A three-stage ClassyFlow workflow. QuPath measurement tables are prepared and harmonized, labeled cells are used for feature selection and XGBoost model development, and the selected model is applied to every normalized cell to produce per-cell results, reports, and reusable model artifacts.</desc>
+<defs>
+  <filter id="cardShadow" x="-12%" y="-18%" width="124%" height="146%" color-interpolation-filters="sRGB">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="6" result="blur"/>
+    <feOffset dx="0" dy="6" result="offsetBlur"/>
+    <feFlood flood-color="#463A50" flood-opacity="0.14" result="shadowColor"/>
+    <feComposite in="shadowColor" in2="offsetBlur" operator="in" result="shadow"/>
+    <feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="pillShadow" x="-12%" y="-22%" width="124%" height="154%" color-interpolation-filters="sRGB">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="blur2"/>
+    <feOffset dx="0" dy="4" result="offset2"/>
+    <feFlood flood-color="#463A50" flood-opacity="0.11" result="shadowColor2"/>
+    <feComposite in="shadowColor2" in2="offset2" operator="in" result="shadow2"/>
+    <feMerge><feMergeNode in="shadow2"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <marker id="arrowPrepare" markerWidth="18" markerHeight="18" refX="16" refY="9" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1 L17 9 L1 17 Z" fill="#7540A6"/></marker>
+  <marker id="arrowLearn" markerWidth="18" markerHeight="18" refX="16" refY="9" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1 L17 9 L1 17 Z" fill="#167D78"/></marker>
+  <marker id="arrowApply" markerWidth="18" markerHeight="18" refX="16" refY="9" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1 L17 9 L1 17 Z" fill="#D46A2B"/></marker>
+  <marker id="arrowLane" markerWidth="18" markerHeight="18" refX="16" refY="9" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1 L17 9 L1 17 Z" fill="#7A7182"/></marker>
+  <style>
+    text { font-family: Arial, Helvetica, sans-serif; }
+    .main-title { font-size: 74px; font-weight: 700; fill: #231632; }
+    .main-subtitle { font-size: 33px; font-weight: 400; fill: #6F6778; }
+    .phase-title { font-size: 40px; font-weight: 700; letter-spacing: 3px; }
+    .phase-subtitle { font-size: 24px; fill: #6F6778; }
+    .step-number { font-size: 22px; font-weight: 700; fill: #FFFFFF; text-anchor: middle; dominant-baseline: central; }
+    .card-title { font-size: 28px; font-weight: 700; fill: #231632; }
+    .card-desc { font-size: 20px; fill: #6F6778; }
+    .delivery-heading { font-size: 18px; font-weight: 700; letter-spacing: 1.2px; fill: #D46A2B; }
+    .delivery-title { font-size: 23px; font-weight: 700; fill: #231632; }
+    .delivery-desc { font-size: 17px; fill: #6F6778; }
+    .lane-heading { font-size: 17px; font-weight: 700; letter-spacing: 0.7px; fill: #7A7182; }
+    .lane-desc { font-size: 17px; fill: #6F6778; }
+  </style>
+</defs>
+<rect width="2400" height="1350" fill="#F8F7FB"/>
+<text x="1200" y="122" class="main-title" text-anchor="middle" >ClassyFlow pipeline</text>
+<text x="1200" y="170" class="main-subtitle" text-anchor="middle" >From QuPath measurements to auditable per-cell classifications</text>
+<rect x="75" y="232" width="645" height="894" rx="35" fill="#F2ECF8" stroke="#D7C6E8" stroke-width="2.2"/>
+<circle cx="147" cy="306" r="33" fill="#7540A6"/>
+<text x="147" y="306" class="step-number">1</text>
+<text x="201" y="314" class="phase-title" text-anchor="start" fill="#7540A6">PREPARE</text>
+<text x="201" y="355" class="phase-subtitle" text-anchor="start" >All cells • batch harmonization</text>
+<path d="M 117 378 H 678" fill="none" stroke="#D7C6E8" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"  />
+<rect x="765" y="232" width="750" height="894" rx="35" fill="#EAF6F4" stroke="#B8DEDA" stroke-width="2.2"/>
+<circle cx="837" cy="306" r="33" fill="#167D78"/>
+<text x="837" y="306" class="step-number">2</text>
+<text x="891" y="314" class="phase-title" text-anchor="start" fill="#167D78">LEARN</text>
+<text x="891" y="355" class="phase-subtitle" text-anchor="start" >Labeled cells • classifier development</text>
+<path d="M 807 378 H 1473" fill="none" stroke="#B8DEDA" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"  />
+<rect x="1560" y="232" width="765" height="894" rx="35" fill="#FFF2E8" stroke="#F1CCAE" stroke-width="2.2"/>
+<circle cx="1632" cy="306" r="33" fill="#D46A2B"/>
+<text x="1632" y="306" class="step-number">3</text>
+<text x="1686" y="314" class="phase-title" text-anchor="start" fill="#D46A2B">APPLY &amp; REPORT</text>
+<text x="1686" y="355" class="phase-subtitle" text-anchor="start" >All cells • prediction and audit trail</text>
+<path d="M 1602 378 H 2283" fill="none" stroke="#F1CCAE" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"  />
+<g filter="url(#cardShadow)">
+<rect x="120" y="405" width="555" height="112" rx="20" fill="#FEFEFE" stroke="#E1E0E7" stroke-width="1.7" />
+</g>
+<circle cx="174" cy="461" r="30" fill="#7540A6"/>
+<text x="174" y="461" class="step-number">1</text>
+<text x="226" y="454" class="card-title" text-anchor="start" >QuPath measurement tables</text>
+<text x="226" y="493" class="card-desc" text-anchor="start" >One folder per batch • one row per cell</text>
+<g filter="url(#cardShadow)">
+<rect x="120" y="543" width="555" height="112" rx="20" fill="#FEFEFE" stroke="#E1E0E7" stroke-width="1.7" />
+</g>
+<circle cx="174" cy="599" r="30" fill="#7540A6"/>
+<text x="174" y="599" class="step-number">2</text>
+<text x="226" y="592" class="card-title" text-anchor="start" >Merge and clean</text>
+<text x="226" y="631" class="card-desc" text-anchor="start" >Merge tables • drop markers • create shards</text>
+<g filter="url(#cardShadow)">
+<rect x="120" y="681" width="555" height="112" rx="20" fill="#FEFEFE" stroke="#7540A6" stroke-width="2.7" stroke-dasharray="11 8"/>
+</g>
+<circle cx="174" cy="737" r="30" fill="#7540A6"/>
+<text x="174" y="737" class="step-number">3</text>
+<text x="226" y="730" class="card-title" text-anchor="start" >Harmonize marker names</text>
+<text x="226" y="769" class="card-desc" text-anchor="start" >Optional: map aliases to canonical marker names</text>
+<g filter="url(#cardShadow)">
+<rect x="120" y="819" width="555" height="112" rx="20" fill="#FEFEFE" stroke="#E1E0E7" stroke-width="1.7" />
+</g>
+<circle cx="174" cy="875" r="30" fill="#7540A6"/>
+<text x="174" y="875" class="step-number">4</text>
+<text x="226" y="868" class="card-title" text-anchor="start" >Align marker panels</text>
+<text x="226" y="907" class="card-desc" text-anchor="start" >Compare panels • fill absent markers</text>
+<g filter="url(#cardShadow)">
+<rect x="120" y="957" width="555" height="112" rx="20" fill="#FEFEFE" stroke="#E1E0E7" stroke-width="1.7" />
+</g>
+<circle cx="174" cy="1013" r="30" fill="#7540A6"/>
+<text x="174" y="1013" class="step-number">5</text>
+<text x="226" y="1006" class="card-title" text-anchor="start" >Normalize and gate</text>
+<text x="226" y="1045" class="card-desc" text-anchor="start" >Transform intensities • call marker-positive cells</text>
+<path d="M 397 520 V 538" fill="none" stroke="#7540A6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowPrepare)" />
+<path d="M 397 658 V 676" fill="none" stroke="#7540A6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowPrepare)" />
+<path d="M 397 796 V 814" fill="none" stroke="#7540A6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowPrepare)" />
+<path d="M 397 934 V 952" fill="none" stroke="#7540A6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowPrepare)" />
+<g filter="url(#cardShadow)">
+<rect x="811" y="426" width="658" height="128" rx="20" fill="#FEFEFE" stroke="#E1E0E7" stroke-width="1.7" />
+</g>
+<circle cx="865" cy="490" r="30" fill="#167D78"/>
+<text x="865" y="490" class="step-number">9</text>
+<text x="917" y="475" class="card-title" text-anchor="start" >Evaluate top two; keep winner</text>
+<text x="917" y="514" class="card-desc" text-anchor="start" >Holdout metrics determine the model used downstream</text>
+<g filter="url(#cardShadow)">
+<rect x="811" y="597" width="658" height="128" rx="20" fill="#FEFEFE" stroke="#E1E0E7" stroke-width="1.7" />
+</g>
+<circle cx="865" cy="661" r="30" fill="#167D78"/>
+<text x="865" y="661" class="step-number">8</text>
+<text x="917" y="646" class="card-title" text-anchor="start" >Search XGBoost models</text>
+<text x="917" y="685" class="card-desc" text-anchor="start" >Repeated validation over tree depth × learning rate</text>
+<g filter="url(#cardShadow)">
+<rect x="811" y="768" width="658" height="128" rx="20" fill="#FEFEFE" stroke="#E1E0E7" stroke-width="1.7" />
+</g>
+<circle cx="865" cy="832" r="30" fill="#167D78"/>
+<text x="865" y="832" class="step-number">7</text>
+<text x="917" y="817" class="card-title" text-anchor="start" >Select features per cell type</text>
+<text x="917" y="856" class="card-desc" text-anchor="start" >One-vs-rest LASSO + recursive feature elimination</text>
+<g filter="url(#cardShadow)">
+<rect x="811" y="939" width="658" height="128" rx="20" fill="#FEFEFE" stroke="#E1E0E7" stroke-width="1.7" />
+</g>
+<circle cx="865" cy="1003" r="30" fill="#167D78"/>
+<text x="865" y="1003" class="step-number">6</text>
+<text x="917" y="988" class="card-title" text-anchor="start" >Split labeled cells</text>
+<text x="917" y="1027" class="card-desc" text-anchor="start" >Training + holdout, stratified by batch × cell type</text>
+<path d="M 1140 938 V 901" fill="none" stroke="#167D78" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowLearn)" />
+<path d="M 1140 767 V 730" fill="none" stroke="#167D78" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowLearn)" />
+<path d="M 1140 596 V 559" fill="none" stroke="#167D78" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowLearn)" />
+<path d="M 675 1013 H 811" fill="none" stroke="#167D78" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowLearn)" />
+<g filter="url(#cardShadow)">
+<rect x="1605" y="427" width="675" height="153" rx="20" fill="#FEFEFE" stroke="#E1E0E7" stroke-width="1.7" />
+</g>
+<circle cx="1659" cy="503.5" r="30" fill="#D46A2B"/>
+<text x="1659" y="503.5" class="step-number">11</text>
+<text x="1711" y="479" class="card-title" text-anchor="start" >Predict every cell</text>
+<text x="1711" y="518" class="card-desc" text-anchor="start" >Apply the selected model to all normalized cells</text>
+<text x="1711" y="551" class="card-desc" text-anchor="start" >Output class, confidence, and top-two probabilities</text>
+<g filter="url(#cardShadow)">
+<rect x="1605" y="644" width="675" height="142" rx="20" fill="#FEFEFE" stroke="#E1E0E7" stroke-width="1.7" />
+</g>
+<circle cx="1659" cy="715" r="30" fill="#D46A2B"/>
+<text x="1659" y="715" class="step-number">12</text>
+<text x="1711" y="693" class="card-title" text-anchor="start" >Bin-level density QC</text>
+<text x="1711" y="732" class="card-desc" text-anchor="start" >Flag cells in sparse coordinate bins</text>
+<path d="M 1942 583 V 638" fill="none" stroke="#D46A2B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowApply)" />
+<path d="M 1469 500 H 1605" fill="none" stroke="#167D78" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowLearn)" />
+<path d="M 1942 789 V 845" fill="none" stroke="#D46A2B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowApply)" />
+<g filter="url(#cardShadow)"><rect x="1605" y="850" width="675" height="218" rx="22" fill="#FEFEFE" stroke="#E1E0E7" stroke-width="1.7"/></g>
+<text x="1640" y="889" class="delivery-heading" text-anchor="start" >DELIVERABLES</text>
+<text x="1640" y="927" class="card-desc" text-anchor="start" >Per-cell outputs, reports, and reusable analysis artifacts</text>
+<rect x="1636" y="946" width="187" height="86" rx="18" fill="#FFF9F4" stroke="#ECD7C8" stroke-width="1.8"/>
+<text x="1729.5" y="984" class="delivery-title" text-anchor="middle" >Per-cell TSV</text>
+<text x="1729.5" y="1015" class="delivery-desc" text-anchor="middle" >predictions + QC</text>
+<rect x="1849" y="946" width="187" height="86" rx="18" fill="#FFF9F4" stroke="#ECD7C8" stroke-width="1.8"/>
+<text x="1942.5" y="984" class="delivery-title" text-anchor="middle" >HTML reports</text>
+<text x="1942.5" y="1015" class="delivery-desc" text-anchor="middle" >run evidence</text>
+<rect x="2062" y="946" width="187" height="86" rx="18" fill="#FFF9F4" stroke="#ECD7C8" stroke-width="1.8"/>
+<text x="2155.5" y="984" class="delivery-title" text-anchor="middle" >Model + CSV</text>
+<text x="2155.5" y="1015" class="delivery-desc" text-anchor="middle" >reusable artifacts</text>
+<path d="M 397 1072 V 1207 H 496" fill="none" stroke="#7A7182" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowLane)" />
+<g filter="url(#pillShadow)"><rect x="496" y="1171" width="448" height="73" rx="27" fill="#FEFEFE" stroke="#D8D2DD" stroke-width="1.7"/></g>
+<text x="720" y="1201" class="lane-heading" text-anchor="middle" >ALL NORMALIZED CELLS</text>
+<text x="720" y="1229" class="lane-desc" text-anchor="middle" >retained for final prediction</text>
+<path d="M 944 1207 H 1051" fill="none" stroke="#7A7182" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowLane)" />
+<g filter="url(#pillShadow)"><rect x="1051" y="1165" width="373" height="85" rx="30" fill="#EDE9EF" stroke="#D4CDD8" stroke-width="1.7"/></g>
+<circle cx="1097" cy="1207" r="27" fill="#7A7182"/>
+<text x="1097" y="1207" class="step-number">10</text>
+<text x="1144" y="1199" class="lane-heading" text-anchor="start" >REJOIN SHARDS</text>
+<text x="1144" y="1229" class="lane-desc" text-anchor="start" >restore one table per batch</text>
+<path d="M 1424 1207 H 1536 V 547 H 1605" fill="none" stroke="#7A7182" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowLane)" />
+</svg>

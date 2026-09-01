@@ -148,7 +148,7 @@ source .envrc
 | `GCP_PROJECT_ID` | Your project ID. |
 | `GCP_CONTAINER` | Full image path, e.g. `us-central1-docker.pkg.dev/PROJECT/REPO/classyflow:latest`. |
 | `GCP_WORKDIR` | Bucket path for Nextflow's working files. Pass it with `-w` (see below). |
-| `GCP_ARTIFACT_REPOSITORY` | Repository name, used only when building with Cloud Build. |
+| `GCP_ARTIFACT_REPOSITORY` | Repository name. `container/cloud-build.sh` refuses to run without it. |
 | `GCP_SERVICE_ACCOUNT` | Optional. A named service account instead of the default. |
 | `GCP_NETWORK`, `GCP_SUBNETWORK` | Optional. For a custom VPC. |
 | `GCP_USE_PRIVATE_ADDRESS` | `true` (default) gives the VMs no public IP. |

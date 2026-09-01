@@ -36,19 +36,13 @@ changing anything but the profile name.
 
 ## How it works
 
-```mermaid
-flowchart LR
-  A["QuPath tables<br/>one folder per batch"] --> B["Merge<br/>and clean"]
-  B --> C["Match marker<br/>names"]
-  C --> D["Fill missing<br/>markers"]
-  D --> E["Normalise<br/>and gate"]
-  E --> F["Split train<br/>and holdout"]
-  F --> G["Pick<br/>features"]
-  G --> H["Train<br/>models"]
-  H --> I["Predict<br/>every cell"]
-  I --> J["Spatial<br/>QC"]
-  J --> K["Report<br/>and per-cell TSV"]
-```
+<p align="center">
+  <img
+    src="assets/images/classyflow_pipeline_overview.svg"
+    alt="ClassyFlow pipeline: prepare and harmonize QuPath data, learn and evaluate a classifier, then predict every cell and generate reports."
+    width="1200"
+  />
+</p>
 
 | Step | What happens |
 | --- | --- |
