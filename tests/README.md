@@ -36,14 +36,6 @@ container (`container/Dockerfile`). On Python 3.12 the install fails.
 
 - Build with a compatible interpreter: `PY=python3.11 ./tests/run_tests.sh`
 - Or run the suite inside the `classyflow` container.
-- Or use the bundled **pixi** environment (`pixi.toml` at the repo root), which
-  pins Python 3.11 and installs `requirements.txt`:
-
-  ```bash
-  pixi run install-deps   # one-time: pip install the pipeline deps into the env
-  pixi run unit           # fast unit suite
-  pixi run e2e            # end-to-end smoke test (needs nextflow on PATH)
-  ```
 
 The **unit tests** avoid the numba stack (the two `scimap` tests skip
 automatically if `scanpy` is missing), so they can run under a lighter env if
@@ -60,7 +52,7 @@ batches) so the whole Nextflow pipeline finishes in a couple of minutes.
 Regenerate it deterministically from `data/` with:
 
 ```bash
-pixi run python tests/e2e/make_micro_dataset.py
+python tests/e2e/make_micro_dataset.py
 ```
 
 The generator keeps the original file layout, headers and column order, and
