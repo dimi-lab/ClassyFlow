@@ -113,7 +113,6 @@ def merge_tab_delimited_files(directory_path, excld, slide_by_prefix, folder_is_
                 [df, pd.DataFrame({'Slide': slide_series}, index=df.index)],
                 axis=1
             )
-            df['Image'] = directory_path+'-'+df['Image']
         df = df.copy()
 
         dataframes.append(df)
