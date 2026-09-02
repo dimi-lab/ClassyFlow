@@ -142,7 +142,7 @@ files must exist — a missing one stops the run immediately.
 | `marker_vocabulary` | `assets/markers.yaml` | Canonical marker names and their aliases. Used when `batch_correct_column_names` is on. |
 | `html_template` | `assets/html_templates` | Folder of report templates. |
 | `letterhead` | `assets/images/Classyflow_banner_purple.png` | Banner image at the top of the reports. |
-| `pipeline_version` | `"1.0"` | Version string stamped into the reports. |
+| `pipeline_version` | from `manifest.version` in `nextflow.config` | Version string stamped into the reports. Edit the manifest, not this param. |
 | `config_file` | the first config file in use | Copied into the results as a record of the settings the run used. |
 
 ---
